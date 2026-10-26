@@ -35,6 +35,7 @@ tests/test_trainer.py           end-to-end test (pictures) in headless Chromium,
 tests/test_pose.py              end-to-end test (body poses)
 tests/test_audio.py             end-to-end test (sounds), with a simulated microphone
 tests/test_project.py           Save project / Open project in all three modes
+guide.html, privacy.html          student guide (plan, collect, train, test, save, use in Python) and privacy page
 EXPORT_FORMAT.md                the JSON format
 ```
 

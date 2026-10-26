@@ -132,3 +132,6 @@ progress { width: 100%; margin-top: 10px; }
 .prose ul { padding-left: 1.2em; }
 .prose li { margin: 4px 0; }
 a { color: var(--accent); }
+.guide-toc { margin: 12px 0 8px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.guide-toc ol { margin: 0; padding-left: 1.2em; }
+.prose ol li { margin: 6px 0; }

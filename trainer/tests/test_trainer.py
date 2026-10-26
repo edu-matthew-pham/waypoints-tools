@@ -187,6 +187,13 @@ def main():
         check(pg2.locator("#settings").is_visible(), "test settings shown with ?settings=1")
         pg2.goto(f"http://127.0.0.1:{port}/privacy.html")
         check(pg2.locator("h1").text_content().startswith("Your privacy"), "privacy page loads")
+        pg2.goto(f"http://127.0.0.1:{port}/index.html")
+        pg2.click("text=How to use it")
+        pg2.wait_for_load_state()
+        check(pg2.locator("h1").text_content() == "How to use the Pattern Trainer"
+              and pg2.locator(".guide-toc a").count() == 6
+              and all(pg2.locator(a.get_attribute("href")).count() == 1 for a in pg2.locator(".guide-toc a").all()),
+              "guide page opens from the trainer and its contents links work")
         pg2.close()
 
         # Privacy lock: the page must not be able to send data to another site
