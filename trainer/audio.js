@@ -4,10 +4,25 @@
 //   * mono float samples at the ORIGINAL sample rate (never resampled by the browser)
 //   * keep only full windows: floor(len * 16000 / rate / 15600) of them (all, if that is 0)
 //   * training: each kept window is one example
-//   * prediction for a longer clip: average the class percentages over its kept windows
+//   * prediction for a longer clip: use the LOUDEST kept window (most sound energy), so a clap or a
+//     word isn't outvoted by the silence around it. Window k covers samples
+//     [floor(k * 0.975 * rate), floor((k + 1) * 0.975 * rate)).
 
 export const CLIP_SECONDS = 0.975;
 export const clipLength = (rate) => Math.ceil(CLIP_SECONDS * rate);
+export const windowStart = (k, rate) => Math.floor(k * CLIP_SECONDS * rate);
+
+// Index of the window with the most sound energy (ties: the first).
+export function loudestWindow(count, samples, rate) {
+  let best = -1, bestAt = 0;
+  for (let k = 0; k < count; k++) {
+    const a = Math.min(windowStart(k, rate), samples.length), b = Math.min(windowStart(k + 1, rate), samples.length);
+    let e = 0;
+    for (let i = a; i < b; i++) e += samples[i] * samples[i];
+    if (e > best) { best = e; bestAt = k; }
+  }
+  return bestAt;
+}
 
 export async function loadAudioClassifier(baseUrl, modelUrl) {
   const { FilesetResolver, AudioClassifier } = await import("./vendor/mediapipe-audio/audio_bundle.mjs");
@@ -122,7 +137,16 @@ export class Mic {
       audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
       video: false,
     });
-    this.ctx = new AudioContext();
+    const track = this.stream.getAudioTracks()[0];
+    track.addEventListener("ended", () => this.onEnded?.());
+    // Run at the microphone's own rate where the browser allows it, so nothing is resampled
+    // before MediaPipe; otherwise fall back to the default rate (Firefox may refuse).
+    const micRate = track.getSettings?.().sampleRate;
+    try {
+      this.ctx = micRate ? new AudioContext({ sampleRate: micRate }) : new AudioContext();
+    } catch {
+      this.ctx = new AudioContext();
+    }
     await this.ctx.audioWorklet.addModule(new URL("audio-worklet.js", location.href).href);
     this.rate = this.ctx.sampleRate;
     this.buf = new Float32Array(Math.ceil(this.seconds * this.rate));

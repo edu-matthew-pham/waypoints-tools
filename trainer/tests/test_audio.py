@@ -76,11 +76,19 @@ def make_files(tmp):
                               f"{'_stereo' if kw.get('channels') == 2 else ''}.wav")
         write_wav(p, sound(kind, rate, 2.0), rate, **kw)
         tests.append((p, kind))
+    quiet = sound("background", 48000, 5.0)          # one knock in 5 s of quiet: tests the loudest-second rule
+    k = sound("knock", 48000, 1.0)
+    quiet[int(2.2 * 48000):int(3.2 * 48000)] += k - 0.01 * rng.standard_normal(k.size)
+    p = os.path.join(tmp, "test_one_knock_in_quiet.wav")
+    write_wav(p, quiet, 48000)
+    tests.append((p, "knock"))
+    long_file = os.path.join(tmp, "long_background.wav")   # 3 minutes: only the first 2 are used
+    write_wav(long_file, sound("background", 16000, 180.0), 16000)
     mic = os.path.join(tmp, "mic_beeps.wav")      # the simulated microphone: steady beeping
     write_wav(mic, sound("beep", 48000, 10.0), 48000)
     not_wav = os.path.join(tmp, "song.mp3")
     open(not_wav, "wb").write(b"ID3 not really an mp3")
-    return train, tests, mic, not_wav
+    return train, tests, mic, not_wav, long_file
 
 
 def main():
@@ -88,7 +96,7 @@ def main():
     import pattern_model as pm
 
     tmp = tempfile.mkdtemp(prefix="trainer-audio-")
-    train, tests, mic, not_wav = make_files(tmp)
+    train, tests, mic, not_wav, long_file = make_files(tmp)
     srv, port = T.serve()
     errors, preds = [], {}
     with sync_playwright() as p:
@@ -116,7 +124,15 @@ def main():
         n0 = int(cards.nth(0).locator(".count").text_content().split()[0])
         check(n0 == 12, f"three 4-second .wav files give 12 one-second examples ({n0})")
         tip = cards.nth(1).locator(".thumbs img").first.get_attribute("title")
-        check(tip.startswith("YAMNet hears:"), f"example thumbnails say what YAMNet heard ({tip})")
+        check(tip.startswith("The sound model heard:") and cards.nth(1).locator(".thumbs img").first.get_attribute("alt") == tip, f"example thumbnails say what YAMNet heard ({tip})")
+        pg.click("#add-class")
+        cards.nth(2).locator(".upload").set_input_files(long_file)
+        wait_js(pg, "document.querySelectorAll('.class-card')[2].querySelector('.card-msg').textContent.startsWith('Added')", 60000)
+        n_long = int(cards.nth(2).locator(".count").text_content().split()[0])
+        check(n_long == 120 and "first 2 minutes" in cards.nth(2).locator(".card-msg").text_content(),
+              f"a 3-minute file only uses its first 2 minutes ({n_long} examples), with a note")
+        cards.nth(2).locator(".remove-class").click()
+        cards.nth(2).locator(".remove-class").click()
         cards.nth(1).locator(".upload").set_input_files(not_wav)
         wait_js(pg, "document.querySelectorAll('.class-card')[1].querySelector('.card-msg').textContent.includes('only .wav')")
         check(True, "a non-.wav file is refused with a clear message")
@@ -132,6 +148,12 @@ def main():
         rate = pg.evaluate("() => window.__trainer.state.mic.rate")
         pg.click("#add-class")
         cards.nth(2).locator(".class-name").fill("beep")
+        cards.nth(2).locator(".record").hover()      # a quick tap: nothing added, and it says why
+        pg.mouse.down()
+        pg.wait_for_timeout(300)
+        pg.mouse.up()
+        check(cards.nth(2).locator(".card-msg").text_content().startswith("Keep holding"),
+              "a quick tap on Hold to record explains each example needs about 1 second")
         cards.nth(2).locator(".record").hover()
         pg.mouse.down()
         pg.wait_for_timeout(3300)
@@ -192,6 +214,14 @@ def main():
     check(same == len(tests), f"Python picks the same sound as the browser ({same}/{len(tests)})")
     check(worst < 0.01, f"Python and browser percentages match (largest difference {worst:.5f})")
     print(f"      (test sounds labelled correctly: {right}/{len(tests)})")
+    # Broken .wav files give a friendly error in Python
+    bad = os.path.join(tmp, "broken.wav")
+    open(bad, "wb").write(b"RIFF\x10\x00\x00\x00WAVEfmt \x02\x00\x00\x00\x01")
+    try:
+        model.predict(bad)
+        check(False, "a broken .wav file gives a friendly error in Python")
+    except pm.ModelFileError as e:
+        check("couldn't be read" in str(e), f"a broken .wav file gives a friendly error in Python ({e})")
     # Gradio-style input: (rate, int16 samples)
     samples, rate = pm.read_wav(tests[0][0])
     g = model.predict((rate, np.round(samples * 32767).astype("int16")))

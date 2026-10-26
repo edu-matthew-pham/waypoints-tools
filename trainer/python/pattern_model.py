@@ -18,7 +18,8 @@ Works for all three kinds of Pattern Trainer model:
   * Body poses needs pose_landmarker_lite.task in this folder.
                If nobody is in the picture, predict() gives None and top() gives (None, 0.0).
   * Sounds     needs yamnet.tflite in this folder. `sound` can be Gradio's (sample_rate, samples)
-               or the path to a .wav file. Longer sounds are scored about once a second and averaged.
+               or the path to a .wav file. A longer sound is scored on its loudest second, so a clap
+               or a word isn't outvoted by silence; use predict(sound, average=True) for steady sounds.
 
 Needs: pip install mediapipe pillow   (no TensorFlow)
 """
@@ -159,6 +160,17 @@ def _to_float(a):
 def read_wav(path):
     """WAV file -> (mono float32 samples, sample rate). PCM 8/16/24/32-bit or float.
     Same reader as the browser trainer (no resampling)."""
+    try:
+        return _read_wav(path)
+    except ModelFileError:
+        raise
+    except FileNotFoundError:
+        raise ModelFileError(f"Can't find the sound file '{path}'.")
+    except Exception:
+        raise ModelFileError(f"'{path}' couldn't be read as a .wav file. Try recording it again.")
+
+
+def _read_wav(path):
     import struct
 
     data = open(path, "rb").read()
@@ -214,9 +226,28 @@ def _to_mono(sound):
 
 def sound_windows(sound, model_file="yamnet.tflite"):
     """Sound -> list of (521 YAMNet scores, YAMNet's top sound name), one per full window."""
+    return _sound_windows(*_to_mono(sound), model_file)
+
+
+def _window_start(k, rate):
+    return int(np.floor(k * 0.975 * rate))
+
+
+def loudest_window(count, samples, rate):
+    """Index of the window with the most sound energy (ties: the first). Same as the browser."""
+    best, best_at = -1.0, 0
+    for k in range(count):
+        a, b = min(_window_start(k, rate), len(samples)), min(_window_start(k + 1, rate), len(samples))
+        seg = samples[a:b].astype("float64")
+        e = float(np.dot(seg, seg))
+        if e > best:
+            best, best_at = e, k
+    return best_at
+
+
+def _sound_windows(samples, rate, model_file):
     from mediapipe.tasks.python.components.containers import audio_data
 
-    samples, rate = _to_mono(sound)
     if len(samples) == 0:
         return []
     results = _audio_classifier(model_file).classify(audio_data.AudioData.create_from_array(samples, rate))
@@ -387,20 +418,28 @@ class PatternModel:
                 f"model expects {emb['dim']}. Check you have the right model file.")
         return vec
 
-    def predict(self, image):
+    def predict(self, image, average=False):
         """Confidence for every class, e.g. {'cat': 0.93, 'dog': 0.07}.
-        Body-pose models: None if nobody is in the picture."""
+        Body-pose models: None if nobody is in the picture.
+        Sound models: scores the loudest second (like the trainer); average=True averages
+        every second instead, which suits steady sounds like music or a fan."""
+        if self.input_type == "audio":
+            samples, rate = _to_mono(image)
+            wins = _sound_windows(samples, rate, self.spec["input"]["embedding"]["model"])
+            if not wins:
+                return None
+            if average:
+                per = [self.predict_embedding(v) for v, _ in wins]
+                return {name: float(np.mean([p[name] for p in per])) for name in self.classes}
+            return self.predict_embedding(wins[loudest_window(len(wins), samples, rate)][0])
         vec = self.embed(image)
         if vec is None:
             return None
-        if self.input_type == "audio":   # average the class percentages over each second
-            per = [self.predict_embedding(v) for v in vec]
-            return {name: float(np.mean([p[name] for p in per])) for name in self.classes}
         return self.predict_embedding(vec)
 
-    def top(self, image):
+    def top(self, image, average=False):
         """(most likely class, confidence). Body-pose models: (None, 0.0) if nobody is found."""
-        probs = self.predict(image)
+        probs = self.predict(image, average) if self.input_type == "audio" else self.predict(image)
         if probs is None:
             return None, 0.0
         best = max(probs, key=probs.get)

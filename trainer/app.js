@@ -7,7 +7,7 @@
 // (format: see EXPORT_FORMAT.md in this folder; loader: pattern_model.py in the starters).
 
 import { FilesetResolver, ImageEmbedder, PoseLandmarker } from "./vendor/mediapipe/vision_bundle.mjs";
-import { Mic, clipLength, drawWave, loadAudioClassifier, loudestStart, parseWav, soundWindows, waveThumb } from "./audio.js";
+import { Mic, clipLength, drawWave, loadAudioClassifier, loudestStart, loudestWindow, parseWav, soundWindows, waveThumb, windowStart } from "./audio.js";
 
 const APP_VERSION = "pattern-trainer 0.2.0";
 const MODE = { pose: "pose", audio: "audio" }[new URLSearchParams(location.search).get("mode")] || "image";
@@ -232,30 +232,38 @@ function addExample(cls, square, live = false) {
 
 // Audio: add sound windows (from soundWindows) as examples. `clip` gives the thumbnail shape.
 function addSoundWindows(cls, wins, clip, rate) {
-  let added = 0;
-  const step = Math.round(0.975 * rate);
+  let added = 0, heard = "";
   for (const [k, w] of wins.entries()) {
     if (cls.examples.length >= MAX_PER_CLASS) {
       cardMsg(cls, `That's the limit of ${MAX_PER_CLASS} examples for one class.`, "warn");
-      return { added, full: true };
+      return { added, full: true, heard };
     }
     cls.examples.push(w.vec);
-    cls.thumbs.push(waveThumb(clip.subarray(k * step, (k + 1) * step)));
-    cls.tips.push(w.top ? `YAMNet hears: ${w.top}` : "");
+    cls.thumbs.push(waveThumb(clip.subarray(windowStart(k, rate), windowStart(k + 1, rate))));
+    cls.tips.push(w.top ? `The sound model heard: ${w.top}` : "");
+    heard = w.top || heard;
     added++;
   }
-  return { added, full: false };
+  return { added, full: false, heard };
 }
 
+const MAX_WINDOWS_PER_FILE = 120;   // first 2 minutes of a long file (keeps the page responsive)
+const MAX_TEST_SECONDS = 30;
+
 async function addSoundFiles(cls, files) {
-  let added = 0, used = 0, failed = 0;
+  let added = 0, used = 0, failed = 0, trimmed = 0;
   for (const [i, file] of files.entries()) {
     if (!state.classes.includes(cls)) return;
     cardMsg(cls, `Adding sound ${i + 1} of ${files.length}…`);
     try {
       const { samples, rate } = parseWav(await file.arrayBuffer());
       if (!samples.length) throw new Error("empty");
-      const r = addSoundWindows(cls, soundWindows(state.embedder, samples, rate), samples, rate);
+      const room = Math.min(MAX_PER_CLASS - cls.examples.length, MAX_WINDOWS_PER_FILE);
+      if (room <= 0) { cardMsg(cls, `That's the limit of ${MAX_PER_CLASS} examples for one class.`, "warn"); return; }
+      const keep = Math.ceil(room * 0.975 * rate);
+      if (samples.length > keep) trimmed++;
+      const part = samples.subarray(0, keep);
+      const r = addSoundWindows(cls, soundWindows(state.embedder, part, rate), part, rate);
       added += r.added; used++;
       if (r.full) break;
     } catch {
@@ -266,14 +274,17 @@ async function addSoundFiles(cls, files) {
   }
   changed();
   const bad = failed ? `${failed} file(s) couldn't be read: only .wav files work here (or record sounds on this page).` : "";
-  cardMsg(cls, used ? `Added ${added} one-second example(s) from ${used} file(s). ${bad}`.trim() : bad, failed ? "warn" : "ok");
+  const long = trimmed ? ` Only the first ${MAX_WINDOWS_PER_FILE / 60 | 0} minutes of long files are used.` : "";
+  cardMsg(cls, used ? `Added ${added} one-second example(s) from ${used} file(s).${long} ${bad}`.trim() : bad, failed ? "warn" : "ok");
 }
 
 // Audio: "Record one" listens for 2 seconds and keeps the loudest 0.975 s as one example.
 function setUpRecordOne(cls, btn) {
   btn.addEventListener("click", async () => {
     if (!state.mic || btn.classList.contains("active")) return;
+    if (cls.examples.length >= MAX_PER_CLASS) { cardMsg(cls, `That's the limit of ${MAX_PER_CLASS} examples for one class.`, "warn"); return; }
     btn.classList.add("active");
+    cardMsg(cls, "Listening for 2 seconds… make the sound now.");
     let left = 2;
     btn.textContent = `Listening… ${left}`;
     const tick = setInterval(() => { left--; if (left > 0) btn.textContent = `Listening… ${left}`; }, 1000);
@@ -285,8 +296,8 @@ function setUpRecordOne(cls, btn) {
     if (heard.length < n) { cardMsg(cls, "Didn't catch enough sound. Try again.", "warn"); return; }
     const s0 = loudestStart(heard, n);
     const clip = heard.slice(s0, s0 + n);
-    addSoundWindows(cls, soundWindows(state.embedder, clip, rate).slice(0, 1), clip, rate);
-    cardMsg(cls, "Added 1 example.", "ok");
+    const r = addSoundWindows(cls, soundWindows(state.embedder, clip, rate).slice(0, 1), clip, rate);
+    if (r.added) cardMsg(cls, `Added 1 example${r.heard ? ` (the sound model heard: ${r.heard})` : ""}.`, "ok");
     changed();
   });
 }
@@ -322,11 +333,12 @@ async function addFiles(cls, files) {
 
 function setUpRecordButton(cls, btn) {
   let timer = null, missed = 0;
-  let listener = null;
+  let listener = null, soundAdded = 0, lastHeard = "";
   const startSound = () => {
     // Chop what's heard into back-to-back 0.975 s clips; each clip is one example.
     const rate = state.mic.rate, n = clipLength(rate);
     let pending = new Float32Array(0);
+    soundAdded = 0;
     listener = (chunk) => {
       const joined = new Float32Array(pending.length + chunk.length);
       joined.set(pending); joined.set(chunk, pending.length);
@@ -335,6 +347,8 @@ function setUpRecordButton(cls, btn) {
         const clip = pending.slice(0, n);
         pending = pending.slice(n);
         const r = addSoundWindows(cls, soundWindows(state.embedder, clip, rate).slice(0, 1), clip, rate);
+        soundAdded += r.added;
+        if (r.heard) lastHeard = r.heard;
         renderClass(cls);
         if (r.full) { stop(); return; }
       }
@@ -368,7 +382,11 @@ function setUpRecordButton(cls, btn) {
   };
   const stop = () => {
     if (!timer) return;
-    if (listener) { state.mic?.listeners.delete(listener); listener = null; }
+    if (listener) {
+      state.mic?.listeners.delete(listener); listener = null;
+      if (soundAdded === 0) cardMsg(cls, "Keep holding: each example needs about 1 second. For a short sound, use Record one.", "warn");
+      else cardMsg(cls, `Added ${soundAdded} example(s)${lastHeard ? ` (the sound model last heard: ${lastHeard})` : ""}.`, "ok");
+    }
     if (timer !== true) clearInterval(timer);
     timer = null;
     btn.classList.remove("active"); btn.textContent = "Hold to record";
@@ -410,7 +428,7 @@ function renderClass(cls) {
   const thumbs = $(".thumbs", cls.card);
   const first = Math.max(0, cls.thumbs.length - 24);
   const show = cls.thumbs.slice(first);
-  thumbs.replaceChildren(...show.map((src, i) => Object.assign(new Image(), { src, alt: "", title: cls.tips[first + i] || "" })));
+  thumbs.replaceChildren(...show.map((src, i) => Object.assign(new Image(), { src, alt: cls.tips[first + i] || "", title: cls.tips[first + i] || "" })));
   if (n > show.length) thumbs.append(Object.assign(document.createElement("span"), { className: "more", textContent: `+${n - show.length} more` }));
 }
 
@@ -704,11 +722,10 @@ function showBars(probs, always = false) {
   });
 }
 
-// Audio: average the class percentages over a clip's windows.
-function predictSound(wins) {
-  const sum = new Array(state.modelClasses.length).fill(0);
-  for (const w of wins) predictVec(w.vec).forEach((p, i) => { sum[i] += p / wins.length; });
-  return sum;
+// Audio: score the loudest window of a clip (same rule as Python), so a short sound
+// isn't outvoted by the silence around it.
+function predictSound(wins, samples, rate) {
+  return predictVec(wins[loudestWindow(wins.length, samples, rate)].vec);
 }
 
 function audioPreviewTick() {
@@ -716,7 +733,7 @@ function audioPreviewTick() {
   if (document.querySelector(".record.active, .record-one.active")) return;
   const rate = state.mic.rate, clip = state.mic.latest(clipLength(rate));
   if (!clip) return;
-  showBars(predictSound(soundWindows(state.embedder, clip, rate).slice(0, 1)));
+  showBars(predictSound(soundWindows(state.embedder, clip, rate).slice(0, 1), clip, rate));
 }
 
 // Audio: draw the last 1.5 s of sound while the microphone is on.
@@ -759,7 +776,9 @@ el.testFile.addEventListener("change", async () => {
   if (!state.model) { fail("Train a model first."); return; }
   if (MODE === "audio") {
     try {
-      const { samples, rate } = parseWav(await file.arrayBuffer());
+      const parsed = parseWav(await file.arrayBuffer());
+      const rate = parsed.rate;
+      const samples = parsed.samples.subarray(0, Math.ceil(MAX_TEST_SECONDS * rate));
       const wins = soundWindows(state.embedder, samples, rate);
       if (!wins.length) throw new Error("no sound");
       const shown = document.createElement("canvas");
@@ -771,7 +790,8 @@ el.testFile.addEventListener("change", async () => {
       el.testImg.hidden = false;
       state.testing = true;
       $("#back-to-camera").hidden = !state.mic;
-      showBars(predictSound(wins), true);
+      showBars(predictSound(wins, samples, rate), true);
+      if (parsed.samples.length > samples.length) $("#bars-status").textContent += ` (first ${MAX_TEST_SECONDS} seconds only)`;
     } catch {
       fail("That file couldn't be read. Only .wav sound files work here.");
     }
@@ -825,6 +845,10 @@ async function toggleMic() {
   }
   el.cameraBtn.disabled = true;
   const mic = new Mic();
+  mic.onEnded = () => {
+    if (state.mic !== mic) return;
+    toggleMic().then(() => { msg.textContent = "The microphone was disconnected. Plug it back in and turn it on again."; });
+  };
   try {
     msg.textContent = "Starting microphone…";
     await mic.start();
@@ -955,7 +979,7 @@ function setUpModeText() {
     $("#camera-h").textContent = "Microphone";
     $("#camera-box").hidden = true;
     $("#mic-box").hidden = false;
-    $("#camera-hint").textContent = "Each example is about 1 second of sound. Only YAMNet's 521 sound scores are kept, not the sound itself. Hover over an example to see what YAMNet heard.";
+    $("#camera-hint").textContent = "Each example is about 1 second of sound. Only the sound model's scores for 521 kinds of sound (speech, clapping, music…) are kept, not the sound itself. Hover over an example to see what the sound model heard. (The sound model is called YAMNet.)";
     $("#good-habits").innerHTML = "<strong>Good habits:</strong> only record your own voice, or people who have said yes. Watch out for other people talking nearby.";
     el.cameraBtn.textContent = "Turn on microphone";
     $("#test-hint").textContent = "Make the sound near the microphone, or try a .wav file the model hasn't heard.";

@@ -1,5 +1,5 @@
-// Copies microphone samples (mixed to mono) to the page, unchanged and at the
-// microphone's own sample rate. MediaPipe does the resampling, as in Python.
+// Copies microphone samples (mixed to mono) to the page, unchanged, at the audio context's rate
+// (the microphone's own rate where the browser allows it). MediaPipe does the resampling to 16 kHz.
 // Samples are sent in chunks of 2048 (about 40 ms) rather than every 128.
 const CHUNK = 2048;
 

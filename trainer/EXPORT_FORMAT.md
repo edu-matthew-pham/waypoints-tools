@@ -175,16 +175,22 @@ Same file format; only `input` differs:
 
 Recipe `mediapipe-yamnet-windows-v1`:
 
-1. **Mono samples at the original sample rate.** Average the channels. Integer samples are scaled to -1..1
-   (16-bit: divide by 32768). Never let anything else resample: in the browser, read WAV files directly and pass
-   the microphone's own rate; in Python, pass Gradio's `(rate, samples)` straight through.
+1. **Mono samples at their original sample rate.** Average the channels. Integer samples are scaled to -1..1
+   (16-bit: divide by 32768). Don't let anything else resample: in the browser, read WAV files directly (not
+   `decodeAudioData`) and pass the audio context's rate with the microphone samples (the trainer asks for the
+   microphone's own rate; some browsers may still convert it); in Python, pass Gradio's `(rate, samples)` straight
+   through.
 2. **MediaPipe AudioClassifier** with `yamnet.tflite` and all 521 scores (`maxResults: -1`). It resamples to
    16 kHz and scores each 0.975-second window.
 3. **Keep only full windows:** the first `floor(samples * 16000 / rate / 15600)` windows (all of them if that is
    0). MediaPipe's resampling always leaves a short, padded extra window, which is dropped.
 4. Each window's 521 scores (by category index) are one example. A recording made in the trainer is 0.975 s,
-   so exactly one window. **Predicting a longer sound:** run the head on every kept window and average the class
-   percentages.
+   so exactly one window.
+5. **Predicting a longer sound: use the loudest kept window.** Window `k` covers samples
+   `floor(k * 0.975 * rate)` to `floor((k + 1) * 0.975 * rate)`; pick the one with the largest sum of squared samples
+   (first on ties) and run the head on it. This stops a short sound (a clap, a word) being outvoted by the silence
+   around it. Python also offers `predict(sound, average=True)`, which averages every window, for steady sounds.
+   The trainer's sound test uses the first 30 seconds of a file; uploads use the first 2 minutes per file.
 
 Only the 521 scores are kept per example; the trainer's thumbnails show the waveform shape, and hovering one
 shows YAMNet's top sound name.
