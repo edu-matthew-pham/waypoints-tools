@@ -201,6 +201,31 @@ changes the scores enough to change answers, which is why step 1 matters.
 
 `yamnet.tflite` (4.1 MB) is Google's YAMNet audio classifier with MediaPipe metadata (Apache-2.0).
 
+## Project files (`format: "pattern-trainer-project"`)
+
+**Save project** in the trainer downloads `my_project.json` (`my_pose_project.json`, `my_audio_project.json`) so
+students can carry on later with **Open project**. It is not a model file: the Python loader refuses it with a
+message saying to download the model instead.
+
+```json
+{
+  "format": "pattern-trainer-project", "version": 1, "created": "…", "app": "pattern-trainer 0.2.0",
+  "input": { "type": "image", "preprocess": "mediapipe-image-embedder-centre-crop-v1",
+             "embedding": { "model": "mobilenet_v2_embedder.tflite", "dim": 1280 } },
+  "classes": [
+    { "name": "Cat", "examples": ["<base64>", "…"], "thumbs": ["data:image/jpeg;base64,…", "…"], "tips": ["", "…"] }
+  ]
+}
+```
+
+- `examples`: each is `dim` little-endian float32 numbers, base64-encoded (numpy:
+  `np.frombuffer(base64.b64decode(s), "<f4")`), exactly what the head is trained on.
+- `thumbs`: one 64×64 preview per example (JPEG for pictures and poses, PNG for sounds). `tips`: hover text
+  (sounds: what YAMNet heard), may be empty strings.
+- Opening checks everything first and refuses a file from another mode, preprocess recipe or `dim`, more than
+  50 classes or 500 examples per class, or anything malformed, leaving the current work untouched.
+- The trained head isn't saved; retraining takes seconds.
+
 ## Export sketch (browser, TF.js)
 
 ```js

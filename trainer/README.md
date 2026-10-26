@@ -16,6 +16,7 @@ Three modes: **Pictures** (default), **Body poses** (`?mode=pose`) and **Sounds*
 | Train | TF.js trains a small model on those numbers. Pictures: one hidden layer of 16, 30 rounds (epochs), learning rate 0.001. Poses: 64, 50 rounds, 0.003. Sounds: 64, 50 rounds, 0.01. Batches of 16. First it holds back the newest 20% of each class to show an accuracy check and a mix-up table, then trains on everything. Takes a few seconds. |
 | Test | Live webcam or microphone preview (body points drawn in pose mode, waveform in sound mode), or test a photo or .wav file. |
 | Download | `my_model.json` (or `my_pose_model.json`, `my_audio_model.json`): the small trained part, class names and a self-check. Format: [`EXPORT_FORMAT.md`](EXPORT_FORMAT.md). |
+| Save / Open project | `my_project.json` (or `my_pose_project.json`, `my_audio_project.json`): class names, each example's numbers and the small previews, to carry on next lesson. Not the trained model; train again after opening. |
 
 The [Python starter](https://github.com/edu-matthew-pham/pattern-detector-starters) loads that file with [`python/pattern_model.py`](python/pattern_model.py), using MediaPipe and the
 same `.tflite` file, so Python gives the same answers as the browser. Students need `pip install mediapipe pillow`;
@@ -33,6 +34,7 @@ teacher/make_image_model.py     how the .tflite was made (needs TensorFlow, run 
 tests/test_trainer.py           end-to-end test (pictures) in headless Chromium, incl. browser-vs-Python match
 tests/test_pose.py              end-to-end test (body poses)
 tests/test_audio.py             end-to-end test (sounds), with a simulated microphone
+tests/test_project.py           Save project / Open project in all three modes
 EXPORT_FORMAT.md                the JSON format
 ```
 

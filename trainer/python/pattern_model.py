@@ -342,6 +342,10 @@ class PatternModel:
 
     @staticmethod
     def _check_spec(spec):
+        if spec.get("format") == "pattern-trainer-project":
+            raise ModelFileError(
+                "That's a project file (for carrying on in the Pattern Trainer), not a model. "
+                "In the trainer, train your model and click Download to get the model file.")
         if spec.get("format") != "pattern-trainer-head":
             raise ModelFileError("This file wasn't made by the Pattern Trainer.")
         if spec.get("version") != SUPPORTED_VERSION:

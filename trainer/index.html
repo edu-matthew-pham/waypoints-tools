@@ -33,6 +33,12 @@
       <p class="hint" id="classes-hint">Make one group (class) for each thing you want to tell apart. Give each group at least 20 examples from different angles, distances and lighting.</p>
       <div id="classes"></div>
       <button id="add-class" class="secondary" type="button">+ Add a class</button>
+      <div class="project-bar">
+        <button id="save-project" class="secondary" type="button" disabled>Save project</button>
+        <label class="file-btn secondary">Open project<input id="open-project" type="file" accept=".json,application/json" class="visually-hidden"></label>
+      </div>
+      <p class="hint" id="project-hint">Save project puts your classes and examples in a file, so you can carry on next lesson. It doesn't save the trained model: just train again.</p>
+      <p id="project-msg" class="msg" role="status"></p>
     </section>
 
     <div class="side">
