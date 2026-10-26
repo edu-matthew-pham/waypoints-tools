@@ -3,6 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Privacy lock: this page can only load its own files and cannot contact any other site in the background (connect-src 'self').
+       'unsafe-eval' is only there because TF.js needs it at start-up; it doesn't loosen what the page can contact. See privacy.html. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src 'self'; img-src 'self' data: blob:; media-src 'self' blob: mediastream:; style-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
   <title>Pattern Trainer</title>
   <link rel="stylesheet" href="style.css">
   <script src="vendor/tf.min.js"></script>
@@ -11,7 +14,7 @@
 <body>
   <header class="top">
     <h1>Pattern Trainer</h1>
-    <p class="lead">Teach a computer to sort pictures into your own groups. Your photos stay on this computer.</p>
+    <p class="lead">Teach a computer to sort pictures into your own groups. Your photos never leave this computer. <a href="privacy.html">How your privacy is protected</a></p>
     <ol class="steps">
       <li>Collect examples</li><li>Train</li><li>Test</li><li>Download</li>
     </ol>
@@ -35,6 +38,7 @@
           <p id="camera-msg" class="camera-msg">Camera is off</p>
         </div>
         <p class="hint">The model only sees what's inside this square. It's shown like a mirror, but saved the right way round.</p>
+        <p class="note"><strong>Good habits:</strong> train on things, not people, where you can: objects, drawings, hand signs. If your project needs faces, use only your own, and never other people's without asking. Check what's behind you before you record.</p>
         <button id="camera-btn" type="button">Turn on camera</button>
       </section>
 
