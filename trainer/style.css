@@ -95,6 +95,17 @@ button.record.active { background: var(--rec); border-color: var(--rec); color: 
 .settings label { font-size: .9rem; color: var(--muted); display: grid; gap: 2px; }
 .settings input { font: inherit; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text); }
 progress { width: 100%; margin-top: 10px; }
+.check { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.check h3 { margin: 0 0 6px; font-size: 1rem; }
+.check p { margin: 0 0 8px; }
+.table-wrap { overflow-x: auto; margin-bottom: 8px; }
+.confusion { border-collapse: collapse; font-size: .9rem; font-variant-numeric: tabular-nums; }
+.confusion th, .confusion td { border: 1px solid var(--line); padding: 4px 8px; text-align: center; }
+.confusion th { font-weight: 600; color: var(--muted); }
+.confusion th[scope=row] { text-align: left; color: var(--text); }
+.confusion td.hit { background: color-mix(in srgb, var(--ok) 18%, transparent); font-weight: 700; }
+.confusion td.miss { background: color-mix(in srgb, var(--rec) 18%, transparent); font-weight: 700; outline: 2px solid var(--rec); outline-offset: -3px; }
+.confusion caption { caption-side: top; text-align: left; color: var(--muted); font-size: .85rem; padding-bottom: 4px; }
 
 .test-img { display: block; max-width: 160px; max-height: 160px; margin-top: 10px; border-radius: 8px; }
 .bars { display: grid; gap: 8px; margin-top: 12px; }
