@@ -60,6 +60,7 @@ h1 { margin: 0 0 4px; font-size: 1.6rem; }
 h2 { margin: 0 0 6px; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; }
 .num { display: inline-grid; place-items: center; width: 1.6em; height: 1.6em; border-radius: 50%; background: var(--accent); color: var(--accent-text); font-size: .85rem; }
 .hint { margin: 0 0 12px; color: var(--muted); font-size: .92rem; }
+.note { margin: 0 0 12px; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--accent-soft); border-radius: 4px; font-size: .9rem; }
 .msg { margin: 8px 0 0; font-size: .92rem; min-height: 1.2em; }
 .msg.warn { color: var(--warn); }
 .msg.ok { color: var(--ok); }
@@ -103,3 +104,11 @@ progress { width: 100%; margin-top: 10px; }
 .bar-fill { display: block; height: 100%; background: var(--bar); width: 0; transition: width .15s; }
 .bar-row .pct { text-align: right; font-variant-numeric: tabular-nums; }
 .bar-row.best .name, .bar-row.best .pct { font-weight: 700; }
+
+/* privacy page */
+.prose { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
+.prose h1 { font-size: 1.6rem; margin: 8px 0 6px; }
+.prose h2 { display: block; font-size: 1.15rem; margin: 24px 0 6px; }
+.prose ul { padding-left: 1.2em; }
+.prose li { margin: 4px 0; }
+a { color: var(--accent); }

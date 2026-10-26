@@ -42,6 +42,18 @@ def check(ok, what):
         failures.append(what)
 
 
+def wait_js(pg, expr, timeout=60000):
+    """Poll a JS expression from Python. (page.wait_for_function compiles strings with eval,
+    which the trainer's privacy lock correctly blocks.)"""
+    import time
+    end = time.time() + timeout / 1000
+    while time.time() < end:
+        if pg.evaluate(f"() => Boolean({expr})"):
+            return
+        pg.wait_for_timeout(100)
+    raise TimeoutError(f"timed out waiting for: {expr}")
+
+
 # ------------------------------------------------------------------ test photos
 def sample_sources(folder):
     """Two 'classes' of source photos. Uses the folder given, else built-in sample images."""
@@ -154,13 +166,27 @@ def main():
         pg.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
         pg.on("console", lambda m: errors.append(f"console.{m.type}: {m.text}") if m.type == "error" else None)
         pg.goto(f"http://127.0.0.1:{port}/index.html")
-        pg.wait_for_function("window.__trainer && window.__trainer.ready()", timeout=60000)
+        wait_js(pg, "window.__trainer && window.__trainer.ready()", timeout=60000)
         check(pg.locator("#loading").is_hidden(), "image model loads")
         check(pg.locator("#settings").is_hidden(), "test settings hidden by default")
         pg2 = ctx.new_page()
         pg2.goto(f"http://127.0.0.1:{port}/index.html?settings=1")
         check(pg2.locator("#settings").is_visible(), "test settings shown with ?settings=1")
+        pg2.goto(f"http://127.0.0.1:{port}/privacy.html")
+        check(pg2.locator("h1").text_content().startswith("Your privacy"), "privacy page loads")
         pg2.close()
+
+        # Privacy lock: the page must not be able to send data to another site
+        blocked = pg.evaluate("""fetch('https://example.com/upload', {method: 'POST', body: 'x'})
+                                 .then(() => false, () => true)""")
+        check(blocked, "privacy lock blocks sending data to another site")
+        errors[:] = [e for e in errors if "Content Security Policy" not in e and "example.com" not in e]
+
+        # From here on: no internet, and record every request the page makes
+        requests_after_load = []
+        pg.on("request", lambda r: requests_after_load.append(r.url)
+              if not r.url.startswith(("data:", "blob:")) else None)
+        ctx.set_offline(True)
 
         cards = pg.locator(".class-card")
         names = list(train)
@@ -168,7 +194,7 @@ def main():
             card = cards.nth(i)
             card.locator(".class-name").fill(name)
             card.locator(".upload").set_input_files(train[name])
-            pg.wait_for_function(f"document.querySelectorAll('.class-card')[{i}].querySelector('.count').textContent.startsWith('{len(train[name])} ')", timeout=60000)
+            wait_js(pg, f"document.querySelectorAll('.class-card')[{i}].querySelector('.count').textContent.startsWith('{len(train[name])} ')", timeout=60000)
         check(True, "photo uploads add examples")
 
         # Upload buttons are reachable by keyboard
@@ -177,7 +203,7 @@ def main():
 
         # Third class from the webcam (double-click 'Turn on camera' must not leave it stuck)
         pg.dblclick("#camera-btn")
-        pg.wait_for_function("document.querySelector('#video').readyState >= 2", timeout=20000)
+        wait_js(pg, "document.querySelector('#video').readyState >= 2", timeout=20000)
         pg.wait_for_timeout(500)
         cam_ok = pg.evaluate("Boolean(window.__trainer.state.stream) && document.querySelector('#camera-btn').textContent === 'Turn off camera'")
         check(cam_ok, "double-clicking 'Turn on camera' starts it cleanly")
@@ -198,7 +224,7 @@ def main():
         cam_card.locator(".class-name").fill("webcam")
 
         pg.click("#train-btn")
-        pg.wait_for_function("document.querySelector('#train-msg').textContent.startsWith('Trained on')", timeout=120000)
+        wait_js(pg, "document.querySelector('#train-msg').textContent.startsWith('Trained on')", timeout=120000)
         print("     ", pg.locator("#train-msg").text_content())
 
         pg.wait_for_timeout(600)
@@ -229,7 +255,7 @@ def main():
         # Retraining keeps memory flat and the bars pick up the new name
         def train_once():
             pg.click("#train-btn")
-            pg.wait_for_function("document.querySelector('#train-msg').textContent.startsWith('Trained on')", timeout=120000)
+            wait_js(pg, "document.querySelector('#train-msg').textContent.startsWith('Trained on')", timeout=120000)
         train_once()
         t1 = pg.evaluate("tf.memory().numTensors")
         train_once()
@@ -241,6 +267,11 @@ def main():
         bar_names = pg.locator(".bar-row .name").all_text_contents()
         check(bar_names[0] == names[0] + "s", f"bars show renamed class after retraining ({bar_names})")
         cards.nth(0).locator(".class-name").fill(names[0])
+
+        check(not requests_after_load,
+              "works offline after loading and makes no network requests"
+              + ("" if not requests_after_load else f": {requests_after_load[:3]}"))
+        ctx.set_offline(False)
 
         # Phone width
         pg.set_viewport_size({"width": 390, "height": 844})
