@@ -40,15 +40,23 @@ const state = {
 
 // ---------------------------------------------------------------- pictures -> numbers
 
-// Centre square of the source at its own resolution (no resizing here).
+// Centre square of the source at its own resolution (no resizing here), on a white
+// background so see-through PNG pixels count as white (Python does the same).
 // MediaPipe then resizes it to 224x224 the same way as in Python.
+const MAX_SQUARE = 4096;  // bigger canvases fail silently on some tablets
+class TooBigError extends Error {}
+
 function centreSquare(source) {
   const w = source.videoWidth || source.naturalWidth || source.width;
   const h = source.videoHeight || source.naturalHeight || source.height;
   const s = Math.min(w, h);
+  if (s > MAX_SQUARE) throw new TooBigError();
   const c = document.createElement("canvas");
   c.width = s; c.height = s;
-  c.getContext("2d").drawImage(source, Math.floor((w - s) / 2), Math.floor((h - s) / 2), s, s, 0, 0, s, s);
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff";
+  g.fillRect(0, 0, s, s);
+  g.drawImage(source, Math.floor((w - s) / 2), Math.floor((h - s) / 2), s, s, 0, 0, s, s);
   return c;
 }
 
@@ -88,27 +96,34 @@ function addClass(name) {
   nameInput.value = cls.name;
   nameInput.addEventListener("input", () => { cls.name = nameInput.value; changed(); });
 
-  $(".remove-class", card).addEventListener("click", () => {
-    if (cls.examples.length && !confirmRemove(cls)) return;
+  const removeBtn = $(".remove-class", card);
+  removeBtn.addEventListener("click", () => {
+    if (cls.examples.length && !armConfirm(removeBtn, "Delete?", "✕")) return;
+    cls.stopRecording?.();
     state.classes = state.classes.filter((c) => c !== cls);
     card.remove();
     changed();
   });
-  $(".clear", card).addEventListener("click", () => {
+  const clearBtn = $(".clear", card);
+  clearBtn.addEventListener("click", () => {
+    if (!armConfirm(clearBtn, "Clear all?", "Clear")) return;
     cls.examples = []; cls.thumbs = [];
     changed();
   });
 
   const upload = $(".upload", card);
   upload.addEventListener("change", async () => {
-    await addFiles(cls, [...upload.files]);
+    const files = [...upload.files];
     upload.value = "";
+    await addFiles(cls, files);
   });
   card.addEventListener("dragover", (e) => { e.preventDefault(); card.classList.add("dragover"); });
   card.addEventListener("dragleave", () => card.classList.remove("dragover"));
   card.addEventListener("drop", async (e) => {
-    e.preventDefault(); card.classList.remove("dragover");
-    await addFiles(cls, [...e.dataTransfer.files].filter((f) => f.type.startsWith("image/")));
+    e.preventDefault(); e.stopPropagation(); card.classList.remove("dragover");
+    const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith("image/"));
+    if (!files.length) { cardMsg(cls, "Only picture files can be added.", "warn"); return; }
+    await addFiles(cls, files);
   });
 
   setUpRecordButton(cls, $(".record", card));
@@ -117,13 +132,18 @@ function addClass(name) {
   return cls;
 }
 
-// A plain inline confirm instead of window.confirm (which blocks the page).
-function confirmRemove(cls) {
-  const btn = $(".remove-class", cls.card);
+// A plain inline "click again to confirm" instead of window.confirm (which blocks the page).
+function armConfirm(btn, askText, normalText) {
   if (btn.dataset.armed) return true;
+  const label = btn.getAttribute("aria-label");
   btn.dataset.armed = "1";
-  btn.textContent = "Delete?";
-  setTimeout(() => { delete btn.dataset.armed; btn.textContent = "✕"; }, 3000);
+  btn.textContent = askText;
+  if (label) btn.setAttribute("aria-label", `${label}: click again to confirm`);
+  setTimeout(() => {
+    delete btn.dataset.armed;
+    btn.textContent = normalText;
+    if (label) btn.setAttribute("aria-label", label);
+  }, 3000);
   return false;
 }
 
@@ -138,22 +158,26 @@ function addExample(cls, square) {
 }
 
 async function addFiles(cls, files) {
-  if (!state.embedder || !files.length) return;
-  let added = 0, failed = 0;
+  if (!files.length) return;
+  if (!state.embedder) { cardMsg(cls, "Still loading the image model. Try again in a moment.", "warn"); return; }
+  let added = 0, failed = 0, tooBig = 0;
   for (const [i, file] of files.entries()) {
+    if (!state.classes.includes(cls)) return;   // class deleted while adding
     cardMsg(cls, `Adding photo ${i + 1} of ${files.length}…`);
     try {
       const img = await loadImageFile(file);
       if (!addExample(cls, centreSquare(img))) break;
       added++;
-    } catch {
-      failed++;
+    } catch (err) {
+      if (err instanceof TooBigError) tooBig++; else failed++;
     }
     if (i % 5 === 4) { renderClass(cls); await new Promise((r) => setTimeout(r)); }
   }
   changed();
-  cardMsg(cls, failed ? `Added ${added}. ${failed} file(s) couldn't be read as pictures.` : `Added ${added} photo(s).`,
-          failed ? "warn" : "ok");
+  const notes = [];
+  if (failed) notes.push(`${failed} file(s) couldn't be read as pictures.`);
+  if (tooBig) notes.push(`${tooBig} photo(s) were too big; use a smaller copy (under ${MAX_SQUARE} pixels on the short side).`);
+  cardMsg(cls, `Added ${added} photo(s).${notes.length ? " " + notes.join(" ") : ""}`, notes.length ? "warn" : "ok");
 }
 
 function setUpRecordButton(cls, btn) {
@@ -163,6 +187,7 @@ function setUpRecordButton(cls, btn) {
     if (timer || !state.stream || btn.disabled) return;
     btn.classList.add("active"); btn.textContent = "Recording…";
     const grab = () => {
+      if (!state.stream) { stop(); return; }
       if (el.video.readyState >= 2 && addExample(cls, centreSquare(el.video))) renderClass(cls);
       else if (cls.examples.length >= MAX_PER_CLASS) stop();
     };
@@ -175,6 +200,7 @@ function setUpRecordButton(cls, btn) {
     btn.classList.remove("active"); btn.textContent = "Hold to record";
     changed();
   };
+  cls.stopRecording = stop;
   btn.addEventListener("pointerdown", start);
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) btn.addEventListener(ev, stop);
   btn.addEventListener("contextmenu", (e) => e.preventDefault());
@@ -191,7 +217,15 @@ function cardMsg(cls, text, kind = "") {
 
 function renderClass(cls) {
   const n = cls.examples.length;
+  const label = cls.name.trim() || "this class";
   $(".count", cls.card).textContent = `${n} example${n === 1 ? "" : "s"}`;
+  $(".class-name", cls.card).setAttribute("aria-label", "Class name");
+  const rm = $(".remove-class", cls.card);
+  if (!rm.dataset.armed) rm.setAttribute("aria-label", `Delete ${label}`);
+  $(".record", cls.card).setAttribute("aria-label", `Hold to record examples of ${label}`);
+  $(".upload", cls.card).setAttribute("aria-label", `Upload photos of ${label}`);
+  const cl = $(".clear", cls.card);
+  if (!cl.dataset.armed) cl.setAttribute("aria-label", `Clear all examples of ${label}`);
   $(".clear", cls.card).disabled = n === 0;
   $(".record", cls.card).disabled = !state.stream || !state.embedder;
   const thumbs = $(".thumbs", cls.card);
@@ -273,7 +307,8 @@ async function train() {
   el.progress.hidden = false; el.progress.value = 0;
   setMsg(el.trainMsg, "Training…");
   const xs = tf.tensor2d(Float32Array.from(xsArr.flatMap((e) => Array.from(e))), [xsArr.length, dim]);
-  const ys = tf.oneHot(tf.tensor1d(ysArr, "int32"), names.length);
+  const ys = tf.tidy(() => tf.oneHot(tf.tensor1d(ysArr, "int32"), names.length));
+  const optimizer = tf.train.adam(cfg.lr);
   const model = tf.sequential();
   if (cfg.hidden > 0) {
     model.add(tf.layers.dense({ inputShape: [dim], units: cfg.hidden, activation: "relu" }));
@@ -281,7 +316,7 @@ async function train() {
   } else {
     model.add(tf.layers.dense({ inputShape: [dim], units: names.length, activation: "softmax" }));
   }
-  model.compile({ optimizer: tf.train.adam(cfg.lr), loss: "categoricalCrossentropy", metrics: ["accuracy"] });
+  model.compile({ optimizer, loss: "categoricalCrossentropy", metrics: ["accuracy"] });
   const t0 = performance.now();
   let lastAcc = 0;
   try {
@@ -298,6 +333,7 @@ async function train() {
     });
   } catch (err) {
     console.error(err);
+    model.dispose(); optimizer.dispose();
     state.training = false;
     el.progress.hidden = true;
     setMsg(el.trainMsg, "Training didn't work. Try again, or reload the page.", "warn");
@@ -305,6 +341,16 @@ async function train() {
     return;
   } finally {
     xs.dispose(); ys.dispose();
+  }
+  optimizer.dispose();   // only needed during training; keeps memory flat across retrains
+  const finite = model.getWeights().every((w) => w.dataSync().every(Number.isFinite));
+  if (!finite) {
+    model.dispose();
+    state.training = false;
+    el.progress.hidden = true;
+    setMsg(el.trainMsg, "Training went wrong (the numbers blew up). Try again with a smaller learning rate.", "warn");
+    refresh();
+    return;
   }
   if (state.model) state.model.dispose();
   state.model = model;
@@ -328,10 +374,23 @@ function predict(square) {
   return tf.tidy(() => Array.from(state.model.predict(tf.tensor2d(vec, [1, vec.length])).dataSync()));
 }
 
-function showBars(probs) {
-  state.lastPrediction = Object.fromEntries(state.modelClasses.map((n, i) => [n, probs[i]]));
+// Screen readers: announce test-photo results and changes of top class, not every live frame.
+let lastAnnounced = "";
+function announce(probs, always) {
   const best = probs.indexOf(Math.max(...probs));
-  if (el.bars.children.length !== probs.length) {
+  const text = `${state.modelClasses[best]}, ${Math.round(probs[best] * 100)} percent`;
+  const key = state.modelClasses[best];
+  if (always || key !== lastAnnounced) $("#bars-status").textContent = text;
+  lastAnnounced = key;
+}
+
+function showBars(probs, always = false) {
+  state.lastPrediction = Object.fromEntries(state.modelClasses.map((n, i) => [n, probs[i]]));
+  announce(probs, always);
+  const best = probs.indexOf(Math.max(...probs));
+  const key = state.modelClasses.join("\n");
+  if (el.bars.dataset.names !== key) {
+    el.bars.dataset.names = key;
     el.bars.replaceChildren(...state.modelClasses.map((name) => {
       const row = document.createElement("div");
       row.className = "bar-row";
@@ -352,7 +411,7 @@ function startPreview() {
   state.previewTimer = setInterval(() => {
     if (!state.model || state.testing || !state.stream || el.video.readyState < 2) return;
     if (document.querySelector(".record.active")) return;
-    showBars(predict(centreSquare(el.video)));
+    try { showBars(predict(centreSquare(el.video))); } catch (err) { console.warn(err); }
   }, PREVIEW_INTERVAL_MS);
 }
 
@@ -360,7 +419,8 @@ el.testFile.addEventListener("change", async () => {
   const file = el.testFile.files[0];
   el.testFile.value = "";
   if (!file) return;
-  if (!state.model) { el.bars.textContent = "Train a model first."; return; }
+  const fail = (text) => { el.bars.dataset.names = ""; el.bars.textContent = text; };
+  if (!state.model) { fail("Train a model first."); return; }
   try {
     const img = await loadImageFile(file);
     const square = centreSquare(img);
@@ -368,9 +428,11 @@ el.testFile.addEventListener("change", async () => {
     el.testImg.hidden = false;
     state.testing = true;
     $("#back-to-camera").hidden = !state.stream;
-    showBars(predict(square));
-  } catch {
-    el.bars.textContent = "That file couldn't be read as a picture.";
+    showBars(predict(square), true);
+  } catch (err) {
+    fail(err instanceof TooBigError
+      ? `That photo is too big; use a smaller copy (under ${MAX_SQUARE} pixels on the short side).`
+      : "That file couldn't be read as a picture.");
   }
 });
 function backToCamera() {
@@ -398,13 +460,16 @@ async function toggleCamera() {
     el.cameraMsg.textContent = "This browser can't use a camera here. You can still upload photos.";
     return;
   }
+  el.cameraBtn.disabled = true;           // no double starts while the camera is opening
+  let stream = null;
   try {
     el.cameraMsg.textContent = "Starting camera…";
-    state.stream = await navigator.mediaDevices.getUserMedia({
+    stream = await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false,
     });
-    el.video.srcObject = state.stream;
+    el.video.srcObject = stream;
     await el.video.play();
+    state.stream = stream;
     el.cameraMsg.hidden = true;
     el.cameraBtn.textContent = "Turn off camera";
     backToCamera();
@@ -412,10 +477,15 @@ async function toggleCamera() {
     startPreview();
   } catch (err) {
     console.warn(err);
+    stream?.getTracks().forEach((t) => t.stop());
+    el.video.srcObject = null;
     state.stream = null;
+    el.cameraBtn.textContent = "Turn on camera";
     el.cameraMsg.textContent = err.name === "NotAllowedError"
       ? "Camera permission was blocked. Allow it in the browser's address bar, or upload photos instead."
       : "Couldn't start a camera. You can still upload photos.";
+  } finally {
+    el.cameraBtn.disabled = false;
   }
 }
 
@@ -460,6 +530,12 @@ function download() {
 
 async function start() {
   if (new URLSearchParams(location.search).get("settings") === "1") el.settings.hidden = false;
+  // A photo dropped outside a class card would otherwise open in the tab and lose all work.
+  window.addEventListener("dragover", (e) => e.preventDefault());
+  window.addEventListener("drop", (e) => e.preventDefault());
+  window.addEventListener("beforeunload", (e) => {
+    if (state.classes.some((c) => c.examples.length)) { e.preventDefault(); e.returnValue = ""; }
+  });
   addClass("Class 1");
   addClass("Class 2");
   el.addClass.addEventListener("click", () => $(".class-name", addClass().card).focus());

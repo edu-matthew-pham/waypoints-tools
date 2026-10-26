@@ -87,12 +87,15 @@ def make_photos(tmp, folder):
     exif[0x0112] = 6
     base.rotate(90, expand=True).save(p, quality=90, exif=exif)
     tests.append(p)
-    # PNG with transparency, greyscale, very wide
+    # PNG with see-through areas whose hidden colour is random noise (must count as white on both sides)
     p = os.path.join(tmp, "test_alpha.png")
-    rgba = base.convert("RGBA")
-    rgba.putalpha(255)
-    rgba.save(p)
+    rgba = np.dstack([np.asarray(base), np.full(base.size[::-1], 255, np.uint8)])
+    h, w = rgba.shape[:2]
+    rgba[: h // 2, :, 3] = 0
+    rgba[: h // 2, :, :3] = rng.integers(0, 256, (h // 2, w, 3))
+    Image.fromarray(rgba, "RGBA").save(p)
     tests.append(p)
+    # greyscale, very wide
     p = os.path.join(tmp, "test_grey.jpg")
     base.convert("L").save(p, quality=90)
     tests.append(p)
@@ -168,9 +171,16 @@ def main():
             pg.wait_for_function(f"document.querySelectorAll('.class-card')[{i}].querySelector('.count').textContent.startsWith('{len(train[name])} ')", timeout=60000)
         check(True, "photo uploads add examples")
 
-        # Third class from the webcam
-        pg.click("#camera-btn")
+        # Upload buttons are reachable by keyboard
+        tag = pg.evaluate("(() => { const i = document.querySelector('.upload'); i.focus(); return document.activeElement === i; })()")
+        check(tag, "upload button can be reached by keyboard")
+
+        # Third class from the webcam (double-click 'Turn on camera' must not leave it stuck)
+        pg.dblclick("#camera-btn")
         pg.wait_for_function("document.querySelector('#video').readyState >= 2", timeout=20000)
+        pg.wait_for_timeout(500)
+        cam_ok = pg.evaluate("Boolean(window.__trainer.state.stream) && document.querySelector('#camera-btn').textContent === 'Turn off camera'")
+        check(cam_ok, "double-clicking 'Turn on camera' starts it cleanly")
         pg.click("#add-class")
         cam_card = cards.nth(2)
         cam_card.locator(".class-name").fill("webcam")
@@ -215,6 +225,22 @@ def main():
         # Changing data marks the model out of date
         cards.nth(0).locator(".class-name").fill(names[0] + "s")
         check(pg.locator("#export-btn").is_disabled(), "renaming a class after training blocks download until retrained")
+
+        # Retraining keeps memory flat and the bars pick up the new name
+        def train_once():
+            pg.click("#train-btn")
+            pg.wait_for_function("document.querySelector('#train-msg').textContent.startsWith('Trained on')", timeout=120000)
+        train_once()
+        t1 = pg.evaluate("tf.memory().numTensors")
+        train_once()
+        train_once()
+        t3 = pg.evaluate("tf.memory().numTensors")
+        check(t3 == t1, f"retraining doesn't leak memory ({t1} -> {t3} tensors)")
+        pg.locator("#test-file").set_input_files(tests[0])
+        pg.wait_for_timeout(300)
+        bar_names = pg.locator(".bar-row .name").all_text_contents()
+        check(bar_names[0] == names[0] + "s", f"bars show renamed class after retraining ({bar_names})")
+        cards.nth(0).locator(".class-name").fill(names[0])
 
         # Phone width
         pg.set_viewport_size({"width": 390, "height": 844})

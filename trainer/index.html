@@ -34,7 +34,7 @@
           <video id="video" playsinline muted></video>
           <p id="camera-msg" class="camera-msg">Camera is off</p>
         </div>
-        <p class="hint">The model only sees what's inside this square.</p>
+        <p class="hint">The model only sees what's inside this square. It's shown like a mirror, but saved the right way round.</p>
         <button id="camera-btn" type="button">Turn on camera</button>
       </section>
 
@@ -55,10 +55,11 @@
       <section class="panel" aria-labelledby="test-h">
         <h2 id="test-h"><span class="num">3</span> Test</h2>
         <p class="hint">Point the camera at something, or try a photo the model hasn't seen.</p>
-        <label class="file-btn secondary">Test a photo<input id="test-file" type="file" accept="image/*" hidden></label>
+        <label class="file-btn secondary">Test a photo<input id="test-file" class="visually-hidden" type="file" accept="image/*"></label>
         <button id="back-to-camera" class="secondary" type="button" hidden>Back to camera</button>
         <img id="test-img" class="test-img" alt="" hidden>
-        <div id="bars" class="bars" aria-live="polite"></div>
+        <div id="bars" class="bars"></div>
+        <p id="bars-status" class="visually-hidden" aria-live="polite"></p>
       </section>
 
       <section class="panel" aria-labelledby="export-h">
@@ -79,7 +80,7 @@
       </div>
       <div class="class-actions">
         <button class="record" type="button" disabled>Hold to record</button>
-        <label class="file-btn secondary">Upload photos<input class="upload" type="file" accept="image/*" multiple hidden></label>
+        <label class="file-btn secondary">Upload photos<input class="upload visually-hidden" type="file" accept="image/*" multiple></label>
         <button class="clear secondary" type="button" disabled>Clear</button>
       </div>
       <div class="thumbs" aria-label="Examples"></div>

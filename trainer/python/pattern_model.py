@@ -41,18 +41,28 @@ class ModelFileError(ValueError):
 # it decodes JPEGs slightly differently from the browser.
 
 def _to_rgb_pixels(image):
-    """PIL image or numpy array -> centre square, uint8 RGB (what MediaPipe wants)."""
+    """PIL image or numpy array -> centre square, uint8 RGB (what MediaPipe wants).
+
+    See-through pixels (PNG transparency) count as white, as in the browser trainer.
+    """
     from PIL import Image, ImageOps
 
     if isinstance(image, Image.Image):
         image = ImageOps.exif_transpose(image)   # phone photos: rotate like browsers do
+        if image.mode in ("RGBA", "LA", "PA") or "transparency" in image.info:
+            rgba = image.convert("RGBA")
+            image = Image.alpha_composite(Image.new("RGBA", rgba.size, (255, 255, 255, 255)), rgba)
         image = image.convert("RGB")
     a = np.asarray(image)
-    if a.ndim == 2:                          # greyscale -> RGB
-        a = np.stack([a] * 3, axis=-1)
-    a = a[..., :3]                           # drop alpha if present
     if a.dtype != np.uint8:                  # e.g. floats from some libraries
         a = np.clip(a * 255 if a.max() <= 1.0 else a, 0, 255).astype(np.uint8)
+    if a.ndim == 2:                          # greyscale -> RGB
+        a = np.stack([a] * 3, axis=-1)
+    if a.shape[-1] == 4:                     # RGBA array -> onto white, same as above
+        rgba = Image.alpha_composite(Image.new("RGBA", a.shape[1::-1], (255, 255, 255, 255)),
+                                     Image.fromarray(np.ascontiguousarray(a), "RGBA"))
+        a = np.asarray(rgba.convert("RGB"))
+    a = a[..., :3]
     h, w = a.shape[:2]
     s = min(h, w)
     top, left = (h - s) // 2, (w - s) // 2

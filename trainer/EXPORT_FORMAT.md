@@ -61,7 +61,7 @@ file, `mobilenet_v2_embedder.tflite`, run by MediaPipe on both sides.
 | `version` | Integer. Bump only for breaking changes. Loader accepts exactly the versions it knows and otherwise says "ask your teacher for the latest starter". |
 | `created`, `app` | Informational (ISO 8601 UTC; tool name and version). |
 | `input.type` | `"image"` now; `"pose"` later. |
-| `input.preprocess` | A **named recipe**. `mediapipe-image-embedder-centre-crop-v1` = take the centre square of the picture at full resolution (no resizing), then MediaPipe ImageEmbedder with default settings (`l2Normalize` and `quantize` off), given RGB pixels (see "Image preparation"). The loader refuses IDs it doesn't know, so a mismatch fails loudly instead of silently lowering accuracy. Pose will get its own ID (e.g. `mediapipe-pose-33-centred-v1`). |
+| `input.preprocess` | A **named recipe**. `mediapipe-image-embedder-centre-crop-v1` = take the centre square of the picture at full resolution (no resizing) on a white background (see-through pixels count as white), then MediaPipe ImageEmbedder with default settings (`l2Normalize` and `quantize` off), given RGB pixels (see "Image preparation"). The loader refuses IDs it doesn't know, so a mismatch fails loudly instead of silently lowering accuracy. Pose will get its own ID (e.g. `mediapipe-pose-33-centred-v1`). |
 | `input.embedding` | `model` = the model file name (looked up next to `pattern_model.py`); `dim` = numbers per picture (1280), must equal the first kernel's input size. |
 | `classes` | Class names; **array position = output index**. |
 | `layers` | Ordered dense layers. `activation` is `relu`, `softmax` or `linear`. The last layer should be `softmax` with `units == classes.length`. |
@@ -93,7 +93,8 @@ no extra settings. Ship the same file in `tools/trainer/` and in each image star
 
 1. **Centre square, no resizing.** Cut the largest centre square out of the picture at its own resolution,
    with offsets `floor((w - s) / 2)`, `floor((h - s) / 2)`. Whatever is inside the square counts; the trainer's
-   camera view shows exactly this square.
+   camera view shows exactly this square. See-through (transparent) pixels count as white on both sides.
+   The browser refuses squares over 4096 px (some tablets silently fail on bigger canvases).
 2. **MediaPipe does the rest.** It resizes the square to 224x224 itself, identically in the browser and Python.
 
 Browser (self-host `vision_bundle.mjs` and the `wasm/` folder from `@mediapipe/tasks-vision`, and pin the same
@@ -107,7 +108,9 @@ function centreSquare(source) {                 // <img>, <video> or <canvas>
   const h = source.videoHeight || source.naturalHeight || source.height;
   const s = Math.min(w, h), c = document.createElement("canvas");
   c.width = s; c.height = s;
-  c.getContext("2d").drawImage(source, Math.floor((w - s) / 2), Math.floor((h - s) / 2), s, s, 0, 0, s, s);
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, s, s);          // see-through pixels count as white
+  g.drawImage(source, Math.floor((w - s) / 2), Math.floor((h - s) / 2), s, s, 0, 0, s, s);
   return c;
 }
 
@@ -122,7 +125,7 @@ async function makeEmbedder() {
 ```
 
 Python: read photos with **Pillow** (applying the photo's EXIF rotation, as browsers do) or take Gradio's numpy
-array, cut the same centre square, then hand MediaPipe the RGB pixels, as `pattern_model.py` does. Don't use
+array, put see-through pixels on white, cut the same centre square, then hand MediaPipe the RGB pixels, as `pattern_model.py` does. Don't use
 MediaPipe's own `mp.Image.create_from_file`: it decodes JPEGs slightly differently from browsers (about 1% off).
 
 Tested 2026-10-26 (Chromium, `tasks-vision` 1.1.1; Python 3.13, `mediapipe` 0.10.32 and 1.1.1): same photo gives
