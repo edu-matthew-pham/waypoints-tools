@@ -85,7 +85,7 @@ Round weights to 6 significant digits on export. Keep readable arrays rather tha
 ## The image model file
 
 `mobilenet_v2_embedder.tflite` (about 9 MB) is made once by the teacher with `make_image_model.py`
-(needs TensorFlow on that one laptop). It is Tutorial 7's MobileNetV2 (ImageNet weights, no top,
+(needs TensorFlow on that one laptop). It is the standard Keras MobileNetV2 (ImageNet weights, no top,
 average pooled) and takes ordinary 0-255 pixels, doing the [-1, 1] scaling inside, so MediaPipe needs
 no extra settings. Ship the same file in `tools/trainer/` and in each image starter folder.
 

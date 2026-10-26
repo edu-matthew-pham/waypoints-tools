@@ -1,6 +1,6 @@
 # Pattern Trainer
 
-A small browser tool for the Pattern Detector unit (Y9/10). Students collect example photos for their own
+A small browser tool for learning how image classifiers work (aimed at about Years 9–10). Students collect example photos for their own
 classes, train a model in the browser, test it, and download `my_model.json` to use in the Python/Gradio starters.
 Nothing is uploaded: photos and training stay on the student's computer.
 
@@ -11,7 +11,7 @@ Add `?settings=1` to the address to show test settings (hidden units, epochs, le
 
 | Step | What happens |
 |---|---|
-| Collect | Each photo or webcam frame is cut to its centre square, then MediaPipe turns it into 1280 numbers using `models/mobilenet_v2_embedder.tflite` (Tutorial 7's MobileNetV2). |
+| Collect | Each photo or webcam frame is cut to its centre square, then MediaPipe turns it into 1280 numbers using `models/mobilenet_v2_embedder.tflite` (the standard MobileNetV2 with ImageNet weights). |
 | Train | TF.js trains a small model on those numbers: one hidden layer of 16, then one output per class. 30 rounds (epochs), learning rate 0.001, batches of 16. Takes a few seconds. |
 | Test | Live webcam preview, or test a photo. |
 | Download | `my_model.json`: the small trained part, class names and a self-check. Format: [`EXPORT_FORMAT.md`](EXPORT_FORMAT.md). |

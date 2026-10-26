@@ -4,7 +4,7 @@ make_image_model.py -- TEACHER ONLY, run once.
 Makes mobilenet_v2_embedder.tflite (about 9 MB): the shared "picture to numbers" model,
 used by MediaPipe in both the browser trainer and the Python starters.
 
-  * Same MobileNetV2 as Tutorial 7 (ImageNet weights, no top, average pooled -> 1280 numbers).
+  * Standard Keras MobileNetV2 (ImageNet weights, no top, average pooled -> 1280 numbers).
   * Takes ordinary 0-255 pixels and does the [-1, 1] scaling inside the model,
     so MediaPipe needs no extra settings and both sides prepare images the same way.
 
