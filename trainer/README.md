@@ -16,7 +16,7 @@ Add `?settings=1` to the address to show test settings (hidden units, epochs, le
 | Test | Live webcam preview, or test a photo. |
 | Download | `my_model.json`: the small trained part, class names and a self-check. Format: [`EXPORT_FORMAT.md`](EXPORT_FORMAT.md). |
 
-The Python starter loads that file with [`python/pattern_model.py`](python/pattern_model.py), using MediaPipe and the
+The [Python starter](https://github.com/edu-matthew-pham/pattern-detector-starters) loads that file with [`python/pattern_model.py`](python/pattern_model.py), using MediaPipe and the
 same `.tflite` file, so Python gives the same answers as the browser. Students need `pip install mediapipe pillow`;
 no TensorFlow.
 

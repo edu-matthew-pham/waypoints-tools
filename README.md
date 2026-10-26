@@ -5,7 +5,7 @@ plain HTML/JS with no build step, and no shared code between tools.
 
 | Tool | What it does |
 |---|---|
-| [`trainer/`](trainer/) | Pattern Trainer: train an image classifier in the browser and download it for the Python/Gradio starters. |
+| [`trainer/`](trainer/) | Pattern Trainer: train an image classifier in the browser and download it for the [Python/Gradio starters](https://github.com/edu-matthew-pham/pattern-detector-starters). |
 
 Hosted with GitHub Pages: `https://edu-matthew-pham.github.io/waypoints-tools/` (Settings → Pages → deploy from
 the `main` branch, root folder).
