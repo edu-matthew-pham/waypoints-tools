@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pattern Trainer</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="vendor/tf.min.js"></script>
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="top">
+    <h1>Pattern Trainer</h1>
+    <p class="lead">Teach a computer to sort pictures into your own groups. Your photos stay on this computer.</p>
+    <ol class="steps">
+      <li>Collect examples</li><li>Train</li><li>Test</li><li>Download</li>
+    </ol>
+  </header>
+
+  <p id="loading" class="banner" role="status">Loading the image model…</p>
+
+  <main class="layout">
+    <section class="panel" aria-labelledby="classes-h">
+      <h2 id="classes-h"><span class="num">1</span> Collect examples</h2>
+      <p class="hint">Make one group (class) for each thing you want to tell apart. Give each group at least 20 examples from different angles, distances and lighting.</p>
+      <div id="classes"></div>
+      <button id="add-class" class="secondary" type="button">+ Add a class</button>
+    </section>
+
+    <div class="side">
+      <section class="panel" aria-labelledby="camera-h">
+        <h2 id="camera-h">Camera</h2>
+        <div class="camera">
+          <video id="video" playsinline muted></video>
+          <p id="camera-msg" class="camera-msg">Camera is off</p>
+        </div>
+        <p class="hint">The model only sees what's inside this square.</p>
+        <button id="camera-btn" type="button">Turn on camera</button>
+      </section>
+
+      <section class="panel" aria-labelledby="train-h">
+        <h2 id="train-h"><span class="num">2</span> Train</h2>
+        <div id="settings" class="settings" hidden>
+          <p class="hint">Test settings (shown because the address ends in <code>?settings=1</code>).</p>
+          <label>Hidden units <input id="set-hidden" type="number" min="0" max="256" value="16"></label>
+          <label>Epochs <input id="set-epochs" type="number" min="1" max="500" value="30"></label>
+          <label>Learning rate <input id="set-lr" type="number" min="0.00001" max="0.1" step="0.0001" value="0.001"></label>
+          <label>Batch size <input id="set-batch" type="number" min="1" max="256" value="16"></label>
+        </div>
+        <button id="train-btn" type="button" disabled>Train model</button>
+        <progress id="train-progress" max="1" value="0" hidden></progress>
+        <p id="train-msg" class="msg" role="status"></p>
+      </section>
+
+      <section class="panel" aria-labelledby="test-h">
+        <h2 id="test-h"><span class="num">3</span> Test</h2>
+        <p class="hint">Point the camera at something, or try a photo the model hasn't seen.</p>
+        <label class="file-btn secondary">Test a photo<input id="test-file" type="file" accept="image/*" hidden></label>
+        <button id="back-to-camera" class="secondary" type="button" hidden>Back to camera</button>
+        <img id="test-img" class="test-img" alt="" hidden>
+        <div id="bars" class="bars" aria-live="polite"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="export-h">
+        <h2 id="export-h"><span class="num">4</span> Download</h2>
+        <p class="hint">Save your model, then put <code>my_model.json</code> in the same folder as your Python starter.</p>
+        <button id="export-btn" type="button" disabled>Download my_model.json</button>
+        <p id="export-msg" class="msg" role="status"></p>
+      </section>
+    </div>
+  </main>
+
+  <template id="class-tpl">
+    <article class="class-card">
+      <div class="class-head">
+        <input class="class-name" type="text" maxlength="40" aria-label="Class name">
+        <span class="count">0 examples</span>
+        <button class="icon remove-class" type="button" aria-label="Delete this class" title="Delete this class">✕</button>
+      </div>
+      <div class="class-actions">
+        <button class="record" type="button" disabled>Hold to record</button>
+        <label class="file-btn secondary">Upload photos<input class="upload" type="file" accept="image/*" multiple hidden></label>
+        <button class="clear secondary" type="button" disabled>Clear</button>
+      </div>
+      <div class="thumbs" aria-label="Examples"></div>
+      <p class="card-msg msg" role="status"></p>
+    </article>
+  </template>
+</body>
+</html>
