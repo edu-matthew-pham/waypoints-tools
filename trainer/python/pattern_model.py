@@ -13,10 +13,12 @@ STUDENTS: you do not need to edit this file.
 `image` can be a PIL image or a numpy array (Gradio gives you a numpy array).
 `predict` returns a dict, which Gradio's Label output shows directly.
 
-Works for both kinds of Pattern Trainer model:
+Works for all three kinds of Pattern Trainer model:
   * Pictures   needs mobilenet_v2_embedder.tflite in this folder
   * Body poses needs pose_landmarker_lite.task in this folder.
                If nobody is in the picture, predict() gives None and top() gives (None, 0.0).
+  * Sounds     needs yamnet.tflite in this folder. `sound` can be Gradio's (sample_rate, samples)
+               or the path to a .wav file. Longer sounds are scored about once a second and averaged.
 
 Needs: pip install mediapipe pillow   (no TensorFlow)
 """
@@ -31,6 +33,7 @@ SUPPORTED_VERSION = 1
 CHECK_TOLERANCE = 1e-4
 IMAGE_PREPROCESS_ID = "mediapipe-image-embedder-centre-crop-v1"
 POSE_PREPROCESS_ID = "mediapipe-pose-lite-xy-centred-v1"
+AUDIO_PREPROCESS_ID = "mediapipe-yamnet-windows-v1"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -126,6 +129,111 @@ def _embed_image(image, model_file):
     return np.array(result.embeddings[0].embedding, dtype="float32")
 
 
+# ----------------------------------------------------------------- sound side
+# Same recipe as the browser (trainer/audio.js): mono samples at their ORIGINAL rate,
+# YAMNet's 521 scores per 0.975 s window, full windows only.
+
+def _audio_classifier(model_file):
+    if model_file not in _embedders:
+        from mediapipe.tasks import python as mp_tasks
+        from mediapipe.tasks.python import audio
+
+        options = audio.AudioClassifierOptions(
+            base_options=mp_tasks.BaseOptions(model_asset_path=_model_path(model_file)),
+            max_results=-1, running_mode=audio.RunningMode.AUDIO_CLIPS)
+        _embedders[model_file] = audio.AudioClassifier.create_from_options(options)
+    return _embedders[model_file]
+
+
+def _to_float(a):
+    a = np.asarray(a)
+    if a.dtype == np.int16:
+        return a.astype("float32") / 32768
+    if a.dtype == np.int32:
+        return (a / 2147483648).astype("float32")
+    if a.dtype == np.uint8:
+        return (a.astype("float32") - 128) / 128
+    return a.astype("float32")
+
+
+def read_wav(path):
+    """WAV file -> (mono float32 samples, sample rate). PCM 8/16/24/32-bit or float.
+    Same reader as the browser trainer (no resampling)."""
+    import struct
+
+    data = open(path, "rb").read()
+    if data[:4] != b"RIFF" or data[8:12] != b"WAVE":
+        raise ModelFileError(f"'{path}' isn't a .wav file.")
+    p, fmt, body = 12, None, None
+    while p + 8 <= len(data):
+        cid, size = data[p:p + 4], struct.unpack("<I", data[p + 4:p + 8])[0]
+        if cid == b"fmt ":
+            fmt_code, channels, rate = struct.unpack("<HHI", data[p + 8:p + 16])
+            bits = struct.unpack("<H", data[p + 22:p + 24])[0]
+            if fmt_code == 0xFFFE and size >= 26:
+                fmt_code = struct.unpack("<H", data[p + 32:p + 34])[0]
+            fmt = (fmt_code, channels, rate, bits)
+        elif cid == b"data":
+            body = data[p + 8:p + 8 + size]
+        p += 8 + size + (size % 2)
+    if fmt is None or body is None:
+        raise ModelFileError(f"'{path}' is missing its sound data.")
+    fmt_code, channels, rate, bits = fmt
+    nbytes = bits // 8
+    frames = len(body) // (nbytes * channels)
+    raw = np.frombuffer(body[:frames * nbytes * channels], dtype=np.uint8)
+    if fmt_code == 3 and bits in (32, 64):
+        x = raw.view("<f4" if bits == 32 else "<f8").astype("float64")
+    elif fmt_code == 1 and bits == 8:
+        x = (raw.astype("float64") - 128) / 128
+    elif fmt_code == 1 and bits == 16:
+        x = raw.view("<i2").astype("float64") / 32768
+    elif fmt_code == 1 and bits == 24:
+        b = raw.reshape(-1, 3).astype("int32")
+        x = ((b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16)) ^ 0x800000) - 0x800000
+        x = x.astype("float64") / 8388608
+    elif fmt_code == 1 and bits == 32:
+        x = raw.view("<i4").astype("float64") / 2147483648
+    else:
+        raise ModelFileError(f"'{path}' uses a .wav encoding this starter can't read.")
+    x = x.reshape(frames, channels)   # mix to mono in double precision, like the browser
+    return (x.sum(axis=1) / channels).astype("float32"), rate
+
+
+def _to_mono(sound):
+    """Gradio (rate, samples), (samples, rate) or a .wav path -> (mono float32, rate)."""
+    if isinstance(sound, (str, os.PathLike)):
+        return read_wav(sound)
+    a, b = sound
+    rate, samples = (a, b) if np.isscalar(a) else (b, a)
+    x = _to_float(samples)
+    if x.ndim == 2:   # Gradio gives (frames, channels)
+        x = x.astype("float64").sum(axis=1) / x.shape[1]
+    return np.ascontiguousarray(x, dtype="float32"), int(rate)
+
+
+def sound_windows(sound, model_file="yamnet.tflite"):
+    """Sound -> list of (521 YAMNet scores, YAMNet's top sound name), one per full window."""
+    from mediapipe.tasks.python.components.containers import audio_data
+
+    samples, rate = _to_mono(sound)
+    if len(samples) == 0:
+        return []
+    results = _audio_classifier(model_file).classify(audio_data.AudioData.create_from_array(samples, rate))
+    full = int(np.floor(len(samples) * 16000 / rate / 15600))
+    kept = results[:full] if full >= 1 else results
+    out = []
+    for r in kept:
+        vec = np.zeros(521, dtype="float32")
+        top = None
+        for c in r.classifications[0].categories:
+            vec[c.index] = c.score
+            if top is None or c.score > top.score:
+                top = c
+        out.append((vec, top.category_name if top else ""))
+    return out
+
+
 def pose_points(image, model_file="pose_landmarker_lite.task"):
     """Picture -> 33 body points as (x, y) between 0 and 1, or None if nobody is found."""
     import mediapipe as mp
@@ -215,6 +323,11 @@ class PatternModel:
                 raise ModelFileError(
                     f"This model expects images prepared as '{inp.get('preprocess')}', "
                     "which this starter doesn't know. Ask your teacher for the latest starter.")
+        elif inp["type"] == "audio":
+            if inp.get("preprocess") != AUDIO_PREPROCESS_ID:
+                raise ModelFileError(
+                    f"This model expects sounds prepared as '{inp.get('preprocess')}', "
+                    "which this starter doesn't know. Ask your teacher for the latest starter.")
         elif inp["type"] == "pose":
             if inp.get("preprocess") != POSE_PREPROCESS_ID:
                 raise ModelFileError(
@@ -256,8 +369,12 @@ class PatternModel:
 
     def embed(self, image):
         """The numbers the trained part sees for this picture (for looking inside).
-        Body-pose models: None if nobody is in the picture."""
+        Body-pose models: None if nobody is in the picture.
+        Sound models: one row of 521 numbers per second of sound (None if empty)."""
         emb = self.spec["input"]["embedding"]
+        if self.input_type == "audio":
+            wins = sound_windows(image, emb["model"])
+            return np.stack([v for v, _ in wins]) if wins else None
         if self.input_type == "pose":
             vec = _pose_vector(image, emb["model"])
             if vec is None:
@@ -274,7 +391,12 @@ class PatternModel:
         """Confidence for every class, e.g. {'cat': 0.93, 'dog': 0.07}.
         Body-pose models: None if nobody is in the picture."""
         vec = self.embed(image)
-        return None if vec is None else self.predict_embedding(vec)
+        if vec is None:
+            return None
+        if self.input_type == "audio":   # average the class percentages over each second
+            per = [self.predict_embedding(v) for v in vec]
+            return {name: float(np.mean([p[name] for p in per])) for name in self.classes}
+        return self.predict_embedding(vec)
 
     def top(self, image):
         """(most likely class, confidence). Body-pose models: (None, 0.0) if nobody is found."""
