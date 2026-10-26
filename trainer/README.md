@@ -4,7 +4,7 @@ A small browser tool for learning how image classifiers work (aimed at about Yea
 classes, train a model in the browser, test it, and download `my_model.json` to use in the Python/Gradio starters.
 Nothing is uploaded: photos and training stay on the student's computer.
 
-**Use it:** `https://edu-matthew-pham.github.io/waypoints-tools/trainer/` (once GitHub Pages is on).
+**Use it:** https://tools.learningwaypoints.com/trainer/
 Add `?settings=1` to the address to show test settings (hidden units, epochs, learning rate, batch size).
 
 ## How it works
