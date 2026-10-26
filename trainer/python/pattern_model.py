@@ -13,8 +13,12 @@ STUDENTS: you do not need to edit this file.
 `image` can be a PIL image or a numpy array (Gradio gives you a numpy array).
 `predict` returns a dict, which Gradio's Label output shows directly.
 
+Works for both kinds of Pattern Trainer model:
+  * Pictures   needs mobilenet_v2_embedder.tflite in this folder
+  * Body poses needs pose_landmarker_lite.task in this folder.
+               If nobody is in the picture, predict() gives None and top() gives (None, 0.0).
+
 Needs: pip install mediapipe pillow   (no TensorFlow)
-Keep the image model file (mobilenet_v2_embedder.tflite) in the same folder as this file.
 """
 
 import atexit
@@ -26,6 +30,7 @@ import numpy as np
 SUPPORTED_VERSION = 1
 CHECK_TOLERANCE = 1e-4
 IMAGE_PREPROCESS_ID = "mediapipe-image-embedder-centre-crop-v1"
+POSE_PREPROCESS_ID = "mediapipe-pose-lite-xy-centred-v1"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -72,20 +77,36 @@ def _to_rgb_pixels(image):
 _embedders = {}
 
 
+def _model_path(model_file):
+    path = model_file if os.path.isabs(model_file) else os.path.join(HERE, model_file)
+    if not os.path.exists(path):
+        raise ModelFileError(
+            f"Can't find the model file '{model_file}'. It should be in the same "
+            "folder as pattern_model.py. Ask your teacher for it.")
+    return path
+
+
 def _image_embedder(model_file):
     if model_file not in _embedders:
-        path = model_file if os.path.isabs(model_file) else os.path.join(HERE, model_file)
-        if not os.path.exists(path):
-            raise ModelFileError(
-                f"Can't find the image model '{model_file}'. It should be in the same "
-                "folder as pattern_model.py. Ask your teacher for it.")
         from mediapipe.tasks import python as mp_tasks
         from mediapipe.tasks.python import vision
 
         options = vision.ImageEmbedderOptions(
-            base_options=mp_tasks.BaseOptions(model_asset_path=path),
+            base_options=mp_tasks.BaseOptions(model_asset_path=_model_path(model_file)),
             l2_normalize=False, quantize=False)
         _embedders[model_file] = vision.ImageEmbedder.create_from_options(options)
+    return _embedders[model_file]
+
+
+def _pose_detector(model_file):
+    if model_file not in _embedders:
+        from mediapipe.tasks import python as mp_tasks
+        from mediapipe.tasks.python import vision
+
+        options = vision.PoseLandmarkerOptions(
+            base_options=mp_tasks.BaseOptions(model_asset_path=_model_path(model_file)),
+            running_mode=vision.RunningMode.IMAGE, num_poses=1)
+        _embedders[model_file] = vision.PoseLandmarker.create_from_options(options)
     return _embedders[model_file]
 
 
@@ -103,6 +124,31 @@ def _embed_image(image, model_file):
     pixels = mp.Image(image_format=mp.ImageFormat.SRGB, data=_to_rgb_pixels(image))
     result = _image_embedder(model_file).embed(pixels)
     return np.array(result.embeddings[0].embedding, dtype="float32")
+
+
+def pose_points(image, model_file="pose_landmarker_lite.task"):
+    """Picture -> 33 body points as (x, y) between 0 and 1, or None if nobody is found."""
+    import mediapipe as mp
+
+    pixels = mp.Image(image_format=mp.ImageFormat.SRGB, data=_to_rgb_pixels(image))
+    result = _pose_detector(model_file).detect(pixels)
+    if not result.pose_landmarks:
+        return None
+    return np.array([[p.x, p.y] for p in result.pose_landmarks[0]], dtype="float64")
+
+
+def _pose_vector(image, model_file):
+    """33 body points -> 66 numbers: centred on the middle of the hips, divided by the
+    torso length (mid-shoulders to mid-hips). Same as the browser trainer."""
+    pts = pose_points(image, model_file)
+    if pts is None:
+        return None
+    hips = (pts[23] + pts[24]) / 2
+    shoulders = (pts[11] + pts[12]) / 2
+    scale = float(np.hypot(*(shoulders - hips)))
+    if not scale > 1e-6:
+        scale = 1.0
+    return ((pts - hips) / scale).astype("float32").reshape(-1)
 
 
 # ----------------------------------------------------------------- head side
@@ -170,7 +216,10 @@ class PatternModel:
                     f"This model expects images prepared as '{inp.get('preprocess')}', "
                     "which this starter doesn't know. Ask your teacher for the latest starter.")
         elif inp["type"] == "pose":
-            raise ModelFileError("Pose models aren't supported by this starter yet.")
+            if inp.get("preprocess") != POSE_PREPROCESS_ID:
+                raise ModelFileError(
+                    f"This model expects body poses prepared as '{inp.get('preprocess')}', "
+                    "which this starter doesn't know. Ask your teacher for the latest starter.")
         else:
             raise ModelFileError(f"Unknown input type '{inp['type']}'.")
 
@@ -206,19 +255,31 @@ class PatternModel:
         return {name: float(p) for name, p in zip(self.classes, x)}
 
     def embed(self, image):
-        """The numbers the trained part sees for this picture (for looking inside)."""
+        """The numbers the trained part sees for this picture (for looking inside).
+        Body-pose models: None if nobody is in the picture."""
         emb = self.spec["input"]["embedding"]
-        vec = _embed_image(image, emb["model"])
+        if self.input_type == "pose":
+            vec = _pose_vector(image, emb["model"])
+            if vec is None:
+                return None
+        else:
+            vec = _embed_image(image, emb["model"])
         if vec.shape[0] != emb["dim"]:
             raise ModelFileError(
-                f"The image model gave {vec.shape[0]} numbers but this model file expects "
-                f"{emb['dim']}. Check you have the right image model file.")
+                f"The model file '{emb['model']}' gave {vec.shape[0]} numbers but your downloaded "
+                f"model expects {emb['dim']}. Check you have the right model file.")
         return vec
 
     def predict(self, image):
-        return self.predict_embedding(self.embed(image))
+        """Confidence for every class, e.g. {'cat': 0.93, 'dog': 0.07}.
+        Body-pose models: None if nobody is in the picture."""
+        vec = self.embed(image)
+        return None if vec is None else self.predict_embedding(vec)
 
     def top(self, image):
+        """(most likely class, confidence). Body-pose models: (None, 0.0) if nobody is found."""
         probs = self.predict(image)
+        if probs is None:
+            return None, 0.0
         best = max(probs, key=probs.get)
         return best, probs[best]
