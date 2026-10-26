@@ -11,3 +11,7 @@ Hosted with GitHub Pages: `https://edu-matthew-pham.github.io/waypoints-tools/` 
 the `main` branch, root folder).
 
 If a tool ever needs a build step or its own releases, it moves to its own repo.
+
+## Licence
+
+MIT (see `LICENSE`). Third-party files in `trainer/vendor/` and the image model keep their own Apache-2.0 licences; see `trainer/vendor/README.md`.
