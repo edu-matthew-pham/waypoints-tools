@@ -7,8 +7,8 @@ plain HTML/JS with no build step, and no shared code between tools.
 |---|---|
 | [`trainer/`](trainer/) | Pattern Trainer: train an image classifier in the browser and download it for the [Python/Gradio starters](https://github.com/edu-matthew-pham/pattern-detector-starters). |
 
-Hosted with GitHub Pages: `https://edu-matthew-pham.github.io/waypoints-tools/` (Settings → Pages → deploy from
-the `main` branch, root folder).
+Live at https://tools.learningwaypoints.com/ (GitHub Pages from `main`, root folder; the custom domain is set by the
+`CNAME` file and a `tools` CNAME record pointing to `edu-matthew-pham.github.io`).
 
 If a tool ever needs a build step or its own releases, it moves to its own repo.
 
