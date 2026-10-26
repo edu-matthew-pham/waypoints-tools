@@ -236,6 +236,10 @@ def main():
         check(pg.locator("#check").is_visible() and pg.locator("#confusion tbody tr").count() == 3,
               "accuracy panel shows a 3x3 mix-up table")
         print("     ", pg.locator("#check-msg").text_content(), "|", pg.locator("#check-mixup").text_content())
+        check("rough guide" in pg.locator("#check-mixup").text_content(),
+              "with under 10 held-back examples, the panel says the score is a rough guide")
+        check(pg.locator("#confusion caption").text_content().startswith("Rows: what it really was"),
+              "mix-up table has a plain caption")
 
         pg.wait_for_timeout(600)
         live = pg.evaluate("window.__trainer.state.lastPrediction")

@@ -56,8 +56,8 @@
         <p id="train-msg" class="msg" role="status"></p>
         <div id="check" class="check" hidden>
           <h3>How well does it do on new examples?</h3>
-          <p id="check-msg"></p>
-          <div class="table-wrap"><table id="confusion" class="confusion" aria-label="What each class was really, against what the model guessed"></table></div>
+          <p id="check-msg" role="status"></p>
+          <div class="table-wrap"><table id="confusion" class="confusion"></table></div>
           <p id="check-mixup" class="hint"></p>
           <p id="check-how" class="hint">How this works: before the final training, the trainer held back the newest 20% of each class's examples, trained without them, then tested on them. If you recorded each class in one go, those examples look a lot like the rest, so it will do worse in real life. Test with new photos and different backgrounds too.</p>
         </div>

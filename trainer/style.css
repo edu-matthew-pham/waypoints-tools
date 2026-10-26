@@ -104,7 +104,8 @@ progress { width: 100%; margin-top: 10px; }
 .confusion th { font-weight: 600; color: var(--muted); }
 .confusion th[scope=row] { text-align: left; color: var(--text); }
 .confusion td.hit { background: color-mix(in srgb, var(--ok) 18%, transparent); font-weight: 700; }
-.confusion td.miss { background: color-mix(in srgb, var(--rec) 18%, transparent); font-weight: 700; }
+.confusion td.miss { background: color-mix(in srgb, var(--rec) 18%, transparent); font-weight: 700; outline: 2px solid var(--rec); outline-offset: -3px; }
+.confusion caption { caption-side: top; text-align: left; color: var(--muted); font-size: .85rem; padding-bottom: 4px; }
 
 .test-img { display: block; max-width: 160px; max-height: 160px; margin-top: 10px; border-radius: 8px; }
 .bars { display: grid; gap: 8px; margin-top: 12px; }

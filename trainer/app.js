@@ -444,15 +444,20 @@ function renderCheck() {
     c.names.forEach((_, g) => {
       const td = document.createElement("td");
       td.textContent = c.matrix[r][g];
+      // Not colour alone: a border on mix-ups, and words for screen readers.
+      const note = r === g ? " right" : c.matrix[r][g] ? " mixed up" : "";
+      if (note) td.append(Object.assign(document.createElement("span"), { className: "visually-hidden", textContent: note }));
       if (r === g) td.className = "hit"; else if (c.matrix[r][g]) td.className = "miss";
       tr.append(td);
     });
     return tr;
   });
   const headRow = document.createElement("tr");
-  headRow.append(Object.assign(document.createElement("th"), { scope: "col", textContent: "Really ↓ / Guessed →" }),
+  headRow.append(Object.assign(document.createElement("th"), { scope: "col", textContent: "Really \\ Guessed" }),
                  ...c.names.map((n) => Object.assign(document.createElement("th"), { scope: "col", textContent: n })));
-  table.replaceChildren(Object.assign(document.createElement("thead")), Object.assign(document.createElement("tbody")));
+  table.replaceChildren(
+    Object.assign(document.createElement("caption"), { textContent: "Rows: what it really was. Columns: what the model guessed." }),
+    document.createElement("thead"), document.createElement("tbody"));
   table.tHead.append(headRow);
   table.tBodies[0].append(...rows);
   table.hidden = false;
@@ -461,6 +466,7 @@ function renderCheck() {
   mix.textContent = worst
     ? `Most common mix-up: “${c.names[worst.r]}” guessed as “${c.names[worst.g]}” (${worst.n} time${worst.n === 1 ? "" : "s"}). More varied examples of both usually help.`
     : "No mix-ups on these examples.";
+  if (c.total < 10) mix.textContent += ` Only ${c.total} examples were checked, so treat this score as a rough guide.`;
 }
 
 // ---------------------------------------------------------------- testing
