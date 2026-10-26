@@ -1,0 +1,39 @@
+<!doctype html><meta charset="utf-8"><script src="tf.min.js"></script><script src="export.js"></script>
+<script type="module">
+import { FilesetResolver, AudioClassifier } from "./audio_bundle.mjs";
+function parseWav(buf){ // 16-bit mono PCM -> {x: Float32Array, sr}
+  const v=new DataView(buf); let p=12, sr=0, x=null;
+  while(p<v.byteLength){ const id=String.fromCharCode(...new Uint8Array(buf,p,4)), n=v.getUint32(p+4,true);
+    if(id==="fmt ") sr=v.getUint32(p+12,true);
+    if(id==="data"){ x=new Float32Array(n/2); for(let i=0;i<x.length;i++) x[i]=v.getInt16(p+8+2*i,true)/32768; }
+    p+=8+n+(n%2); }
+  return {x, sr};
+}
+let clf;
+function scores(x, sr){
+  const res=clf.classify(x, sr); const v=new Float32Array(521);
+  for(const r of res) for(const c of r.classifications[0].categories) v[c.index]+=c.score/res.length;
+  return {v: Array.from(v), windows: res.length};
+}
+window.run=async(names)=>{
+  const files=await FilesetResolver.forAudioTasks(new URL("wasm",location.href).href);
+  clf=await AudioClassifier.createFromOptions(files,{baseOptions:{modelAssetPath:new URL("yamnet.tflite",location.href).href,delegate:"CPU"},maxResults:-1});
+  const ctx=new AudioContext(); const out={ctxRate: ctx.sampleRate, raw:{}, decoded:{}};
+  for(const n of names){
+    const buf=await (await fetch(`clips/${n}.wav`)).arrayBuffer();
+    const {x,sr}=parseWav(buf.slice(0)); out.raw[n]=scores(x,sr);
+    const ab=await ctx.decodeAudioData(buf.slice(0)); out.decoded[n]=scores(ab.getChannelData(0), ab.sampleRate);
+  }
+  // tiny training on raw-path features: 12 per class train, 4 per class test (16 kHz clips only)
+  const kinds=["beep","hiss","whistle","knock"]; const xs=[],ys=[],test=[];
+  kinds.forEach((k,ci)=>{ for(let i=0;i<16;i++){ const v=out.raw[`${k}_${i}`].v; if(i<12){xs.push(v);ys.push(ci);} else test.push({n:`${k}_${i}`,ci}); } });
+  tf.setBackend("cpu"); await tf.ready();
+  const m=tf.sequential({layers:[tf.layers.dense({inputShape:[521],units:16,activation:"relu"}),tf.layers.dense({units:4,activation:"softmax"})]});
+  m.compile({optimizer:tf.train.adam(0.003),loss:"categoricalCrossentropy"});
+  await m.fit(tf.tensor2d(xs),tf.oneHot(tf.tensor1d(ys,"int32"),4),{epochs:60,batchSize:16});
+  out.test=test.map(t=>({n:t.n, ci:t.ci, probs:Array.from(m.predict(tf.tensor2d([out.raw[t.n].v])).dataSync())}));
+  out.head=JSON.parse(exportHead(m, kinds, {}));
+  return out;
+};
+window.ready=true;
+</script>
