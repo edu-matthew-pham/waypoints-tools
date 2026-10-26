@@ -68,7 +68,7 @@ file, `mobilenet_v2_embedder.tflite`, run by MediaPipe on both sides.
 | `kernel` | `shape: [in, out]`, `data` is a flat array in **row-major** order (TF.js `dataSync()` already gives this). |
 | `bias` | `shape: [out]`. |
 | `check` | Optional but recommended. The head's output on a fixed ramp input `x[i] = ((i * 37) % 100) / 100`. The loader recomputes it and refuses to run if it differs by more than 1e-4. Catches weight layout bugs, not image problems. |
-| `training` | Optional, informational. Not read by the loader. |
+| `training` | Optional, informational. Not read by the loader. The trainer writes examples per class, its settings, and `check_correct` / `check_total` (held-back accuracy check) when every class had at least 5 examples. |
 
 ## Size
 

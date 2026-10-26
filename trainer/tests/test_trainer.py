@@ -227,6 +227,16 @@ def main():
         wait_js(pg, "document.querySelector('#train-msg').textContent.startsWith('Trained on')", timeout=120000)
         print("     ", pg.locator("#train-msg").text_content())
 
+        # Accuracy check on held-back examples
+        chk = pg.evaluate("() => window.__trainer.state.check")
+        counts = [len(train[n]) for n in names] + [n_cam]
+        expected = sum(max(1, round(n * 0.2)) for n in counts)
+        check(chk is not None and chk["total"] == expected and sum(map(sum, chk["matrix"])) == expected,
+              f"accuracy check holds back newest 20% per class ({chk and chk['correct']}/{chk and chk['total']} right, expected {expected} held back)")
+        check(pg.locator("#check").is_visible() and pg.locator("#confusion tbody tr").count() == 3,
+              "accuracy panel shows a 3x3 mix-up table")
+        print("     ", pg.locator("#check-msg").text_content(), "|", pg.locator("#check-mixup").text_content())
+
         pg.wait_for_timeout(600)
         live = pg.evaluate("window.__trainer.state.lastPrediction")
         check(bool(live) and max(live, key=live.get) == "webcam", f"live camera preview predicts 'webcam' ({live and max(live.values()):.2f})")
@@ -273,6 +283,20 @@ def main():
               + ("" if not requests_after_load else f": {requests_after_load[:3]}"))
         ctx.set_offline(False)
 
+        # Too few examples for a check: friendly message instead of a score
+        pg3 = ctx.new_page()
+        pg3.goto(f"http://127.0.0.1:{port}/index.html")
+        wait_js(pg3, "window.__trainer && window.__trainer.ready()")
+        for i, name in enumerate(names):
+            pg3.locator(".class-card").nth(i).locator(".upload").set_input_files(train[name][:3])
+            wait_js(pg3, f"document.querySelectorAll('.class-card')[{i}].querySelector('.count').textContent.startsWith('3 ')")
+        pg3.click("#train-btn")
+        wait_js(pg3, "document.querySelector('#train-msg').textContent.startsWith('Trained on')", 120000)
+        msg = pg3.locator("#check-msg").text_content()
+        check(msg.startswith("Add at least 5") and pg3.locator("#confusion").is_hidden(),
+              "with under 5 examples per class, the panel explains instead of scoring")
+        pg3.close()
+
         # Phone width
         pg.set_viewport_size({"width": 390, "height": 844})
         pg.wait_for_timeout(200)
@@ -293,6 +317,8 @@ def main():
     pm.HERE = os.path.dirname(MODEL)
     model = pm.PatternModel.load(out)
     check(model.classes == names + ["webcam"], f"exported classes {model.classes}")
+    tr = json.load(open(out))["training"]
+    check("check_correct" in tr and "check_total" in tr, f"download records the accuracy check ({tr.get('check_correct')}/{tr.get('check_total')})")
     worst, same = 0.0, 0
     for t in tests:
         py = model.predict(Image.open(t))

@@ -270,6 +270,7 @@ function refresh() {
     setMsg(el.trainMsg, "Your examples have changed. Train again to update the model.", "warn");
   }
   if (!upToDate) setMsg(el.exportMsg, state.model ? "Train again before downloading." : "");
+  $("#check").hidden = !upToDate;
 }
 
 function setMsg(node, text, kind = "") {
@@ -293,6 +294,73 @@ function settings() {
   };
 }
 
+class DivergedError extends Error {}
+const CHECK_MIN = 5;          // examples per class needed before holding some back
+const CHECK_SHARE = 0.2;      // hold back the newest 20% of each class
+
+// Train one small model. Always cleans up its tensors; throws on failure.
+async function fitModel(xsArr, ysArr, nClasses, cfg, onEpoch) {
+  const dim = xsArr[0].length;
+  const xs = tf.tensor2d(Float32Array.from(xsArr.flatMap((e) => Array.from(e))), [xsArr.length, dim]);
+  const ys = tf.tidy(() => tf.oneHot(tf.tensor1d(ysArr, "int32"), nClasses));
+  const optimizer = tf.train.adam(cfg.lr);
+  const model = tf.sequential();
+  if (cfg.hidden > 0) {
+    model.add(tf.layers.dense({ inputShape: [dim], units: cfg.hidden, activation: "relu" }));
+    model.add(tf.layers.dense({ units: nClasses, activation: "softmax" }));
+  } else {
+    model.add(tf.layers.dense({ inputShape: [dim], units: nClasses, activation: "softmax" }));
+  }
+  model.compile({ optimizer, loss: "categoricalCrossentropy", metrics: ["accuracy"] });
+  let lastAcc = 0;
+  try {
+    await model.fit(xs, ys, {
+      epochs: cfg.epochs, batchSize: cfg.batch, shuffle: true,
+      callbacks: {
+        onEpochEnd: async (epoch, logs) => {
+          lastAcc = logs.acc ?? logs.accuracy ?? 0;
+          onEpoch(epoch);
+          await tf.nextFrame();
+        },
+      },
+    });
+  } catch (err) {
+    model.dispose();
+    throw err;
+  } finally {
+    xs.dispose(); ys.dispose(); optimizer.dispose();
+  }
+  if (!model.getWeights().every((w) => w.dataSync().every(Number.isFinite))) {
+    model.dispose();
+    throw new DivergedError();
+  }
+  return { model, lastAcc };
+}
+
+// Hold back the newest examples of each class (not a random pick: frames recorded
+// back to back are near-duplicates, so a random pick would score unrealistically well).
+function splitForCheck() {
+  if (state.classes.some((c) => c.examples.length < CHECK_MIN)) return null;
+  const split = { trX: [], trY: [], teX: [], teY: [] };
+  state.classes.forEach((c, k) => {
+    const n = c.examples.length;
+    const nTest = Math.max(1, Math.round(n * CHECK_SHARE));
+    c.examples.forEach((e, i) => {
+      if (i < n - nTest) { split.trX.push(e); split.trY.push(k); } else { split.teX.push(e); split.teY.push(k); }
+    });
+  });
+  return split;
+}
+
+function evaluate(model, teX, teY, nClasses) {
+  const guesses = tf.tidy(() =>
+    Array.from(model.predict(tf.tensor2d(Float32Array.from(teX.flatMap((e) => Array.from(e))), [teX.length, teX[0].length])).argMax(1).dataSync()));
+  const matrix = Array.from({ length: nClasses }, () => new Array(nClasses).fill(0));
+  guesses.forEach((g, i) => { matrix[teY[i]][g]++; });
+  const correct = guesses.filter((g, i) => g === teY[i]).length;
+  return { correct, total: teY.length, matrix };
+}
+
 async function train() {
   if (problems() || state.training) return;
   state.training = true;
@@ -301,70 +369,98 @@ async function train() {
   const names = state.classes.map((c) => c.name.trim());
   const xsArr = [], ysArr = [];
   state.classes.forEach((c, k) => c.examples.forEach((e) => { xsArr.push(e); ysArr.push(k); }));
-  const dim = xsArr[0].length;
   const version = state.dataVersion;
+  const split = splitForCheck();
+  const phases = split ? 2 : 1;
+  let phase = 0;
+  const onEpoch = (epoch) => {
+    el.progress.value = (phase + (epoch + 1) / cfg.epochs) / phases;
+    setMsg(el.trainMsg, split && phase === 0
+      ? `Checking on held-back examples… round ${epoch + 1} of ${cfg.epochs}`
+      : `Training… round ${epoch + 1} of ${cfg.epochs}`);
+  };
 
   el.progress.hidden = false; el.progress.value = 0;
   setMsg(el.trainMsg, "Training…");
-  const xs = tf.tensor2d(Float32Array.from(xsArr.flatMap((e) => Array.from(e))), [xsArr.length, dim]);
-  const ys = tf.tidy(() => tf.oneHot(tf.tensor1d(ysArr, "int32"), names.length));
-  const optimizer = tf.train.adam(cfg.lr);
-  const model = tf.sequential();
-  if (cfg.hidden > 0) {
-    model.add(tf.layers.dense({ inputShape: [dim], units: cfg.hidden, activation: "relu" }));
-    model.add(tf.layers.dense({ units: names.length, activation: "softmax" }));
-  } else {
-    model.add(tf.layers.dense({ inputShape: [dim], units: names.length, activation: "softmax" }));
-  }
-  model.compile({ optimizer, loss: "categoricalCrossentropy", metrics: ["accuracy"] });
   const t0 = performance.now();
-  let lastAcc = 0;
+  let check = null, result;
   try {
-    await model.fit(xs, ys, {
-      epochs: cfg.epochs, batchSize: cfg.batch, shuffle: true,
-      callbacks: {
-        onEpochEnd: async (epoch, logs) => {
-          el.progress.value = (epoch + 1) / cfg.epochs;
-          lastAcc = logs.acc ?? logs.accuracy ?? 0;
-          setMsg(el.trainMsg, `Training… round ${epoch + 1} of ${cfg.epochs}`);
-          await tf.nextFrame();
-        },
-      },
-    });
+    if (split) {
+      const { model: checkModel } = await fitModel(split.trX, split.trY, names.length, cfg, onEpoch);
+      check = { ...evaluate(checkModel, split.teX, split.teY, names.length), names };
+      checkModel.dispose();
+      phase = 1;
+    }
+    result = await fitModel(xsArr, ysArr, names.length, cfg, onEpoch);
   } catch (err) {
     console.error(err);
-    model.dispose(); optimizer.dispose();
     state.training = false;
     el.progress.hidden = true;
-    setMsg(el.trainMsg, "Training didn't work. Try again, or reload the page.", "warn");
-    refresh();
-    return;
-  } finally {
-    xs.dispose(); ys.dispose();
-  }
-  optimizer.dispose();   // only needed during training; keeps memory flat across retrains
-  const finite = model.getWeights().every((w) => w.dataSync().every(Number.isFinite));
-  if (!finite) {
-    model.dispose();
-    state.training = false;
-    el.progress.hidden = true;
-    setMsg(el.trainMsg, "Training went wrong (the numbers blew up). Try again with a smaller learning rate.", "warn");
+    setMsg(el.trainMsg, err instanceof DivergedError
+      ? "Training went wrong (the numbers blew up). Try again with a smaller learning rate."
+      : "Training didn't work. Try again, or reload the page.", "warn");
     refresh();
     return;
   }
   if (state.model) state.model.dispose();
-  state.model = model;
+  state.model = result.model;
   state.modelClasses = names;
   state.trainedSettings = cfg;
   state.trainedCounts = state.classes.map((c) => c.examples.length);
   state.trainedVersion = version;
+  state.check = check;
   state.training = false;
   el.progress.hidden = true;
   const secs = ((performance.now() - t0) / 1000).toFixed(1);
-  setMsg(el.trainMsg, `Trained on ${xsArr.length} examples in ${secs} s. It got ${Math.round(lastAcc * 100)}% of its own training examples right; test it on new ones below.`, "ok");
+  setMsg(el.trainMsg, `Trained on ${xsArr.length} examples in ${secs} s. On its own training examples it scores ${Math.round(result.lastAcc * 100)}%, but that's the easy test.`, "ok");
   setMsg(el.exportMsg, "");
+  renderCheck();
   refresh();
   startPreview();
+}
+
+// ---------------------------------------------------------------- accuracy check
+
+function renderCheck() {
+  const box = $("#check");
+  const c = state.check;
+  if (!state.model) { box.hidden = true; return; }
+  box.hidden = false;
+  const head = $("#check-msg"), table = $("#confusion"), mix = $("#check-mixup");
+  if (!c) {
+    head.textContent = `Add at least ${CHECK_MIN} examples to every class to see how it does on examples it hasn't seen.`;
+    table.hidden = true; mix.textContent = "";
+    $("#check-how").hidden = true;
+    return;
+  }
+  $("#check-how").hidden = false;
+  const pct = Math.round((c.correct / c.total) * 100);
+  head.innerHTML = "";
+  head.append(Object.assign(document.createElement("strong"), { textContent: `${c.correct} of ${c.total} right (${pct}%)` }),
+              " on held-back examples it wasn't trained on.");
+  const rows = c.names.map((name, r) => {
+    const tr = document.createElement("tr");
+    tr.append(Object.assign(document.createElement("th"), { scope: "row", textContent: name }));
+    c.names.forEach((_, g) => {
+      const td = document.createElement("td");
+      td.textContent = c.matrix[r][g];
+      if (r === g) td.className = "hit"; else if (c.matrix[r][g]) td.className = "miss";
+      tr.append(td);
+    });
+    return tr;
+  });
+  const headRow = document.createElement("tr");
+  headRow.append(Object.assign(document.createElement("th"), { scope: "col", textContent: "Really ↓ / Guessed →" }),
+                 ...c.names.map((n) => Object.assign(document.createElement("th"), { scope: "col", textContent: n })));
+  table.replaceChildren(Object.assign(document.createElement("thead")), Object.assign(document.createElement("tbody")));
+  table.tHead.append(headRow);
+  table.tBodies[0].append(...rows);
+  table.hidden = false;
+  let worst = null;
+  c.matrix.forEach((row, r) => row.forEach((n, g) => { if (r !== g && n && (!worst || n > worst.n)) worst = { r, g, n }; }));
+  mix.textContent = worst
+    ? `Most common mix-up: “${c.names[worst.r]}” guessed as “${c.names[worst.g]}” (${worst.n} time${worst.n === 1 ? "" : "s"}). More varied examples of both usually help.`
+    : "No mix-ups on these examples.";
 }
 
 // ---------------------------------------------------------------- testing
@@ -513,7 +609,10 @@ function exportHead() {
     input: { type: "image", preprocess: PREPROCESS_ID, embedding: { model: MODEL_FILE, dim } },
     classes: state.modelClasses,
     layers, check,
-    training: { examples_per_class: state.trainedCounts, ...state.trainedSettings },
+    training: {
+      examples_per_class: state.trainedCounts, ...state.trainedSettings,
+      ...(state.check && { check_correct: state.check.correct, check_total: state.check.total }),
+    },
   });
 }
 
