@@ -202,12 +202,14 @@ function armConfirm(btn, askText, normalText) {
 }
 
 // Returns "added", "full" or "noperson" (pose mode, nobody found in the picture).
-function addExample(cls, square) {
+// live = true when the square comes from the camera: pose mode then redraws the skeleton.
+function addExample(cls, square, live = false) {
   if (cls.examples.length >= MAX_PER_CLASS) {
     cardMsg(cls, `That's the limit of ${MAX_PER_CLASS} examples for one class.`, "warn");
     return "full";
   }
   const f = features(square);
+  if (live && MODE === "pose") drawOverlay(f?.points);
   if (!f) return "noperson";
   cls.examples.push(f.vec);
   cls.thumbs.push(thumbnail(square, f.points));
@@ -249,10 +251,11 @@ function setUpRecordButton(cls, btn) {
     const grab = () => {
       if (!state.stream) { stop(); return; }
       if (el.video.readyState < 2) return;
-      const r = addExample(cls, centreSquare(el.video));
+      const r = addExample(cls, centreSquare(el.video), true);
       if (r === "added") renderClass(cls);
-      else if (r === "noperson") missed++;
-      else stop();
+      else if (r === "noperson") {
+        if (missed++ === 0) cardMsg(cls, "No person in view, so nothing is being saved. Step back so your whole body is in the square.", "warn");
+      } else stop();
     };
     grab();
     timer = setInterval(grab, RECORD_INTERVAL_MS);
@@ -592,7 +595,8 @@ function startPreview() {
   clearInterval(state.previewTimer);
   state.previewTimer = setInterval(() => {
     if (!state.embedder || !state.stream || el.video.readyState < 2) return;
-    if (document.querySelector(".record.active")) return;
+    if (state.training) return;                       // leave the CPU to training
+    if (document.querySelector(".record.active")) return;   // recording draws its own overlay
     if (!state.model && MODE !== "pose") return;      // image mode: nothing to show until trained
     try {
       const f = features(centreSquare(el.video));
@@ -730,8 +734,10 @@ function download() {
 
 // Wording that differs between the two modes.
 function setUpModeText() {
+  const keepSettings = new URLSearchParams(location.search).get("settings") === "1";
   document.querySelectorAll(".mode-nav a").forEach((a) => {
     if (a.dataset.mode === MODE) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    if (keepSettings) a.href = a.dataset.mode === "pose" ? "./?mode=pose&settings=1" : "./?settings=1";
   });
   el.loading.textContent = INPUT.loading;
   document.querySelectorAll(".download-name").forEach((n) => { n.textContent = INPUT.download; });

@@ -150,7 +150,7 @@ Recipe `mediapipe-pose-lite-xy-centred-v1`:
    example (trainer) or no prediction (loader: `predict()` gives `None`, `top()` gives `(None, 0.0)`).
 3. Take the 33 landmarks' `x, y` (0 to 1 across the square). Centre on the middle of the hips (landmarks 23, 24)
    and divide by the torso length (distance from mid-shoulders, landmarks 11 and 12, to mid-hips); use 1 if that
-   length is 0. Flatten as `x0, y0, x1, y1, ...` to 66 numbers.
+   length is under 0.000001. Flatten as `x0, y0, x1, y1, ...` to 66 numbers.
 
 Only these 66 numbers are used. The trainer's thumbnails for pose classes are stick figures, not photos.
 

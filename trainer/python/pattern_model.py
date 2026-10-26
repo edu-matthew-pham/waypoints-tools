@@ -266,8 +266,8 @@ class PatternModel:
             vec = _embed_image(image, emb["model"])
         if vec.shape[0] != emb["dim"]:
             raise ModelFileError(
-                f"The model file '{emb['model']}' gave {vec.shape[0]} numbers but my_model.json "
-                f"expects {emb['dim']}. Check you have the right model file.")
+                f"The model file '{emb['model']}' gave {vec.shape[0]} numbers but your downloaded "
+                f"model expects {emb['dim']}. Check you have the right model file.")
         return vec
 
     def predict(self, image):

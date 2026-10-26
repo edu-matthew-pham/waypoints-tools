@@ -82,6 +82,11 @@ def main():
         check(pg.locator("#loading").is_hidden(), "pose model loads")
         check(pg.locator('.mode-nav a[data-mode="pose"]').get_attribute("aria-current") == "page",
               "mode switch shows Body poses as current")
+        pg2 = ctx.new_page()
+        pg2.goto(f"http://127.0.0.1:{port}/index.html?mode=pose&settings=1")
+        wait_js(pg2, "document.querySelector('.mode-nav a').getAttribute('href') === './?settings=1'", 20000)
+        check(pg2.locator("#set-hidden").input_value() == "64", "pose mode uses its own defaults; mode links keep ?settings=1")
+        pg2.close()
 
         cards = pg.locator(".class-card")
         for i, (name, files) in enumerate(train.items()):
@@ -110,6 +115,10 @@ def main():
         pg.wait_for_timeout(1500)
         pg.mouse.up()
         n_cam = int(cards.nth(2).locator(".count").text_content().split()[0])
+        drawn_rec = pg.evaluate("""() => { const c = document.querySelector('#overlay');
+            const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+            let n = 0; for (let i = 3; i < d.length; i += 4) if (d[i]) n++; return n; }""")
+        check(drawn_rec > 200, "skeleton keeps drawing while recording")
         check(n_cam >= 5, f"hold-to-record captures poses from the webcam ({n_cam})")
 
         pg.click("#train-btn")
