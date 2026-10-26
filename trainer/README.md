@@ -5,16 +5,17 @@ classes, train a model in the browser, test it, and download `my_model.json` to 
 Nothing is uploaded: photos and training stay on the student's computer.
 
 **Use it:** `https://edu-matthew-pham.github.io/waypoints-tools/trainer/` (once GitHub Pages is on).
-Add `?settings=1` to the address to show test settings (hidden units, epochs, learning rate, batch size).
+Two modes: **Pictures** (default) and **Body poses** (`?mode=pose`). Add `?settings=1` to show test settings
+(hidden units, epochs, learning rate, batch size), e.g. `?mode=pose&settings=1`.
 
 ## How it works
 
 | Step | What happens |
 |---|---|
-| Collect | Each photo or webcam frame is cut to its centre square, then MediaPipe turns it into 1280 numbers using `models/mobilenet_v2_embedder.tflite` (the standard MobileNetV2 with ImageNet weights). |
-| Train | TF.js trains a small model on those numbers: one hidden layer of 16, then one output per class. 30 rounds (epochs), learning rate 0.001, batches of 16. Takes a few seconds. |
-| Test | Live webcam preview, or test a photo. |
-| Download | `my_model.json`: the small trained part, class names and a self-check. Format: [`EXPORT_FORMAT.md`](EXPORT_FORMAT.md). |
+| Collect | Each photo or webcam frame is cut to its centre square. **Pictures:** MediaPipe turns it into 1280 numbers using `models/mobilenet_v2_embedder.tflite` (the standard MobileNetV2 with ImageNet weights). **Body poses:** MediaPipe finds 33 body points with `models/pose_landmarker_lite.task`, turned into 66 numbers (centred on the hips, scaled by torso length); only the points are kept. |
+| Train | TF.js trains a small model on those numbers. Pictures: one hidden layer of 16, 30 rounds (epochs), learning rate 0.001. Poses: 64, 50 rounds, 0.003. Batches of 16. First it holds back the newest 20% of each class to show an accuracy check and a mix-up table, then trains on everything. Takes a few seconds. |
+| Test | Live webcam preview (with the body points drawn in pose mode), or test a photo. |
+| Download | `my_model.json` (or `my_pose_model.json`): the small trained part, class names and a self-check. Format: [`EXPORT_FORMAT.md`](EXPORT_FORMAT.md). |
 
 The [Python starter](https://github.com/edu-matthew-pham/pattern-detector-starters) loads that file with [`python/pattern_model.py`](python/pattern_model.py), using MediaPipe and the
 same `.tflite` file, so Python gives the same answers as the browser. Students need `pip install mediapipe pillow`;
@@ -24,11 +25,12 @@ no TensorFlow.
 
 ```
 index.html, app.js, style.css   the tool (plain HTML/JS, no build step)
-models/                         mobilenet_v2_embedder.tflite (9 MB, shared with the Python starters)
+models/                         mobilenet_v2_embedder.tflite (9 MB) and pose_landmarker_lite.task (5.8 MB), shared with the Python starters
 vendor/                         TF.js 4.22.0 and MediaPipe tasks-vision 1.1.1, self-hosted and pinned
 python/pattern_model.py         reference copy of the loader the starters use
 teacher/make_image_model.py     how the .tflite was made (needs TensorFlow, run once)
-tests/test_trainer.py           end-to-end test in headless Chromium, incl. browser-vs-Python match
+tests/test_trainer.py           end-to-end test (pictures) in headless Chromium, incl. browser-vs-Python match
+tests/test_pose.py              end-to-end test (body poses)
 EXPORT_FORMAT.md                the JSON format
 ```
 
@@ -43,7 +45,8 @@ model files there. The webcam also needs `localhost` or `https`.)
 ```
 pip install playwright mediapipe pillow numpy scikit-image
 playwright install chromium
-python tests/test_trainer.py path/to/pattern-detector-starters   # uses its bottle/honey photos; optional
+python tests/test_trainer.py    # pictures; uses scikit-image sample photos
+python tests/test_pose.py       # body poses
 ```
 
 It uploads photos, records from a simulated webcam, trains, tests photos (including a rotated phone photo, a PNG

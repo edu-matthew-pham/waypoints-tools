@@ -1,14 +1,25 @@
 // Pattern Trainer — plain JS, no build step.
-// Pictures -> numbers: MediaPipe ImageEmbedder + models/mobilenet_v2_embedder.tflite
+// Two modes (?mode=pose switches):
+//   Pictures:   picture -> 1280 numbers (MediaPipe ImageEmbedder + models/mobilenet_v2_embedder.tflite)
+//   Body poses: picture -> 33 body points -> 66 numbers (MediaPipe PoseLandmarker + models/pose_landmarker_lite.task)
 // Numbers -> classes: a small TF.js model trained here, exported as JSON
 // (format: see EXPORT_FORMAT.md in this folder; loader: pattern_model.py in the starters).
 
-import { FilesetResolver, ImageEmbedder } from "./vendor/mediapipe/vision_bundle.mjs";
+import { FilesetResolver, ImageEmbedder, PoseLandmarker } from "./vendor/mediapipe/vision_bundle.mjs";
 
-const APP_VERSION = "pattern-trainer 0.1.0";
-const MODEL_FILE = "mobilenet_v2_embedder.tflite";
-const PREPROCESS_ID = "mediapipe-image-embedder-centre-crop-v1";
-const DEFAULTS = { hidden: 16, epochs: 30, lr: 0.001, batch: 16 };
+const APP_VERSION = "pattern-trainer 0.2.0";
+const MODE = new URLSearchParams(location.search).get("mode") === "pose" ? "pose" : "image";
+const INPUT = {
+  image: { type: "image", modelFile: "mobilenet_v2_embedder.tflite", preprocess: "mediapipe-image-embedder-centre-crop-v1",
+           loading: "Loading the image model…", download: "my_model.json" },
+  pose: { type: "pose", modelFile: "pose_landmarker_lite.task", preprocess: "mediapipe-pose-lite-xy-centred-v1",
+          loading: "Loading the pose model…", download: "my_pose_model.json" },
+}[MODE];
+// Chosen by experiment (see the design notes): pose input is only 66 numbers, so it learns
+// better with a wider hidden layer and a higher learning rate; its files stay small anyway.
+const DEFAULTS = MODE === "pose"
+  ? { hidden: 64, epochs: 50, lr: 0.003, batch: 16 }
+  : { hidden: 16, epochs: 30, lr: 0.001, batch: 16 };
 const RECORD_INTERVAL_MS = 150;   // about 6 photos a second while holding
 const PREVIEW_INTERVAL_MS = 200;
 const MAX_PER_CLASS = 500;
@@ -60,15 +71,58 @@ function centreSquare(source) {
   return c;
 }
 
-function embed(square) {
-  const result = state.embedder.embed(square);
-  return Float32Array.from(result.embeddings[0].floatEmbedding);
+// Pose: 33 body points -> 66 numbers. Centre on the middle of the hips and divide by the
+// torso length (mid-shoulders to mid-hips), so where you stand and how far from the camera
+// you are matter much less than the pose itself. Python does exactly the same.
+function poseVector(p) {
+  const hx = (p[23].x + p[24].x) / 2, hy = (p[23].y + p[24].y) / 2;
+  const sx = (p[11].x + p[12].x) / 2, sy = (p[11].y + p[12].y) / 2;
+  let scale = Math.hypot(sx - hx, sy - hy);
+  if (!(scale > 1e-6)) scale = 1;
+  const v = new Float32Array(66);
+  p.forEach((pt, i) => { v[2 * i] = (pt.x - hx) / scale; v[2 * i + 1] = (pt.y - hy) / scale; });
+  return v;
 }
 
-function thumbnail(square) {
+// Picture square -> { vec, points } (points only in pose mode), or null if no person found.
+function features(square) {
+  if (MODE === "pose") {
+    const result = state.embedder.detect(square);
+    const points = result.landmarks?.[0];
+    return points ? { vec: poseVector(points), points } : null;
+  }
+  const result = state.embedder.embed(square);
+  return { vec: Float32Array.from(result.embeddings[0].floatEmbedding), points: null };
+}
+
+function drawSkeleton(g, points, size, dark) {
+  g.lineWidth = Math.max(2, size / 60);
+  g.strokeStyle = dark ? "#7fb0ff" : "#2f6fdd";
+  g.fillStyle = dark ? "#ffffff" : "#d64545";
+  for (const { start, end } of PoseLandmarker.POSE_CONNECTIONS) {
+    g.beginPath();
+    g.moveTo(points[start].x * size, points[start].y * size);
+    g.lineTo(points[end].x * size, points[end].y * size);
+    g.stroke();
+  }
+  for (const pt of points) {
+    g.beginPath();
+    g.arc(pt.x * size, pt.y * size, Math.max(1.5, size / 90), 0, 2 * Math.PI);
+    g.fill();
+  }
+}
+
+// Thumbnail: a small photo, or in pose mode just the stick figure (only the points are kept).
+function thumbnail(square, points) {
   const c = document.createElement("canvas");
   c.width = 64; c.height = 64;
-  c.getContext("2d").drawImage(square, 0, 0, 64, 64);
+  const g = c.getContext("2d");
+  if (points) {
+    g.fillStyle = "#1c2430"; g.fillRect(0, 0, 64, 64);
+    drawSkeleton(g, points, 64, true);
+  } else {
+    g.drawImage(square, 0, 0, 64, 64);
+  }
   return c.toDataURL("image/jpeg", 0.7);
 }
 
@@ -147,27 +201,31 @@ function armConfirm(btn, askText, normalText) {
   return false;
 }
 
+// Returns "added", "full" or "noperson" (pose mode, nobody found in the picture).
 function addExample(cls, square) {
   if (cls.examples.length >= MAX_PER_CLASS) {
     cardMsg(cls, `That's the limit of ${MAX_PER_CLASS} examples for one class.`, "warn");
-    return false;
+    return "full";
   }
-  cls.examples.push(embed(square));
-  cls.thumbs.push(thumbnail(square));
-  return true;
+  const f = features(square);
+  if (!f) return "noperson";
+  cls.examples.push(f.vec);
+  cls.thumbs.push(thumbnail(square, f.points));
+  return "added";
 }
 
 async function addFiles(cls, files) {
   if (!files.length) return;
-  if (!state.embedder) { cardMsg(cls, "Still loading the image model. Try again in a moment.", "warn"); return; }
-  let added = 0, failed = 0, tooBig = 0;
+  if (!state.embedder) { cardMsg(cls, "Still loading the model. Try again in a moment.", "warn"); return; }
+  let added = 0, failed = 0, tooBig = 0, noPerson = 0;
   for (const [i, file] of files.entries()) {
     if (!state.classes.includes(cls)) return;   // class deleted while adding
     cardMsg(cls, `Adding photo ${i + 1} of ${files.length}…`);
     try {
       const img = await loadImageFile(file);
-      if (!addExample(cls, centreSquare(img))) break;
-      added++;
+      const r = addExample(cls, centreSquare(img));
+      if (r === "full") break;
+      if (r === "noperson") noPerson++; else added++;
     } catch (err) {
       if (err instanceof TooBigError) tooBig++; else failed++;
     }
@@ -176,20 +234,25 @@ async function addFiles(cls, files) {
   changed();
   const notes = [];
   if (failed) notes.push(`${failed} file(s) couldn't be read as pictures.`);
+  if (noPerson) notes.push(`No person found in ${noPerson} photo(s), so they were skipped.`);
   if (tooBig) notes.push(`${tooBig} photo(s) were too big; use a smaller copy (under ${MAX_SQUARE} pixels on the short side).`);
   cardMsg(cls, `Added ${added} photo(s).${notes.length ? " " + notes.join(" ") : ""}`, notes.length ? "warn" : "ok");
 }
 
 function setUpRecordButton(cls, btn) {
-  let timer = null;
+  let timer = null, missed = 0;
   const start = (e) => {
     e.preventDefault();
     if (timer || !state.stream || btn.disabled) return;
     btn.classList.add("active"); btn.textContent = "Recording…";
+    missed = 0;
     const grab = () => {
       if (!state.stream) { stop(); return; }
-      if (el.video.readyState >= 2 && addExample(cls, centreSquare(el.video))) renderClass(cls);
-      else if (cls.examples.length >= MAX_PER_CLASS) stop();
+      if (el.video.readyState < 2) return;
+      const r = addExample(cls, centreSquare(el.video));
+      if (r === "added") renderClass(cls);
+      else if (r === "noperson") missed++;
+      else stop();
     };
     grab();
     timer = setInterval(grab, RECORD_INTERVAL_MS);
@@ -198,6 +261,7 @@ function setUpRecordButton(cls, btn) {
     if (!timer) return;
     clearInterval(timer); timer = null;
     btn.classList.remove("active"); btn.textContent = "Hold to record";
+    if (missed) cardMsg(cls, `No person in view for ${missed} frame(s), so they were skipped. Step back so your whole body is in the square.`, "warn");
     changed();
   };
   cls.stopRecording = stop;
@@ -465,9 +529,25 @@ function renderCheck() {
 
 // ---------------------------------------------------------------- testing
 
-function predict(square) {
-  const vec = embed(square);
+function predictVec(vec) {
   return tf.tidy(() => Array.from(state.model.predict(tf.tensor2d(vec, [1, vec.length])).dataSync()));
+}
+
+function showNoPerson(text) {
+  state.lastPrediction = null;
+  el.bars.dataset.names = "";
+  el.bars.textContent = text;
+  if (lastAnnounced !== "none") $("#bars-status").textContent = text;
+  lastAnnounced = "none";
+}
+
+// Pose mode: draw the detected body points over the camera view (mirrored like the video).
+function drawOverlay(points) {
+  const c = $("#overlay");
+  if (!c) return;
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, c.width, c.height);
+  if (points) drawSkeleton(g, points, c.width, false);
 }
 
 // Screen readers: announce test-photo results and changes of top class, not every live frame.
@@ -505,9 +585,16 @@ function showBars(probs, always = false) {
 function startPreview() {
   clearInterval(state.previewTimer);
   state.previewTimer = setInterval(() => {
-    if (!state.model || state.testing || !state.stream || el.video.readyState < 2) return;
+    if (!state.embedder || !state.stream || el.video.readyState < 2) return;
     if (document.querySelector(".record.active")) return;
-    try { showBars(predict(centreSquare(el.video))); } catch (err) { console.warn(err); }
+    if (!state.model && MODE !== "pose") return;      // image mode: nothing to show until trained
+    try {
+      const f = features(centreSquare(el.video));
+      if (MODE === "pose") drawOverlay(f?.points);
+      if (!state.model || state.testing) return;
+      if (f) showBars(predictVec(f.vec));
+      else showNoPerson("No person in view. Step back so your whole body is in the square.");
+    } catch (err) { console.warn(err); }
   }, PREVIEW_INTERVAL_MS);
 }
 
@@ -520,11 +607,18 @@ el.testFile.addEventListener("change", async () => {
   try {
     const img = await loadImageFile(file);
     const square = centreSquare(img);
-    el.testImg.src = square.toDataURL("image/jpeg", 0.85);
+    const f = features(square);
+    const shown = document.createElement("canvas");
+    shown.width = shown.height = 320;
+    const g = shown.getContext("2d");
+    g.drawImage(square, 0, 0, 320, 320);
+    if (f?.points) drawSkeleton(g, f.points, 320, false);
+    el.testImg.src = shown.toDataURL("image/jpeg", 0.85);
     el.testImg.hidden = false;
     state.testing = true;
     $("#back-to-camera").hidden = !state.stream;
-    showBars(predict(square), true);
+    if (f) showBars(predictVec(f.vec), true);
+    else showNoPerson("No person found in that photo.");
   } catch (err) {
     fail(err instanceof TooBigError
       ? `That photo is too big; use a smaller copy (under ${MAX_SQUARE} pixels on the short side).`
@@ -547,6 +641,7 @@ async function toggleCamera() {
     el.video.srcObject = null;
     el.cameraMsg.hidden = false;
     el.cameraMsg.textContent = "Camera is off";
+    drawOverlay(null);
     el.cameraBtn.textContent = "Turn on camera";
     $("#back-to-camera").hidden = true;
     changed();
@@ -606,7 +701,7 @@ function exportHead() {
   return JSON.stringify({
     format: "pattern-trainer-head", version: 1,
     created: new Date().toISOString(), app: APP_VERSION,
-    input: { type: "image", preprocess: PREPROCESS_ID, embedding: { model: MODEL_FILE, dim } },
+    input: { type: INPUT.type, preprocess: INPUT.preprocess, embedding: { model: INPUT.modelFile, dim } },
     classes: state.modelClasses,
     layers, check,
     training: {
@@ -619,13 +714,30 @@ function exportHead() {
 function download() {
   if (el.exportBtn.disabled) return;
   const blob = new Blob([exportHead()], { type: "application/json" });
-  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "my_model.json" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: INPUT.download });
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  setMsg(el.exportMsg, `Downloaded my_model.json (${Math.round(blob.size / 1024)} KB). Classes: ${state.modelClasses.join(", ")}.`, "ok");
+  setMsg(el.exportMsg, `Downloaded ${INPUT.download} (${Math.round(blob.size / 1024)} KB). Classes: ${state.modelClasses.join(", ")}.`, "ok");
 }
 
 // ---------------------------------------------------------------- start up
+
+// Wording that differs between the two modes.
+function setUpModeText() {
+  document.querySelectorAll(".mode-nav a").forEach((a) => {
+    if (a.dataset.mode === MODE) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  });
+  el.loading.textContent = INPUT.loading;
+  document.querySelectorAll(".download-name").forEach((n) => { n.textContent = INPUT.download; });
+  $("#set-hidden").value = DEFAULTS.hidden; $("#set-epochs").value = DEFAULTS.epochs;
+  $("#set-lr").value = DEFAULTS.lr; $("#set-batch").value = DEFAULTS.batch;
+  if (MODE !== "pose") return;
+  document.title = "Pattern Trainer: Body poses";
+  $("#lead").firstChild.textContent = "Teach a computer to recognise your own body poses. Only 33 body points are kept, never the pictures. ";
+  $("#classes-hint").textContent = "Make one class for each pose you want to tell apart. Give each class at least 20 examples, with your whole body in the square, from slightly different positions.";
+  $("#camera-hint").textContent = "The dots show the 33 body points the model uses; nothing else is kept. Stand back so your whole body fits in the square. It's shown like a mirror, but saved the right way round.";
+  $("#good-habits").innerHTML = "<strong>Good habits:</strong> only record yourself, or people who have said yes. Check what's behind you before you record.";
+}
 
 async function start() {
   if (new URLSearchParams(location.search).get("settings") === "1") el.settings.hidden = false;
@@ -641,17 +753,18 @@ async function start() {
   el.cameraBtn.addEventListener("click", toggleCamera);
   el.trainBtn.addEventListener("click", train);
   el.exportBtn.addEventListener("click", download);
+  setUpModeText();
   try {
     await tf.setBackend("cpu");
     const files = await FilesetResolver.forVisionTasks(new URL("vendor/mediapipe/wasm", location.href).href);
-    state.embedder = await ImageEmbedder.createFromOptions(files, {
-      baseOptions: { modelAssetPath: new URL(`models/${MODEL_FILE}`, location.href).href, delegate: "CPU" },
-      runningMode: "IMAGE",
-    });
+    const baseOptions = { modelAssetPath: new URL(`models/${INPUT.modelFile}`, location.href).href, delegate: "CPU" };
+    state.embedder = MODE === "pose"
+      ? await PoseLandmarker.createFromOptions(files, { baseOptions, runningMode: "IMAGE", numPoses: 1 })
+      : await ImageEmbedder.createFromOptions(files, { baseOptions, runningMode: "IMAGE" });
     el.loading.hidden = true;
   } catch (err) {
     console.error(err);
-    el.loading.textContent = "The image model didn't load. Check your internet connection and reload the page.";
+    el.loading.textContent = "The model didn't load. Check your internet connection and reload the page.";
     el.loading.classList.add("error");
   }
   changed();

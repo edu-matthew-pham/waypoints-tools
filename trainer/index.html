@@ -14,7 +14,11 @@
 <body>
   <header class="top">
     <h1>Pattern Trainer</h1>
-    <p class="lead">Teach a computer to sort pictures into your own groups. Your photos never leave this computer. <a href="privacy.html">How your privacy is protected</a></p>
+    <p class="lead" id="lead">Teach a computer to sort pictures into your own groups. Your photos never leave this computer. <a href="privacy.html">How your privacy is protected</a></p>
+    <nav class="mode-nav" aria-label="What are you sorting?">
+      <a href="./" data-mode="image">Pictures</a>
+      <a href="./?mode=pose" data-mode="pose">Body poses</a>
+    </nav>
     <ol class="steps">
       <li>Collect examples</li><li>Train</li><li>Test</li><li>Download</li>
     </ol>
@@ -25,7 +29,7 @@
   <main class="layout">
     <section class="panel" aria-labelledby="classes-h">
       <h2 id="classes-h"><span class="num">1</span> Collect examples</h2>
-      <p class="hint">Make one group (class) for each thing you want to tell apart. Give each group at least 20 examples from different angles, distances and lighting.</p>
+      <p class="hint" id="classes-hint">Make one group (class) for each thing you want to tell apart. Give each group at least 20 examples from different angles, distances and lighting.</p>
       <div id="classes"></div>
       <button id="add-class" class="secondary" type="button">+ Add a class</button>
     </section>
@@ -35,10 +39,11 @@
         <h2 id="camera-h">Camera</h2>
         <div class="camera">
           <video id="video" playsinline muted></video>
+          <canvas id="overlay" class="overlay" width="300" height="300" aria-hidden="true"></canvas>
           <p id="camera-msg" class="camera-msg">Camera is off</p>
         </div>
-        <p class="hint">The model only sees what's inside this square. It's shown like a mirror, but saved the right way round.</p>
-        <p class="note"><strong>Good habits:</strong> train on things, not people, where you can: objects, drawings, hand signs. If your project needs faces, use only your own, and never other people's without asking. Check what's behind you before you record.</p>
+        <p class="hint" id="camera-hint">The model only sees what's inside this square. It's shown like a mirror, but saved the right way round.</p>
+        <p class="note" id="good-habits"><strong>Good habits:</strong> train on things, not people, where you can: objects, drawings, hand signs. If your project needs faces, use only your own, and never other people's without asking. Check what's behind you before you record.</p>
         <button id="camera-btn" type="button">Turn on camera</button>
       </section>
 
@@ -75,8 +80,8 @@
 
       <section class="panel" aria-labelledby="export-h">
         <h2 id="export-h"><span class="num">4</span> Download</h2>
-        <p class="hint">Save your model, then put <code>my_model.json</code> in the same folder as your <a href="https://github.com/edu-matthew-pham/pattern-detector-starters">Python starter</a>.</p>
-        <button id="export-btn" type="button" disabled>Download my_model.json</button>
+        <p class="hint">Save your model, then put <code class="download-name">my_model.json</code> in the same folder as your <a href="https://github.com/edu-matthew-pham/pattern-detector-starters">Python starter</a>.</p>
+        <button id="export-btn" type="button" disabled>Download <span class="download-name">my_model.json</span></button>
         <p id="export-msg" class="msg" role="status"></p>
       </section>
     </div>

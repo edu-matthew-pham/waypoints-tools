@@ -54,6 +54,28 @@ def wait_js(pg, expr, timeout=60000):
     raise TimeoutError(f"timed out waiting for: {expr}")
 
 
+class _Quiet(http.server.SimpleHTTPRequestHandler):
+    extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map,
+                      ".mjs": "text/javascript", ".wasm": "application/wasm",
+                      ".tflite": "application/octet-stream", ".task": "application/octet-stream"}
+
+    def log_message(self, *a):
+        pass
+
+    def handle(self):
+        try:
+            super().handle()
+        except ConnectionResetError:   # the browser closing early is fine
+            pass
+
+
+def serve():
+    """Serve the trainer folder on a free local port. Returns (server, port)."""
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(_Quiet, directory=TRAINER))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, srv.server_address[1]
+
+
 # ------------------------------------------------------------------ test photos
 def sample_sources(folder):
     """Two 'classes' of source photos. Uses the folder given, else built-in sample images."""
@@ -146,16 +168,7 @@ def main():
     cam = os.path.join(tmp, "webcam.y4m")
     make_fake_webcam(cam, cam_src)
 
-    class Quiet(http.server.SimpleHTTPRequestHandler):
-        extensions_map = {**http.server.SimpleHTTPRequestHandler.extensions_map,
-                          ".mjs": "text/javascript", ".wasm": "application/wasm", ".tflite": "application/octet-stream"}
-
-        def log_message(self, *a):
-            pass
-
-    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=TRAINER))
-    port = srv.server_address[1]
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    srv, port = serve()
 
     errors, browser_preds = [], {}
     with sync_playwright() as p:

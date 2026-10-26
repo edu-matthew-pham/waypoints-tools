@@ -60,8 +60,8 @@ file, `mobilenet_v2_embedder.tflite`, run by MediaPipe on both sides.
 | `format` | Always `"pattern-trainer-head"`. Loader rejects anything else. |
 | `version` | Integer. Bump only for breaking changes. Loader accepts exactly the versions it knows and otherwise says "ask your teacher for the latest starter". |
 | `created`, `app` | Informational (ISO 8601 UTC; tool name and version). |
-| `input.type` | `"image"` now; `"pose"` later. |
-| `input.preprocess` | A **named recipe**. `mediapipe-image-embedder-centre-crop-v1` = take the centre square of the picture at full resolution (no resizing) on a white background (see-through pixels count as white), then MediaPipe ImageEmbedder with default settings (`l2Normalize` and `quantize` off), given RGB pixels (see "Image preparation"). The loader refuses IDs it doesn't know, so a mismatch fails loudly instead of silently lowering accuracy. Pose will get its own ID (e.g. `mediapipe-pose-33-centred-v1`). |
+| `input.type` | `"image"` or `"pose"` (see "Body poses"). |
+| `input.preprocess` | A **named recipe**. `mediapipe-image-embedder-centre-crop-v1` = take the centre square of the picture at full resolution (no resizing) on a white background (see-through pixels count as white), then MediaPipe ImageEmbedder with default settings (`l2Normalize` and `quantize` off), given RGB pixels (see "Image preparation"). The loader refuses IDs it doesn't know, so a mismatch fails loudly instead of silently lowering accuracy. Pose uses `mediapipe-pose-lite-xy-centred-v1`. |
 | `input.embedding` | `model` = the model file name (looked up next to `pattern_model.py`); `dim` = numbers per picture (1280), must equal the first kernel's input size. |
 | `classes` | Class names; **array position = output index**. |
 | `layers` | Ordered dense layers. `activation` is `relu`, `softmax` or `linear`. The last layer should be `softmax` with `units == classes.length`. |
@@ -130,6 +130,36 @@ MediaPipe's own `mp.Image.create_from_file`: it decodes JPEGs slightly different
 
 Tested 2026-10-26 (Chromium, `tasks-vision` 1.1.1; Python 3.13, `mediapipe` 0.10.32 and 1.1.1): same photo gives
 the same 1280 numbers to about 0.0002%, and a head trained in the browser gives identical predictions in Python.
+
+## Body poses (`input.type: "pose"`)
+
+Same file format; only `input` differs:
+
+```json
+"input": {
+  "type": "pose",
+  "preprocess": "mediapipe-pose-lite-xy-centred-v1",
+  "embedding": { "model": "pose_landmarker_lite.task", "dim": 66 }
+}
+```
+
+Recipe `mediapipe-pose-lite-xy-centred-v1`:
+
+1. Centre square on white, exactly as for pictures.
+2. MediaPipe PoseLandmarker (`pose_landmarker_lite.task`, IMAGE mode, one pose). No person found means no
+   example (trainer) or no prediction (loader: `predict()` gives `None`, `top()` gives `(None, 0.0)`).
+3. Take the 33 landmarks' `x, y` (0 to 1 across the square). Centre on the middle of the hips (landmarks 23, 24)
+   and divide by the torso length (distance from mid-shoulders, landmarks 11 and 12, to mid-hips); use 1 if that
+   length is 0. Flatten as `x0, y0, x1, y1, ...` to 66 numbers.
+
+Only these 66 numbers are used. The trainer's thumbnails for pose classes are stick figures, not photos.
+
+Tested 2026-10-27 (Chromium, `tasks-vision` 1.1.1; Python `mediapipe` 1.1.1): body points match closely but
+**not exactly** between browser and Python (within about 1% of the image size on test photos; each side is
+repeatable). Classifications agree. For pictures, the match is exact.
+
+`pose_landmarker_lite.task` (5.8 MB, SHA-256 `59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a`)
+is Google's MediaPipe pose model (Apache-2.0).
 
 ## Export sketch (browser, TF.js)
 
