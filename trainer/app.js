@@ -1,25 +1,33 @@
 // Pattern Trainer — plain JS, no build step.
-// Two modes (?mode=pose switches):
+// Three modes (?mode=pose / ?mode=audio):
 //   Pictures:   picture -> 1280 numbers (MediaPipe ImageEmbedder + models/mobilenet_v2_embedder.tflite)
 //   Body poses: picture -> 33 body points -> 66 numbers (MediaPipe PoseLandmarker + models/pose_landmarker_lite.task)
+//   Sounds:     0.975 s of sound -> 521 sound scores (MediaPipe AudioClassifier + models/yamnet.tflite; see audio.js)
 // Numbers -> classes: a small TF.js model trained here, exported as JSON
 // (format: see EXPORT_FORMAT.md in this folder; loader: pattern_model.py in the starters).
 
 import { FilesetResolver, ImageEmbedder, PoseLandmarker } from "./vendor/mediapipe/vision_bundle.mjs";
+import { Mic, clipLength, drawWave, loadAudioClassifier, loudestStart, loudestWindow, parseWav, soundWindows, waveThumb, windowStart } from "./audio.js";
 
 const APP_VERSION = "pattern-trainer 0.2.0";
-const MODE = new URLSearchParams(location.search).get("mode") === "pose" ? "pose" : "image";
+const MODE = { pose: "pose", audio: "audio" }[new URLSearchParams(location.search).get("mode")] || "image";
 const INPUT = {
   image: { type: "image", modelFile: "mobilenet_v2_embedder.tflite", preprocess: "mediapipe-image-embedder-centre-crop-v1",
            loading: "Loading the image model…", download: "my_model.json" },
   pose: { type: "pose", modelFile: "pose_landmarker_lite.task", preprocess: "mediapipe-pose-lite-xy-centred-v1",
           loading: "Loading the pose model…", download: "my_pose_model.json" },
+  audio: { type: "audio", modelFile: "yamnet.tflite", preprocess: "mediapipe-yamnet-windows-v1",
+           loading: "Loading the sound model…", download: "my_audio_model.json" },
 }[MODE];
+const DIM = { image: 1280, pose: 66, audio: 521 }[MODE];   // numbers per example
+const PROJECT_FILE = { image: "my_project.json", pose: "my_pose_project.json", audio: "my_audio_project.json" }[MODE];
 // Chosen by experiment (see the design notes): pose input is only 66 numbers, so it learns
 // better with a wider hidden layer and a higher learning rate; its files stay small anyway.
-const DEFAULTS = MODE === "pose"
-  ? { hidden: 64, epochs: 50, lr: 0.003, batch: 16 }
-  : { hidden: 16, epochs: 30, lr: 0.001, batch: 16 };
+const DEFAULTS = {
+  image: { hidden: 16, epochs: 30, lr: 0.001, batch: 16 },
+  pose: { hidden: 64, epochs: 50, lr: 0.003, batch: 16 },
+  audio: { hidden: 64, epochs: 50, lr: 0.01, batch: 16 },
+}[MODE];
 const RECORD_INTERVAL_MS = 150;   // about 6 photos a second while holding
 const PREVIEW_INTERVAL_MS = 200;
 const MAX_PER_CLASS = 500;
@@ -32,6 +40,7 @@ const el = {
   trainBtn: $("#train-btn"), progress: $("#train-progress"), trainMsg: $("#train-msg"),
   settings: $("#settings"), testFile: $("#test-file"), testImg: $("#test-img"), bars: $("#bars"),
   exportBtn: $("#export-btn"), exportMsg: $("#export-msg"),
+  saveBtn: $("#save-project"), openFile: $("#open-project"), projectMsg: $("#project-msg"),
 };
 
 const state = {
@@ -45,8 +54,11 @@ const state = {
   training: false,
   stream: null,
   previewTimer: null,
-  testing: false,       // a test photo is showing instead of the live camera
+  testing: false,       // a test photo/sound is showing instead of the live camera/mic
+  mic: null,            // audio mode: Mic from audio.js
   lastPrediction: null,
+  opening: false,       // a project file is being read
+  savedVersion: 0,      // dataVersion when last saved or opened (no "leave page?" warning if unchanged)
 };
 
 // ---------------------------------------------------------------- pictures -> numbers
@@ -140,10 +152,10 @@ async function loadImageFile(file) {
 
 // ---------------------------------------------------------------- classes
 
-function addClass(name) {
+function addClass(name, silent = false) {
   const id = state.nextId++;
   const card = el.tpl.content.firstElementChild.cloneNode(true);
-  const cls = { id, name: name || `Class ${id}`, examples: [], thumbs: [], card };
+  const cls = { id, name: name || `Class ${id}`, examples: [], thumbs: [], tips: [], card };
   state.classes.push(cls);
 
   const nameInput = $(".class-name", card);
@@ -161,11 +173,17 @@ function addClass(name) {
   const clearBtn = $(".clear", card);
   clearBtn.addEventListener("click", () => {
     if (!armConfirm(clearBtn, "Clear all?", "Clear")) return;
-    cls.examples = []; cls.thumbs = [];
+    cls.examples = []; cls.thumbs = []; cls.tips = [];
     changed();
   });
 
   const upload = $(".upload", card);
+  if (MODE === "audio") {
+    upload.accept = ".wav,audio/wav,audio/x-wav";
+    $(".upload-label", card).textContent = "Upload sounds (.wav)";
+    $(".record-one", card).hidden = false;
+    setUpRecordOne(cls, $(".record-one", card));
+  }
   upload.addEventListener("change", async () => {
     const files = [...upload.files];
     upload.value = "";
@@ -175,14 +193,15 @@ function addClass(name) {
   card.addEventListener("dragleave", () => card.classList.remove("dragover"));
   card.addEventListener("drop", async (e) => {
     e.preventDefault(); e.stopPropagation(); card.classList.remove("dragover");
-    const files = [...e.dataTransfer.files].filter((f) => f.type.startsWith("image/"));
-    if (!files.length) { cardMsg(cls, "Only picture files can be added.", "warn"); return; }
+    const files = [...e.dataTransfer.files].filter((f) => MODE === "audio"
+      ? /\.wav$/i.test(f.name) || f.type.startsWith("audio/") : f.type.startsWith("image/"));
+    if (!files.length) { cardMsg(cls, MODE === "audio" ? "Only .wav sound files can be added." : "Only picture files can be added.", "warn"); return; }
     await addFiles(cls, files);
   });
 
   setUpRecordButton(cls, $(".record", card));
   el.classes.appendChild(card);
-  changed();
+  if (!silent) changed();
   return cls;
 }
 
@@ -216,8 +235,84 @@ function addExample(cls, square, live = false) {
   return "added";
 }
 
+// Audio: add sound windows (from soundWindows) as examples. `clip` gives the thumbnail shape.
+function addSoundWindows(cls, wins, clip, rate) {
+  let added = 0, heard = "";
+  for (const [k, w] of wins.entries()) {
+    if (cls.examples.length >= MAX_PER_CLASS) {
+      cardMsg(cls, `That's the limit of ${MAX_PER_CLASS} examples for one class.`, "warn");
+      return { added, full: true, heard };
+    }
+    cls.examples.push(w.vec);
+    cls.thumbs.push(waveThumb(clip.subarray(windowStart(k, rate), windowStart(k + 1, rate))));
+    cls.tips.push(w.top ? `The sound model heard: ${w.top}` : "");
+    heard = w.top || heard;
+    added++;
+  }
+  return { added, full: false, heard };
+}
+
+const MAX_WINDOWS_PER_FILE = 120;   // first 2 minutes of a long file (keeps the page responsive)
+const MAX_TEST_SECONDS = 30;
+
+async function addSoundFiles(cls, files) {
+  let added = 0, used = 0, failed = 0, trimmed = 0;
+  for (const [i, file] of files.entries()) {
+    if (!state.classes.includes(cls)) return;
+    cardMsg(cls, `Adding sound ${i + 1} of ${files.length}…`);
+    try {
+      const { samples, rate } = parseWav(await file.arrayBuffer());
+      if (!samples.length) throw new Error("empty");
+      const room = Math.min(MAX_PER_CLASS - cls.examples.length, MAX_WINDOWS_PER_FILE);
+      if (room <= 0) { cardMsg(cls, `That's the limit of ${MAX_PER_CLASS} examples for one class.`, "warn"); return; }
+      const keep = Math.ceil(room * 0.975 * rate);
+      if (samples.length > keep) trimmed++;
+      const part = samples.subarray(0, keep);
+      const r = addSoundWindows(cls, soundWindows(state.embedder, part, rate), part, rate);
+      added += r.added; used++;
+      if (r.full) break;
+    } catch {
+      failed++;
+    }
+    renderClass(cls);
+    await new Promise((r) => setTimeout(r));
+  }
+  changed();
+  const bad = failed ? `${failed} file(s) couldn't be read: only .wav files work here (or record sounds on this page).` : "";
+  const long = trimmed ? ` Only the first ${MAX_WINDOWS_PER_FILE / 60 | 0} minutes of long files are used.` : "";
+  cardMsg(cls, used ? `Added ${added} one-second example(s) from ${used} file(s).${long} ${bad}`.trim() : bad, failed ? "warn" : "ok");
+}
+
+// Audio: "Record one" listens for 2 seconds and keeps the loudest 0.975 s as one example.
+function setUpRecordOne(cls, btn) {
+  btn.addEventListener("click", async () => {
+    if (!state.mic || btn.classList.contains("active")) return;
+    if (cls.examples.length >= MAX_PER_CLASS) { cardMsg(cls, `That's the limit of ${MAX_PER_CLASS} examples for one class.`, "warn"); return; }
+    btn.classList.add("active");
+    cardMsg(cls, "Listening for 2 seconds… make the sound now.");
+    let left = 2;
+    btn.textContent = `Listening… ${left}`;
+    const tick = setInterval(() => { left--; if (left > 0) btn.textContent = `Listening… ${left}`; }, 1000);
+    const heard = await state.mic.record(2000);
+    clearInterval(tick);
+    btn.classList.remove("active"); btn.textContent = "Record one";
+    if (!state.mic || !state.classes.includes(cls)) return;
+    const rate = state.mic.rate, n = clipLength(rate);
+    if (heard.length < n) { cardMsg(cls, "Didn't catch enough sound. Try again.", "warn"); return; }
+    const s0 = loudestStart(heard, n);
+    const clip = heard.slice(s0, s0 + n);
+    const r = addSoundWindows(cls, soundWindows(state.embedder, clip, rate).slice(0, 1), clip, rate);
+    if (r.added) cardMsg(cls, `Added 1 example${r.heard ? ` (the sound model heard: ${r.heard})` : ""}.`, "ok");
+    changed();
+  });
+}
+
 async function addFiles(cls, files) {
   if (!files.length) return;
+  if (MODE === "audio") {
+    if (!state.embedder) { cardMsg(cls, "Still loading the model. Try again in a moment.", "warn"); return; }
+    return addSoundFiles(cls, files);
+  }
   if (!state.embedder) { cardMsg(cls, "Still loading the model. Try again in a moment.", "warn"); return; }
   let added = 0, failed = 0, tooBig = 0, noPerson = 0;
   for (const [i, file] of files.entries()) {
@@ -243,9 +338,39 @@ async function addFiles(cls, files) {
 
 function setUpRecordButton(cls, btn) {
   let timer = null, missed = 0;
+  let listener = null, soundAdded = 0, lastHeard = "";
+  const startSound = () => {
+    // Chop what's heard into back-to-back 0.975 s clips; each clip is one example.
+    const rate = state.mic.rate, n = clipLength(rate);
+    let pending = new Float32Array(0);
+    soundAdded = 0;
+    listener = (chunk) => {
+      const joined = new Float32Array(pending.length + chunk.length);
+      joined.set(pending); joined.set(chunk, pending.length);
+      pending = joined;
+      while (pending.length >= n) {
+        const clip = pending.slice(0, n);
+        pending = pending.slice(n);
+        const r = addSoundWindows(cls, soundWindows(state.embedder, clip, rate).slice(0, 1), clip, rate);
+        soundAdded += r.added;
+        if (r.heard) lastHeard = r.heard;
+        renderClass(cls);
+        if (r.full) { stop(); return; }
+      }
+    };
+    state.mic.listeners.add(listener);
+  };
   const start = (e) => {
     e.preventDefault();
-    if (timer || !state.stream || btn.disabled) return;
+    if (timer || btn.disabled) return;
+    if (MODE === "audio") {
+      if (!state.mic) return;
+      btn.classList.add("active"); btn.textContent = "Recording…";
+      timer = true;
+      startSound();
+      return;
+    }
+    if (!state.stream) return;
     btn.classList.add("active"); btn.textContent = "Recording…";
     missed = 0;
     const grab = () => {
@@ -262,7 +387,13 @@ function setUpRecordButton(cls, btn) {
   };
   const stop = () => {
     if (!timer) return;
-    clearInterval(timer); timer = null;
+    if (listener) {
+      state.mic?.listeners.delete(listener); listener = null;
+      if (soundAdded === 0) cardMsg(cls, "Keep holding: each example needs about 1 second. For a short sound, use Record one.", "warn");
+      else cardMsg(cls, `Added ${soundAdded} example(s)${lastHeard ? ` (the sound model last heard: ${lastHeard})` : ""}.`, "ok");
+    }
+    if (timer !== true) clearInterval(timer);
+    timer = null;
     btn.classList.remove("active"); btn.textContent = "Hold to record";
     if (missed) cardMsg(cls, `No person in view for ${missed} frame(s), so they were skipped. Step back so your whole body is in the square.`, "warn");
     changed();
@@ -294,10 +425,15 @@ function renderClass(cls) {
   const cl = $(".clear", cls.card);
   if (!cl.dataset.armed) cl.setAttribute("aria-label", `Clear all examples of ${label}`);
   $(".clear", cls.card).disabled = n === 0;
-  $(".record", cls.card).disabled = !state.stream || !state.embedder;
+  const live = MODE === "audio" ? Boolean(state.mic) : Boolean(state.stream);
+  $(".record", cls.card).disabled = !live || !state.embedder;
+  $(".record-one", cls.card).disabled = !live || !state.embedder;
+  $(".record-one", cls.card).setAttribute("aria-label", `Record one example of ${label}`);
+  if (MODE === "audio") $(".upload", cls.card).setAttribute("aria-label", `Upload .wav sounds of ${label}`);
   const thumbs = $(".thumbs", cls.card);
-  const show = cls.thumbs.slice(-24);
-  thumbs.replaceChildren(...show.map((src) => Object.assign(new Image(), { src, alt: "" })));
+  const first = Math.max(0, cls.thumbs.length - 24);
+  const show = cls.thumbs.slice(first);
+  thumbs.replaceChildren(...show.map((src, i) => Object.assign(new Image(), { src, alt: cls.tips[first + i] || "", title: cls.tips[first + i] || "" })));
   if (n > show.length) thumbs.append(Object.assign(document.createElement("span"), { className: "more", textContent: `+${n - show.length} more` }));
 }
 
@@ -314,8 +450,14 @@ function problems() {
   return "";
 }
 
+// Examples or names changed: the trained model is out of date.
 function changed() {
   state.dataVersion++;
+  redraw();
+}
+
+// Only the buttons and messages need updating (camera or microphone switched, page finished loading).
+function redraw() {
   for (const c of state.classes) renderClass(c);
   refresh();
 }
@@ -323,8 +465,12 @@ function changed() {
 function refresh() {
   const issue = problems();
   const upToDate = state.model && state.trainedVersion === state.dataVersion;
-  el.trainBtn.disabled = !state.embedder || state.training || Boolean(issue);
+  el.trainBtn.disabled = !state.embedder || state.training || state.opening || Boolean(issue);
+  const full = state.classes.length >= MAX_CLASSES;
+  el.addClass.disabled = full;
+  el.addClass.textContent = full ? `${MAX_CLASSES} classes is the most` : "+ Add a class";
   el.exportBtn.disabled = !upToDate || state.training;
+  el.saveBtn.disabled = !state.classes.some((c) => c.examples.length);
   if (state.training) return;
   if (issue) {
     setMsg(el.trainMsg, issue, state.classes.some((c) => c.examples.length) ? "warn" : "");
@@ -429,7 +575,7 @@ function evaluate(model, teX, teY, nClasses) {
 }
 
 async function train() {
-  if (problems() || state.training) return;
+  if (problems() || state.training || state.opening) return;
   state.training = true;
   refresh();
   const cfg = settings();
@@ -591,9 +737,38 @@ function showBars(probs, always = false) {
   });
 }
 
+// Audio: score the loudest window of a clip (same rule as Python), so a short sound
+// isn't outvoted by the silence around it.
+function predictSound(wins, samples, rate) {
+  return predictVec(wins[loudestWindow(wins.length, samples, rate)].vec);
+}
+
+function audioPreviewTick() {
+  if (!state.mic || !state.model || state.training || state.testing) return;
+  if (document.querySelector(".record.active, .record-one.active")) return;
+  const rate = state.mic.rate, clip = state.mic.latest(clipLength(rate));
+  if (!clip) return;
+  showBars(predictSound(soundWindows(state.embedder, clip, rate).slice(0, 1), clip, rate));
+}
+
+// Audio: draw the last 1.5 s of sound while the microphone is on.
+function drawMicLoop() {
+  const c = $("#wave"), g = c.getContext("2d");
+  const frame = () => {
+    g.fillStyle = "#000"; g.fillRect(0, 0, c.width, c.height);
+    if (!state.mic) return;
+    const n = Math.min(state.mic.filled, Math.floor(state.mic.rate * 1.5));
+    const x = n > 0 ? state.mic.latest(n) : null;
+    if (x) drawWave(g, x, c.width, c.height, "#7fb0ff");
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+
 function startPreview() {
   clearInterval(state.previewTimer);
   state.previewTimer = setInterval(() => {
+    if (MODE === "audio") { try { audioPreviewTick(); } catch (err) { console.warn(err); } return; }
     if (!state.embedder || !state.stream || el.video.readyState < 2) return;
     if (state.training) return;                       // leave the CPU to training
     if (document.querySelector(".record.active")) return;   // recording draws its own overlay
@@ -614,6 +789,29 @@ el.testFile.addEventListener("change", async () => {
   if (!file) return;
   const fail = (text) => { el.bars.dataset.names = ""; el.bars.textContent = text; };
   if (!state.model) { fail("Train a model first."); return; }
+  if (MODE === "audio") {
+    try {
+      const parsed = parseWav(await file.arrayBuffer());
+      const rate = parsed.rate;
+      const samples = parsed.samples.subarray(0, Math.ceil(MAX_TEST_SECONDS * rate));
+      const wins = soundWindows(state.embedder, samples, rate);
+      if (!wins.length) throw new Error("no sound");
+      const shown = document.createElement("canvas");
+      shown.width = 320; shown.height = 90;
+      const g = shown.getContext("2d");
+      g.fillStyle = "#1c2430"; g.fillRect(0, 0, 320, 90);
+      drawWave(g, samples, 320, 90, "#7fb0ff");
+      el.testImg.src = shown.toDataURL("image/png");
+      el.testImg.hidden = false;
+      state.testing = true;
+      $("#back-to-camera").hidden = !state.mic;
+      showBars(predictSound(wins, samples, rate), true);
+      if (parsed.samples.length > samples.length) $("#bars-status").textContent += ` (first ${MAX_TEST_SECONDS} seconds only)`;
+    } catch {
+      fail("That file couldn't be read. Only .wav sound files work here.");
+    }
+    return;
+  }
   try {
     const img = await loadImageFile(file);
     const square = centreSquare(img);
@@ -644,7 +842,53 @@ $("#back-to-camera").addEventListener("click", backToCamera);
 
 // ---------------------------------------------------------------- camera
 
+async function toggleMic() {
+  const msg = $("#mic-msg");
+  if (state.mic) {
+    state.mic.stop();
+    state.mic = null;
+    msg.hidden = false;
+    msg.textContent = "Microphone is off";
+    el.cameraBtn.textContent = "Turn on microphone";
+    $("#back-to-camera").hidden = true;
+    redraw();
+    return;
+  }
+  if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) {
+    msg.textContent = "This browser can't use a microphone here. You can still upload .wav sounds.";
+    return;
+  }
+  el.cameraBtn.disabled = true;
+  const mic = new Mic();
+  mic.onEnded = () => {
+    if (state.mic !== mic) return;
+    toggleMic().then(() => { msg.textContent = "The microphone was disconnected. Plug it back in and turn it on again."; });
+  };
+  try {
+    msg.textContent = "Starting microphone…";
+    await mic.start();
+    state.mic = mic;
+    msg.hidden = true;
+    el.cameraBtn.textContent = "Turn off microphone";
+    backToCamera();
+    redraw();
+    startPreview();
+    drawMicLoop();
+  } catch (err) {
+    console.warn(err);
+    mic.stop();
+    state.mic = null;
+    el.cameraBtn.textContent = "Turn on microphone";
+    msg.textContent = err.name === "NotAllowedError"
+      ? "Microphone permission was blocked. Allow it in the browser's address bar, or upload .wav sounds instead."
+      : "Couldn't start a microphone. You can still upload .wav sounds.";
+  } finally {
+    el.cameraBtn.disabled = false;
+  }
+}
+
 async function toggleCamera() {
+  if (MODE === "audio") return toggleMic();
   if (state.stream) {
     state.stream.getTracks().forEach((t) => t.stop());
     state.stream = null;
@@ -654,7 +898,7 @@ async function toggleCamera() {
     drawOverlay(null);
     el.cameraBtn.textContent = "Turn on camera";
     $("#back-to-camera").hidden = true;
-    changed();
+    redraw();
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -674,7 +918,7 @@ async function toggleCamera() {
     el.cameraMsg.hidden = true;
     el.cameraBtn.textContent = "Turn off camera";
     backToCamera();
-    changed();
+    redraw();
     startPreview();
   } catch (err) {
     console.warn(err);
@@ -689,6 +933,150 @@ async function toggleCamera() {
     el.cameraBtn.disabled = false;
   }
 }
+
+// ---------------------------------------------------------------- save / open a project
+// A project file keeps the class names, each example's numbers (as little-endian float32, base64)
+// and the small previews, so students can carry on next lesson. Not the trained model:
+// training again takes seconds. Format: see "Project files" in EXPORT_FORMAT.md.
+
+const PROJECT_FORMAT = "pattern-trainer-project";
+const MODE_NAMES = { image: "Pictures", pose: "Body poses", audio: "Sounds" };
+const MAX_CLASSES = 20;      // 20 x 500 examples is about 90 MB, the most a project file can hold
+const MAX_PROJECT_MB = 150;
+const MAX_THUMB = 30000;     // characters: a real 64x64 preview is a few thousand
+const MAX_NAME = 40;         // same as the class name box
+const MAX_TIP = 200;
+class ProjectError extends Error {}
+
+function toBase64(vec) {
+  const f = Float32Array.from(vec);
+  const bytes = new Uint8Array(f.buffer);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+function fromBase64(text) {
+  const bin = atob(text);
+  if (bin.length !== DIM * 4) throw new ProjectError("damaged");
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const vec = new Float32Array(bytes.buffer);
+  if (!vec.every(Number.isFinite)) throw new ProjectError("damaged");
+  return vec;
+}
+
+function projectJSON() {
+  return JSON.stringify({
+    format: PROJECT_FORMAT, version: 1, created: new Date().toISOString(), app: APP_VERSION,
+    input: { type: INPUT.type, preprocess: INPUT.preprocess, embedding: { model: INPUT.modelFile, dim: DIM } },
+    classes: state.classes.map((c) => ({
+      name: c.name,
+      examples: c.examples.map(toBase64),
+      thumbs: c.thumbs,
+      tips: c.examples.map((_, i) => c.tips[i] || ""),
+    })),
+  });
+}
+
+function saveProject() {
+  if (el.saveBtn.disabled) return;
+  const blob = new Blob([projectJSON()], { type: "application/json" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: PROJECT_FILE });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  state.savedVersion = state.dataVersion;
+  const n = state.classes.reduce((t, c) => t + c.examples.length, 0);
+  const photos = MODE === "image" ? " It includes the small previews of your photos, so don't share it if it shows people." : "";
+  setMsg(el.projectMsg, `Saved ${PROJECT_FILE} (${n} examples, ${Math.max(1, Math.round(blob.size / 1024))} KB). Next time, click Open project and choose this file.${photos}`, "ok");
+}
+
+// Checks everything before changing anything, so a bad file leaves the current work alone.
+function readProject(text) {
+  let p;
+  try { p = JSON.parse(text); } catch { throw new ProjectError("That file isn't a Pattern Trainer project."); }
+  if (p?.format === "pattern-trainer-head") {
+    throw new ProjectError("That's a model file (for the Python starter), not a project. Open the file you made with Save project.");
+  }
+  if (p?.format !== PROJECT_FORMAT) throw new ProjectError("That file isn't a Pattern Trainer project.");
+  if (p.version !== 1) throw new ProjectError("That project was made by a newer Pattern Trainer. Reload this page to get the latest version, then try again.");
+  const type = p.input?.type;
+  if (type !== INPUT.type) {
+    if (MODE_NAMES[type]) throw new ProjectError(`That's a ${MODE_NAMES[type]} project. Switch to ${MODE_NAMES[type]} at the top of the page, then open it again.`);
+    throw new ProjectError("That file isn't a Pattern Trainer project.");
+  }
+  if (p.input.preprocess !== INPUT.preprocess || p.input.embedding?.dim !== DIM) {
+    throw new ProjectError("That project was made with a different version of the trainer, so its examples don't fit this one. Ask your teacher which version to use.");
+  }
+  const damaged = () => new ProjectError("That project file is damaged, so it couldn't be opened.");
+  if (!Array.isArray(p.classes) || !p.classes.length) throw damaged();
+  if (p.classes.length > MAX_CLASSES) throw new ProjectError(`That project has more than ${MAX_CLASSES} classes, so it couldn't be opened.`);
+  try {
+    return p.classes.map((c) => {
+      const okList = (a) => Array.isArray(a) && a.length === c.examples.length;
+      if (typeof c.name !== "string" || !Array.isArray(c.examples) || c.examples.length > MAX_PER_CLASS) throw damaged();
+      if (!okList(c.thumbs) || !c.thumbs.every((t) => typeof t === "string" && t.length <= MAX_THUMB
+          && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]*$/.test(t))) throw damaged();
+      const tips = okList(c.tips) && c.tips.every((t) => typeof t === "string") ? c.tips : c.examples.map(() => "");
+      const name = [...c.name.replace(/\s+/g, " ").trim()].slice(0, MAX_NAME).join("");
+      return { name, examples: c.examples.map(fromBase64), thumbs: c.thumbs, tips: tips.map((t) => t.slice(0, MAX_TIP)) };
+    });
+  } catch (err) {
+    throw err instanceof ProjectError && err.message !== "damaged" ? err : damaged();
+  }
+}
+
+async function openProject(file) {
+  if (state.training || state.opening) { setMsg(el.projectMsg, "Wait for training to finish, then open the project.", "warn"); return; }
+  let classes;
+  state.opening = true;           // stops Train and a second Open while the file is read
+  refresh();
+  setMsg(el.projectMsg, `Opening ${file.name}…`);
+  try {
+    if (file.size > MAX_PROJECT_MB * 1024 * 1024) throw new ProjectError("That file is too big to be a Pattern Trainer project.");
+    classes = readProject(await file.text());
+  } catch (err) {
+    if (!(err instanceof ProjectError)) console.error(err);
+    setMsg(el.projectMsg, err instanceof ProjectError ? err.message : "That file couldn't be opened.", "warn");
+    return;
+  } finally {
+    state.opening = false;
+    refresh();
+  }
+  for (const c of state.classes) { c.stopRecording?.(); c.card.remove(); }
+  state.classes = [];
+  for (const c of classes) {
+    const cls = addClass(c.name, true);
+    Object.assign(cls, { examples: c.examples, thumbs: c.thumbs, tips: c.tips });
+  }
+  if (state.model) state.model.dispose();
+  Object.assign(state, { model: null, modelClasses: [], trainedVersion: -1, check: null, lastPrediction: null });
+  backToCamera();
+  el.bars.dataset.names = "";
+  el.bars.replaceChildren();
+  setMsg(el.trainMsg, "");
+  changed();
+  state.savedVersion = state.dataVersion;
+  const n = classes.reduce((t, c) => t + c.examples.length, 0);
+  setMsg(el.projectMsg, `Opened ${file.name}: ${classes.length} classes, ${n} examples. Train the model to use it.`, "ok");
+}
+
+// Opening replaces the current examples, so ask first (click again) when there are any.
+let openArmed = false;
+el.openFile.addEventListener("click", (e) => {
+  if (openArmed || !state.classes.some((c) => c.examples.length) || state.savedVersion === state.dataVersion) return;
+  e.preventDefault();
+  openArmed = true;
+  const warning = "Opening a project will replace the examples you have now. Click Open project again to go ahead, or click Save project first to keep them.";
+  setMsg(el.projectMsg, warning, "warn");
+  setTimeout(() => { openArmed = false; if (el.projectMsg.textContent === warning) setMsg(el.projectMsg, ""); }, 6000);
+});
+el.openFile.addEventListener("change", async () => {
+  const file = el.openFile.files[0];
+  el.openFile.value = "";
+  openArmed = false;
+  if (file) await openProject(file);
+});
 
 // ---------------------------------------------------------------- export
 
@@ -737,12 +1125,28 @@ function setUpModeText() {
   const keepSettings = new URLSearchParams(location.search).get("settings") === "1";
   document.querySelectorAll(".mode-nav a").forEach((a) => {
     if (a.dataset.mode === MODE) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
-    if (keepSettings) a.href = a.dataset.mode === "pose" ? "./?mode=pose&settings=1" : "./?settings=1";
+    if (keepSettings) a.href = a.dataset.mode === "image" ? "./?settings=1" : `./?mode=${a.dataset.mode}&settings=1`;
   });
   el.loading.textContent = INPUT.loading;
   document.querySelectorAll(".download-name").forEach((n) => { n.textContent = INPUT.download; });
   $("#set-hidden").value = DEFAULTS.hidden; $("#set-epochs").value = DEFAULTS.epochs;
   $("#set-lr").value = DEFAULTS.lr; $("#set-batch").value = DEFAULTS.batch;
+  if (MODE === "audio") {
+    document.title = "Pattern Trainer: Sounds";
+    $("#lead").firstChild.textContent = "Teach a computer to recognise your own sounds. Only sound scores are kept, never the recordings. ";
+    $("#classes-hint").textContent = "Make one class for each sound, plus a “Background noise” class for when nothing is happening. Use Hold to record for ongoing sounds (music, a fan) and Record one for short sounds (a word, a clap). Aim for 20 or more examples per class.";
+    $("#camera-h").textContent = "Microphone";
+    $("#camera-box").hidden = true;
+    $("#mic-box").hidden = false;
+    $("#camera-hint").textContent = "Each example is about 1 second of sound. Only the sound model's scores for 521 kinds of sound (speech, clapping, music…) are kept, not the sound itself. Hover over an example to see what the sound model heard. (The sound model is called YAMNet.)";
+    $("#good-habits").innerHTML = "<strong>Good habits:</strong> only record your own voice, or people who have said yes. Watch out for other people talking nearby.";
+    el.cameraBtn.textContent = "Turn on microphone";
+    $("#test-hint").textContent = "Make the sound near the microphone, or try a .wav file the model hasn't heard.";
+    $("#test-label").textContent = "Test a sound (.wav)";
+    el.testFile.accept = ".wav,audio/wav,audio/x-wav";
+    $("#back-to-camera").textContent = "Back to microphone";
+    return;
+  }
   if (MODE !== "pose") return;
   document.title = "Pattern Trainer: Body poses";
   $("#lead").firstChild.textContent = "Teach a computer to recognise your own body poses. Only 33 body points are kept, never the pictures. ";
@@ -757,19 +1161,27 @@ async function start() {
   window.addEventListener("dragover", (e) => e.preventDefault());
   window.addEventListener("drop", (e) => e.preventDefault());
   window.addEventListener("beforeunload", (e) => {
-    if (state.classes.some((c) => c.examples.length)) { e.preventDefault(); e.returnValue = ""; }
+    if (state.classes.some((c) => c.examples.length) && state.savedVersion !== state.dataVersion) { e.preventDefault(); e.returnValue = ""; }
   });
-  addClass("Class 1");
+  addClass(MODE === "audio" ? "Background noise" : "Class 1");
   addClass("Class 2");
   el.addClass.addEventListener("click", () => $(".class-name", addClass().card).focus());
   el.cameraBtn.addEventListener("click", toggleCamera);
   el.trainBtn.addEventListener("click", train);
   el.exportBtn.addEventListener("click", download);
+  el.saveBtn.addEventListener("click", saveProject);
   setUpModeText();
   try {
     await tf.setBackend("cpu");
+    const modelUrl = new URL(`models/${INPUT.modelFile}`, location.href).href;
+    if (MODE === "audio") {
+      state.embedder = await loadAudioClassifier(location.href, modelUrl);
+      el.loading.hidden = true;
+      redraw();
+      return;
+    }
     const files = await FilesetResolver.forVisionTasks(new URL("vendor/mediapipe/wasm", location.href).href);
-    const baseOptions = { modelAssetPath: new URL(`models/${INPUT.modelFile}`, location.href).href, delegate: "CPU" };
+    const baseOptions = { modelAssetPath: modelUrl, delegate: "CPU" };
     state.embedder = MODE === "pose"
       ? await PoseLandmarker.createFromOptions(files, { baseOptions, runningMode: "IMAGE", numPoses: 1 })
       : await ImageEmbedder.createFromOptions(files, { baseOptions, runningMode: "IMAGE" });
@@ -779,7 +1191,7 @@ async function start() {
     el.loading.textContent = "The model didn't load. Check your internet connection and reload the page.";
     el.loading.classList.add("error");
   }
-  changed();
+  redraw();
 }
 
 // Small hook for automated tests and curious teachers (read-only use).
@@ -787,6 +1199,7 @@ window.__trainer = {
   state,
   exportJSON: () => (state.model ? exportHead() : null),
   ready: () => Boolean(state.embedder),
+  projectJSON,
 };
 
 start();

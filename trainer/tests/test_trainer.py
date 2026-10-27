@@ -187,6 +187,13 @@ def main():
         check(pg2.locator("#settings").is_visible(), "test settings shown with ?settings=1")
         pg2.goto(f"http://127.0.0.1:{port}/privacy.html")
         check(pg2.locator("h1").text_content().startswith("Your privacy"), "privacy page loads")
+        pg2.goto(f"http://127.0.0.1:{port}/index.html")
+        pg2.click("text=How to use it")
+        pg2.wait_for_load_state()
+        check(pg2.locator("h1").text_content() == "How to use the Pattern Trainer"
+              and pg2.locator(".guide-toc a").count() == 6
+              and all(pg2.locator(a.get_attribute("href")).count() == 1 for a in pg2.locator(".guide-toc a").all()),
+              "guide page opens from the trainer and its contents links work")
         pg2.close()
 
         # Privacy lock: the page must not be able to send data to another site
@@ -215,11 +222,14 @@ def main():
         check(tag, "upload button can be reached by keyboard")
 
         # Third class from the webcam (double-click 'Turn on camera' must not leave it stuck)
+        pg.evaluate("() => { const s = window.__trainer.state; s.savedVersion = s.dataVersion; }")   # as if just saved
         pg.dblclick("#camera-btn")
         wait_js(pg, "document.querySelector('#video').readyState >= 2", timeout=20000)
         pg.wait_for_timeout(500)
         cam_ok = pg.evaluate("Boolean(window.__trainer.state.stream) && document.querySelector('#camera-btn').textContent === 'Turn off camera'")
         check(cam_ok, "double-clicking 'Turn on camera' starts it cleanly")
+        check(pg.evaluate("window.__trainer.state.savedVersion === window.__trainer.state.dataVersion"),
+              "turning the camera on doesn't make saved work look unsaved")
         pg.click("#add-class")
         cam_card = cards.nth(2)
         cam_card.locator(".class-name").fill("webcam")

@@ -83,12 +83,17 @@ button.record.active { background: var(--rec); border-color: var(--rec); color: 
 .class-name { flex: 1; min-width: 0; font: inherit; font-weight: 600; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text); }
 .count { color: var(--muted); font-size: .9rem; white-space: nowrap; }
 .class-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.project-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.project-bar + .hint { margin: 6px 0 0; }
 .thumbs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
 .thumbs img { width: 44px; height: 44px; object-fit: cover; border-radius: 4px; }
 .thumbs .more { align-self: center; color: var(--muted); font-size: .85rem; padding-left: 4px; }
 
 .camera { position: relative; width: 100%; max-width: 360px; aspect-ratio: 1; margin-bottom: 8px; border-radius: 10px; overflow: hidden; background: #000; }
 .camera video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
+.mic { position: relative; width: 100%; max-width: 360px; aspect-ratio: 18 / 5; margin-bottom: 8px; border-radius: 10px; overflow: hidden; background: #000; }
+.mic .wave { width: 100%; height: 100%; display: block; }
+button.record-one.active { background: var(--rec); border-color: var(--rec); color: #fff; }
 .camera .overlay { position: absolute; inset: 0; width: 100%; height: 100%; transform: scaleX(-1); pointer-events: none; }
 .mode-nav { display: inline-flex; gap: 4px; margin: 0 0 10px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
 .mode-nav a { padding: 4px 14px; border-radius: 999px; text-decoration: none; color: var(--muted); font-size: .92rem; }
@@ -127,6 +132,9 @@ progress { width: 100%; margin-top: 10px; }
 .prose ul { padding-left: 1.2em; }
 .prose li { margin: 4px 0; }
 a { color: var(--accent); }
+.guide-toc { margin: 12px 0 8px; padding: 10px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.guide-toc ol { margin: 0; padding-left: 1.2em; }
+.prose ol li { margin: 6px 0; }
 
 /* credits footer */
 .credits { max-width: 1100px; margin: 0 auto; padding: 0 16px 32px; color: var(--muted); font-size: .85rem; }
