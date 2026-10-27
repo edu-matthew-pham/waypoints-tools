@@ -60,7 +60,7 @@ file, `mobilenet_v2_embedder.tflite`, run by MediaPipe on both sides.
 | `format` | Always `"pattern-trainer-head"`. Loader rejects anything else. |
 | `version` | Integer. Bump only for breaking changes. Loader accepts exactly the versions it knows and otherwise says "ask your teacher for the latest starter". |
 | `created`, `app` | Informational (ISO 8601 UTC; tool name and version). |
-| `input.type` | `"image"` or `"pose"` (see "Body poses"). |
+| `input.type` | `"image"`, `"pose"` (see "Body poses") or `"audio"` (see "Sounds"). |
 | `input.preprocess` | A **named recipe**. `mediapipe-image-embedder-centre-crop-v1` = take the centre square of the picture at full resolution (no resizing) on a white background (see-through pixels count as white), then MediaPipe ImageEmbedder with default settings (`l2Normalize` and `quantize` off), given RGB pixels (see "Image preparation"). The loader refuses IDs it doesn't know, so a mismatch fails loudly instead of silently lowering accuracy. Pose uses `mediapipe-pose-lite-xy-centred-v1`. |
 | `input.embedding` | `model` = the model file name (looked up next to `pattern_model.py`); `dim` = numbers per picture (1280), must equal the first kernel's input size. |
 | `classes` | Class names; **array position = output index**. |
@@ -160,6 +160,46 @@ repeatable). Classifications agree. For pictures, the match is exact.
 
 `pose_landmarker_lite.task` (5.8 MB, SHA-256 `59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a`)
 is Google's MediaPipe pose model (Apache-2.0).
+
+## Sounds (`input.type: "audio"`)
+
+Same file format; only `input` differs:
+
+```json
+"input": {
+  "type": "audio",
+  "preprocess": "mediapipe-yamnet-windows-v1",
+  "embedding": { "model": "yamnet.tflite", "dim": 521 }
+}
+```
+
+Recipe `mediapipe-yamnet-windows-v1`:
+
+1. **Mono samples at their original sample rate.** Average the channels. Integer samples are scaled to -1..1
+   (16-bit: divide by 32768). Don't let anything else resample: in the browser, read WAV files directly (not
+   `decodeAudioData`) and pass the audio context's rate with the microphone samples (the trainer asks for the
+   microphone's own rate; some browsers may still convert it); in Python, pass Gradio's `(rate, samples)` straight
+   through.
+2. **MediaPipe AudioClassifier** with `yamnet.tflite` and all 521 scores (`maxResults: -1`). It resamples to
+   16 kHz and scores each 0.975-second window.
+3. **Keep only full windows:** the first `floor(samples * 16000 / rate / 15600)` windows (all of them if that is
+   0). MediaPipe's resampling always leaves a short, padded extra window, which is dropped.
+4. Each window's 521 scores (by category index) are one example. A recording made in the trainer is 0.975 s,
+   so exactly one window.
+5. **Predicting a longer sound: use the loudest kept window.** Window `k` covers samples
+   `floor(k * 0.975 * rate)` to `floor((k + 1) * 0.975 * rate)`; pick the one with the largest sum of squared samples
+   (first on ties) and run the head on it. This stops a short sound (a clap, a word) being outvoted by the silence
+   around it. Python also offers `predict(sound, average=True)`, which averages every window, for steady sounds.
+   The trainer's sound test uses the first 30 seconds of a file; uploads use the first 2 minutes per file.
+
+Only the 521 scores are kept per example; the trainer's thumbnails show the waveform shape, and hovering one
+shows YAMNet's top sound name.
+
+Tested 2026-10-27 (Chromium, `tasks-audio` 1.1.1; Python `mediapipe` 1.1.1): with the same samples both sides give
+matching scores. A browser that resamples the audio itself (`decodeAudioData` on a file with a different rate)
+changes the scores enough to change answers, which is why step 1 matters.
+
+`yamnet.tflite` (4.1 MB) is Google's YAMNet audio classifier with MediaPipe metadata (Apache-2.0).
 
 ## Export sketch (browser, TF.js)
 

@@ -18,6 +18,7 @@
     <nav class="mode-nav" aria-label="What are you sorting?">
       <a href="./" data-mode="image">Pictures</a>
       <a href="./?mode=pose" data-mode="pose">Body poses</a>
+      <a href="./?mode=audio" data-mode="audio">Sounds</a>
     </nav>
     <ol class="steps">
       <li>Collect examples</li><li>Train</li><li>Test</li><li>Download</li>
@@ -37,7 +38,11 @@
     <div class="side">
       <section class="panel" aria-labelledby="camera-h">
         <h2 id="camera-h">Camera</h2>
-        <div class="camera">
+        <div class="mic" id="mic-box" hidden>
+          <canvas id="wave" class="wave" width="720" height="200" aria-hidden="true"></canvas>
+          <p id="mic-msg" class="camera-msg">Microphone is off</p>
+        </div>
+        <div class="camera" id="camera-box">
           <video id="video" playsinline muted></video>
           <canvas id="overlay" class="overlay" width="720" height="720" aria-hidden="true"></canvas>
           <p id="camera-msg" class="camera-msg">Camera is off</p>
@@ -70,8 +75,8 @@
 
       <section class="panel" aria-labelledby="test-h">
         <h2 id="test-h"><span class="num">3</span> Test</h2>
-        <p class="hint">Point the camera at something, or try a photo the model hasn't seen.</p>
-        <label class="file-btn secondary">Test a photo<input id="test-file" class="visually-hidden" type="file" accept="image/*"></label>
+        <p class="hint" id="test-hint">Point the camera at something, or try a photo the model hasn't seen.</p>
+        <label class="file-btn secondary"><span id="test-label">Test a photo</span><input id="test-file" class="visually-hidden" type="file" accept="image/*"></label>
         <button id="back-to-camera" class="secondary" type="button" hidden>Back to camera</button>
         <img id="test-img" class="test-img" alt="" hidden>
         <div id="bars" class="bars"></div>
@@ -96,7 +101,8 @@
       </div>
       <div class="class-actions">
         <button class="record" type="button" disabled>Hold to record</button>
-        <label class="file-btn secondary">Upload photos<input class="upload visually-hidden" type="file" accept="image/*" multiple></label>
+        <button class="record-one" type="button" disabled hidden>Record one</button>
+        <label class="file-btn secondary"><span class="upload-label">Upload photos</span><input class="upload visually-hidden" type="file" accept="image/*" multiple></label>
         <button class="clear secondary" type="button" disabled>Clear</button>
       </div>
       <div class="thumbs" aria-label="Examples"></div>
