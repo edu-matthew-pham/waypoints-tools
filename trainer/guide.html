@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; img-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <title>Pattern Trainer Guide</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="prose">
+    <p><a href="./">← Back to the Pattern Trainer</a></p>
+    <h1>How to use the Pattern Trainer</h1>
+    <p class="lead">You'll teach the computer your own groups of pictures, poses or sounds, check how well it learned, then use what it learned in your own Python app.</p>
+
+    <nav class="guide-toc" aria-label="On this page">
+      <ol>
+        <li><a href="#plan">Plan your groups</a></li>
+        <li><a href="#collect">Collect examples</a></li>
+        <li><a href="#train">Train and check</a></li>
+        <li><a href="#test">Try to fool it</a></li>
+        <li><a href="#save">Save your project</a></li>
+        <li><a href="#python">Use it in Python</a></li>
+      </ol>
+    </nav>
+
+    <h2 id="plan">1. Plan your groups</h2>
+    <p>Each group is called a <strong>class</strong>. Pick the mode at the top that fits your idea:</p>
+    <ul>
+      <li><strong>Pictures</strong> for things you can see: objects, drawings, hand signs.</li>
+      <li><strong>Body poses</strong> for how someone is standing or moving: exercise form, dance moves, gestures.</li>
+      <li><strong>Sounds</strong> for things you can hear: words, claps, instruments, machines.</li>
+    </ul>
+    <p>Think about what should happen when the camera or microphone sees <em>none</em> of your classes. The model always has to pick one of them, so it often helps to add a "nothing" class (an empty desk, standing still, background noise). Sounds mode starts with a Background noise class for this reason.</p>
+
+    <h2 id="collect">2. Collect examples</h2>
+    <p>The model only knows what you show it, so variety matters more than anything else. For each class, change things around while you record: angles, distances, lighting, backgrounds, different hands or voices (if they say yes). Aim for 20 or more examples per class, and about the same number in each.</p>
+    <ul>
+      <li><strong>Hold to record</strong> keeps adding examples while you hold the button. Move around slowly while it records.</li>
+      <li><strong>Upload</strong> adds photos (or .wav sound files) you already have. You can also drag files onto a class.</li>
+      <li><strong>Record one</strong> (Sounds only) listens for 2 seconds and keeps the loudest second. It's best for short sounds like a clap or a word.</li>
+    </ul>
+    <p>If the camera or microphone won't turn on, check your browser has permission and close any other app using it. No camera or microphone? Upload photos or .wav sound files instead.</p>
+    <p>Short on time? You can save your examples at any point (see <a href="#save">Save your project</a>).</p>
+
+    <h2 id="train">3. Train and check</h2>
+    <p>Click <strong>Train model</strong>. It takes a few seconds. You'll see two scores:</p>
+    <ul>
+      <li>The score on its <strong>own training examples</strong> is the easy test. It has already seen the answers, so it's usually close to 100%.</li>
+      <li>The <strong>held-back</strong> score is the fairer one. Before training, the trainer puts aside about a fifth of the examples in each class (the newest ones), then tests the model on them. That tells you how it does on examples it didn't train on. This needs at least 5 examples in each class.</li>
+    </ul>
+    <p>The table shows what got mixed up with what. If two classes keep getting confused, ask why: do they look or sound alike? Add more varied examples of both, then train again.</p>
+    <p>Even the held-back score is a bit generous. If you recorded everything in one go, the held-back examples look a lot like the rest. Real life will be harder.</p>
+
+    <h2 id="test">4. Try to fool it</h2>
+    <p>Now test it the way it will really be used: live, or with <strong>Test a photo</strong> / <strong>Test a sound</strong> using things it has never seen. Try a new place, different light, another person. Then try something that isn't any of your classes at all.</p>
+    <p>You'll probably notice the model can be <strong>very sure and still wrong</strong>. The percentages show how sure it is, not how right it is. Write down what fools it. You'll use that list to improve the model, and to pick your cut-off: the number below which your app says "I'm not sure" instead of guessing.</p>
+
+    <h2 id="save">5. Save your project</h2>
+    <p>Reloading or closing the tab loses your examples. To carry on next lesson, click <strong>Save project</strong>. Next time, click <strong>Open project</strong>, choose that file, then train again.</p>
+    <p>In Pictures mode, the project file includes tiny copies of your photos, so keep it to yourself if it shows people.</p>
+
+    <h2 id="python">6. Use it in Python</h2>
+    <p>You'll need the <a href="https://github.com/edu-matthew-pham/pattern-detector-starters">Pattern Detector starters</a>. The first time, follow the "Set up" steps in their README (your teacher may have done this for you). After that:</p>
+    <ol>
+      <li>When you're happy with it, click the <strong>Download</strong> button. The file is called <code>my_model.json</code> in Pictures mode, <code>my_pose_model.json</code> in Body poses and <code>my_audio_model.json</code> in Sounds. It holds your class names and the trained numbers, but no pictures or sounds.</li>
+      <li>Move it into the starters folder, replacing the sample file with the same name. If your browser called it <code>my_model (1).json</code>, rename it. Use the starter for your mode: <code>image_pattern_trainer.py</code>, <code>pose_pattern_trainer.py</code> or <code>audio_pattern_trainer.py</code>.</li>
+      <li>Run that starter (for example <code>python image_pattern_trainer.py</code>) and open the address it prints. Your class names appear automatically.</li>
+      <li>Change the lines marked <code># ADAPT:</code>: what your app says for each class, and how sure it must be before it says it.</li>
+    </ol>
+    <p>Your app gives the same answers as the trainer, because it uses the same models in the same way.</p>
+
+    <h2>Good habits</h2>
+    <ul>
+      <li>Only record yourself, or people who have said yes.</li>
+      <li>Check what's behind you or around you before you record.</li>
+      <li>Your pictures and sounds stay on this computer. <a href="privacy.html">How your privacy is protected</a></li>
+    </ul>
+  </main>
+</body>
+</html>
