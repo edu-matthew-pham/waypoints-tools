@@ -11,24 +11,24 @@
   <main class="prose">
     <p><a href="./">← Back to the Pattern Trainer</a></p>
     <h1>Your privacy in the Pattern Trainer</h1>
-    <p class="lead">Your photos, webcam pictures and sounds never leave your computer, and they aren't saved anywhere. Closing the tab deletes them.</p>
+    <p class="lead">Your photos, webcam pictures and sounds never leave your computer. The trainer doesn't keep them after you close the tab, unless you choose Save project, which makes a file on your computer.</p>
 
     <h2>What happens to your pictures</h2>
     <ul>
       <li>Everything runs inside your browser on your own computer. There's no account, no server doing the work, and no tracking or analytics.</li>
-      <li>When you add a picture, the page turns it into a list of 1280 numbers and keeps those numbers plus a tiny 64×64 preview, only in this tab's memory. The original picture isn't kept.</li>
-      <li><strong>Body poses mode</strong> keeps even less: just 33 body points (66 numbers) per example, shown as stick figures. No picture is kept at all.</li>
-      <li><strong>Sounds mode</strong> keeps no recordings: each second of sound becomes 521 scores (how much it sounds like speech, music, clapping and so on), shown as a waveform shape. The sound itself is thrown away straight away.</li>
+      <li>When you add a picture, the page turns it into a list of numbers and keeps those numbers plus a tiny preview, only in this tab's memory. The original picture isn't kept.</li>
+      <li><strong>Body poses mode</strong> keeps even less: just the positions of body points, shown as stick figures. No picture is kept at all.</li>
+      <li><strong>Sounds mode</strong> keeps no recordings: each second of sound becomes a list of scores (how much it sounds like speech, music, clapping and so on), shown as a waveform shape. The sound itself is thrown away straight away.</li>
       <li>Nothing is written to your computer except the files you choose to download.</li>
       <li>Close or reload the tab and everything is gone, unless you saved a project. The page warns you first.</li>
     </ul>
 
     <h2>What's in the file you download</h2>
-    <p><code>my_model.json</code>, <code>my_pose_model.json</code> or <code>my_audio_model.json</code> holds only your class names, the trained numbers (weights), and a few settings. It contains no pictures or sounds and can't be turned back into them. Open it in any text editor and you'll see it's just numbers. You decide where it goes after you download it.</p>
+    <p><code>my_model.json</code>, <code>my_pose_model.json</code> or <code>my_audio_model.json</code> holds only your class names, the trained numbers, and a few settings. It contains no pictures or sounds and can't be turned back into them. Open it in any text editor and you'll see it's just numbers. You decide where it goes after you download it.</p>
     <p><strong>Project files</strong> (<code>my_project.json</code> and so on, from <em>Save project</em>) hold your class names, each example's numbers and the small previews you see on screen. In Pictures mode, those previews are tiny 64×64 copies of your photos, so look after a project file like your photos and don't share it if it shows people. Pose and sound projects only have stick figures and waveform shapes.</p>
 
     <h2>The privacy lock</h2>
-    <p>The page carries a browser security rule (a <em>Content Security Policy</em>) that only lets it load its own files from this website. The browser itself blocks it from contacting any other website in the background, so this isn't just a promise.</p>
+    <p>The page is set up so it can only load its own files. Your browser blocks it from sending anything to other websites, so you don't have to take our word for it.</p>
 
     <h2>Check it yourself</h2>
     <ul>
@@ -43,6 +43,8 @@
       <li>If your project needs faces, use only your own. Never use other people's faces or photos without asking them.</li>
       <li>Check what's in the background before you record.</li>
     </ul>
+
+    <p class="hint">For teachers: each picture becomes 1280 numbers, each pose 66 numbers (33 body points) and each second of sound 521 scores. The browser rule that does the blocking is a Content Security Policy.</p>
 
     <p class="hint">For teachers: the code is open at <a href="https://github.com/edu-matthew-pham/waypoints-tools">github.com/edu-matthew-pham/waypoints-tools</a> (MIT licence). The Python starters run the same way, entirely on the student's computer.</p>
   </main>
