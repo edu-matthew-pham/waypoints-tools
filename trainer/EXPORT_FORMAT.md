@@ -222,8 +222,11 @@ message saying to download the model instead.
   `np.frombuffer(base64.b64decode(s), "<f4")`), exactly what the head is trained on.
 - `thumbs`: one 64×64 preview per example (JPEG for pictures and poses, PNG for sounds). `tips`: hover text
   (sounds: what YAMNet heard), may be empty strings.
-- Opening checks everything first and refuses a file from another mode, preprocess recipe or `dim`, more than
-  50 classes or 500 examples per class, or anything malformed, leaving the current work untouched.
+- Opening checks everything first and refuses a file from another mode, preprocess recipe or `dim`, no classes,
+  more than 20 classes or 500 examples per class, a file over 150 MB, `thumbs` that aren't the same length as
+  `examples` or are over 30,000 characters, or anything else malformed, leaving the current work untouched.
+  Class names are tidied to one line of at most 40 letters (the size of the name box); `tips` are cut to 200
+  letters and quietly ignored if malformed.
 - The trained head isn't saved; retraining takes seconds.
 
 ## Export sketch (browser, TF.js)

@@ -110,6 +110,35 @@ def run_mode(ctx, port, mode, files, tmp, other_project, model_file):
         wait_js(pg, f"document.querySelector('#project-msg').textContent.includes({json.dumps(want)})")
         check(pg.evaluate(f"() => {COUNTS}") == counts, f"[{mode}] refuses {os.path.basename(path)} and keeps the work ('{want}')")
 
+    # A file with an oversized preview, and one with a 5000-letter name
+    spec2 = json.load(open(saved))
+    spec2["classes"][0]["thumbs"][0] = "data:image/png;base64," + "A" * 40000
+    big = os.path.join(tmp, f"bigthumb_{mode}.json")
+    json.dump(spec2, open(big, "w"))
+    pg.locator("#open-project").set_input_files(big)
+    wait_js(pg, "document.querySelector('#project-msg').textContent.includes('damaged')")
+    check(pg.evaluate(f"() => {COUNTS}") == counts, f"[{mode}] refuses an oversized preview and keeps the work")
+    spec3 = json.load(open(saved))
+    spec3["classes"][0]["name"] = "  Long\nname " + "x" * 5000
+    longname = os.path.join(tmp, f"longname_{mode}.json")
+    json.dump(spec3, open(longname, "w"))
+    pg.locator("#open-project").set_input_files(longname)
+    wait_js(pg, "document.querySelector('#project-msg').textContent.startsWith('Opened')")
+    nm = pg.evaluate(f"() => {STATE}.classes[0].name")
+    check(len(nm) == 40 and "\n" not in nm and nm.startswith("Long name x"), f"[{mode}] a very long name is cut to the box's 40 letters ({len(nm)})")
+    pg.locator("#open-project").set_input_files(saved)          # back to the real project
+    wait_js(pg, "document.querySelector('#project-msg').textContent.startsWith('Opened')")
+
+    # Opening doesn't leave Train usable while the file is still being read, and nothing is "unsaved" afterwards
+    check(pg.evaluate(f"() => {STATE}.opening === false && {STATE}.savedVersion === {STATE}.dataVersion"),
+          f"[{mode}] after opening, nothing counts as unsaved and the lock is released")
+    pg.evaluate("() => { window.__trainer.state.opening = true; }")
+    pg.evaluate("() => document.querySelector('#train-btn').click()")
+    check(not pg.evaluate(f"() => {STATE}.training") and pg.locator("#train-progress").is_hidden(),
+          f"[{mode}] Train does nothing while a project is being opened")
+    pg.evaluate("() => { window.__trainer.state.opening = false; }")
+    pg.evaluate("() => window.__trainer.state.classes.forEach(() => {})")
+
     # Train from the opened project
     pg.click("#train-btn")
     wait_js(pg, "document.querySelector('#train-msg').textContent.startsWith('Trained')", 120000)
@@ -120,7 +149,7 @@ def run_mode(ctx, port, mode, files, tmp, other_project, model_file):
     wait_js(pg, f"{STATE}.classes[0].examples.length > {counts[0]}")
     pg.locator("label:has(#open-project)").click()      # the warning click: no file chooser
     msg = pg.locator("#project-msg").text_content()
-    check("replaces the examples you have now" in msg, f"[{mode}] Open warns before replacing unsaved examples")
+    check("will replace the examples you have now" in msg, f"[{mode}] Open warns before replacing unsaved examples")
     with pg.expect_file_chooser() as fc:
         pg.locator("label:has(#open-project)").click()
     fc.value.set_files(saved)
@@ -129,6 +158,18 @@ def run_mode(ctx, port, mode, files, tmp, other_project, model_file):
           f"[{mode}] second click opens it; the old model is cleared until you train again")
     check(not errors, f"[{mode}] no page errors" + (f": {errors[:2]}" if errors else ""))
     pg.close()
+    if mode == "image":      # 20 classes is the most; the button says so
+        pg = ctx.new_page()
+        pg.goto(f"http://127.0.0.1:{port}/index.html")
+        wait_js(pg, "window.__trainer && window.__trainer.ready()", 90000)
+        for _ in range(18):
+            pg.click("#add-class")
+        add = pg.locator("#add-class")
+        check(pg.locator(".class-card").count() == 20 and add.is_disabled() and "20 classes" in add.text_content(),
+              "[image] Add a class stops at 20 and says so")
+        pg.locator(".class-card").nth(19).locator(".remove-class").click()
+        check(add.is_enabled() and add.text_content() == "+ Add a class", "[image] removing a class turns Add a class back on")
+        pg.close()
     return saved
 
 

@@ -57,6 +57,7 @@ const state = {
   testing: false,       // a test photo/sound is showing instead of the live camera/mic
   mic: null,            // audio mode: Mic from audio.js
   lastPrediction: null,
+  opening: false,       // a project file is being read
   savedVersion: 0,      // dataVersion when last saved or opened (no "leave page?" warning if unchanged)
 };
 
@@ -151,7 +152,7 @@ async function loadImageFile(file) {
 
 // ---------------------------------------------------------------- classes
 
-function addClass(name) {
+function addClass(name, silent = false) {
   const id = state.nextId++;
   const card = el.tpl.content.firstElementChild.cloneNode(true);
   const cls = { id, name: name || `Class ${id}`, examples: [], thumbs: [], tips: [], card };
@@ -200,7 +201,7 @@ function addClass(name) {
 
   setUpRecordButton(cls, $(".record", card));
   el.classes.appendChild(card);
-  changed();
+  if (!silent) changed();
   return cls;
 }
 
@@ -449,8 +450,14 @@ function problems() {
   return "";
 }
 
+// Examples or names changed: the trained model is out of date.
 function changed() {
   state.dataVersion++;
+  redraw();
+}
+
+// Only the buttons and messages need updating (camera or microphone switched, page finished loading).
+function redraw() {
   for (const c of state.classes) renderClass(c);
   refresh();
 }
@@ -458,7 +465,10 @@ function changed() {
 function refresh() {
   const issue = problems();
   const upToDate = state.model && state.trainedVersion === state.dataVersion;
-  el.trainBtn.disabled = !state.embedder || state.training || Boolean(issue);
+  el.trainBtn.disabled = !state.embedder || state.training || state.opening || Boolean(issue);
+  const full = state.classes.length >= MAX_CLASSES;
+  el.addClass.disabled = full;
+  el.addClass.textContent = full ? `${MAX_CLASSES} classes is the most` : "+ Add a class";
   el.exportBtn.disabled = !upToDate || state.training;
   el.saveBtn.disabled = !state.classes.some((c) => c.examples.length);
   if (state.training) return;
@@ -565,7 +575,7 @@ function evaluate(model, teX, teY, nClasses) {
 }
 
 async function train() {
-  if (problems() || state.training) return;
+  if (problems() || state.training || state.opening) return;
   state.training = true;
   refresh();
   const cfg = settings();
@@ -841,7 +851,7 @@ async function toggleMic() {
     msg.textContent = "Microphone is off";
     el.cameraBtn.textContent = "Turn on microphone";
     $("#back-to-camera").hidden = true;
-    changed();
+    redraw();
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) {
@@ -861,7 +871,7 @@ async function toggleMic() {
     msg.hidden = true;
     el.cameraBtn.textContent = "Turn off microphone";
     backToCamera();
-    changed();
+    redraw();
     startPreview();
     drawMicLoop();
   } catch (err) {
@@ -888,7 +898,7 @@ async function toggleCamera() {
     drawOverlay(null);
     el.cameraBtn.textContent = "Turn on camera";
     $("#back-to-camera").hidden = true;
-    changed();
+    redraw();
     return;
   }
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -908,7 +918,7 @@ async function toggleCamera() {
     el.cameraMsg.hidden = true;
     el.cameraBtn.textContent = "Turn off camera";
     backToCamera();
-    changed();
+    redraw();
     startPreview();
   } catch (err) {
     console.warn(err);
@@ -931,8 +941,11 @@ async function toggleCamera() {
 
 const PROJECT_FORMAT = "pattern-trainer-project";
 const MODE_NAMES = { image: "Pictures", pose: "Body poses", audio: "Sounds" };
-const MAX_CLASSES = 50;
-const MAX_PROJECT_MB = 200;
+const MAX_CLASSES = 20;      // 20 x 500 examples is about 90 MB, the most a project file can hold
+const MAX_PROJECT_MB = 150;
+const MAX_THUMB = 30000;     // characters: a real 64x64 preview is a few thousand
+const MAX_NAME = 40;         // same as the class name box
+const MAX_TIP = 200;
 class ProjectError extends Error {}
 
 function toBase64(vec) {
@@ -971,10 +984,10 @@ function saveProject() {
   const blob = new Blob([projectJSON()], { type: "application/json" });
   const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: PROJECT_FILE });
   document.body.append(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  setTimeout(() => URL.revokeObjectURL(a.href), 30000);
   state.savedVersion = state.dataVersion;
   const n = state.classes.reduce((t, c) => t + c.examples.length, 0);
-  const photos = MODE === "image" ? " It includes the small previews of your photos, so look after it like your photos." : "";
+  const photos = MODE === "image" ? " It includes the small previews of your photos, so don't share it if it shows people." : "";
   setMsg(el.projectMsg, `Saved ${PROJECT_FILE} (${n} examples, ${Math.max(1, Math.round(blob.size / 1024))} KB). Next time, click Open project and choose this file.${photos}`, "ok");
 }
 
@@ -993,7 +1006,7 @@ function readProject(text) {
     throw new ProjectError("That file isn't a Pattern Trainer project.");
   }
   if (p.input.preprocess !== INPUT.preprocess || p.input.embedding?.dim !== DIM) {
-    throw new ProjectError("That project was made with a different version of the trainer, so its examples don't fit this one.");
+    throw new ProjectError("That project was made with a different version of the trainer, so its examples don't fit this one. Ask your teacher which version to use.");
   }
   const damaged = () => new ProjectError("That project file is damaged, so it couldn't be opened.");
   if (!Array.isArray(p.classes) || !p.classes.length) throw damaged();
@@ -1002,9 +1015,11 @@ function readProject(text) {
     return p.classes.map((c) => {
       const okList = (a) => Array.isArray(a) && a.length === c.examples.length;
       if (typeof c.name !== "string" || !Array.isArray(c.examples) || c.examples.length > MAX_PER_CLASS) throw damaged();
-      if (!okList(c.thumbs) || !c.thumbs.every((t) => typeof t === "string" && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]*$/.test(t))) throw damaged();
+      if (!okList(c.thumbs) || !c.thumbs.every((t) => typeof t === "string" && t.length <= MAX_THUMB
+          && /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]*$/.test(t))) throw damaged();
       const tips = okList(c.tips) && c.tips.every((t) => typeof t === "string") ? c.tips : c.examples.map(() => "");
-      return { name: c.name.slice(0, 100), examples: c.examples.map(fromBase64), thumbs: c.thumbs, tips };
+      const name = [...c.name.replace(/\s+/g, " ").trim()].slice(0, MAX_NAME).join("");
+      return { name, examples: c.examples.map(fromBase64), thumbs: c.thumbs, tips: tips.map((t) => t.slice(0, MAX_TIP)) };
     });
   } catch (err) {
     throw err instanceof ProjectError && err.message !== "damaged" ? err : damaged();
@@ -1012,8 +1027,11 @@ function readProject(text) {
 }
 
 async function openProject(file) {
-  if (state.training) { setMsg(el.projectMsg, "Wait for training to finish, then open the project.", "warn"); return; }
+  if (state.training || state.opening) { setMsg(el.projectMsg, "Wait for training to finish, then open the project.", "warn"); return; }
   let classes;
+  state.opening = true;           // stops Train and a second Open while the file is read
+  refresh();
+  setMsg(el.projectMsg, `Opening ${file.name}…`);
   try {
     if (file.size > MAX_PROJECT_MB * 1024 * 1024) throw new ProjectError("That file is too big to be a Pattern Trainer project.");
     classes = readProject(await file.text());
@@ -1021,11 +1039,14 @@ async function openProject(file) {
     if (!(err instanceof ProjectError)) console.error(err);
     setMsg(el.projectMsg, err instanceof ProjectError ? err.message : "That file couldn't be opened.", "warn");
     return;
+  } finally {
+    state.opening = false;
+    refresh();
   }
   for (const c of state.classes) { c.stopRecording?.(); c.card.remove(); }
   state.classes = [];
   for (const c of classes) {
-    const cls = addClass(c.name);
+    const cls = addClass(c.name, true);
     Object.assign(cls, { examples: c.examples, thumbs: c.thumbs, tips: c.tips });
   }
   if (state.model) state.model.dispose();
@@ -1046,8 +1067,9 @@ el.openFile.addEventListener("click", (e) => {
   if (openArmed || !state.classes.some((c) => c.examples.length) || state.savedVersion === state.dataVersion) return;
   e.preventDefault();
   openArmed = true;
-  setMsg(el.projectMsg, "Opening a project replaces the examples you have now. Click Open project again to carry on, or Save project first.", "warn");
-  setTimeout(() => { openArmed = false; }, 6000);
+  const warning = "Opening a project will replace the examples you have now. Click Open project again to go ahead, or click Save project first to keep them.";
+  setMsg(el.projectMsg, warning, "warn");
+  setTimeout(() => { openArmed = false; if (el.projectMsg.textContent === warning) setMsg(el.projectMsg, ""); }, 6000);
 });
 el.openFile.addEventListener("change", async () => {
   const file = el.openFile.files[0];
@@ -1155,7 +1177,7 @@ async function start() {
     if (MODE === "audio") {
       state.embedder = await loadAudioClassifier(location.href, modelUrl);
       el.loading.hidden = true;
-      changed();
+      redraw();
       return;
     }
     const files = await FilesetResolver.forVisionTasks(new URL("vendor/mediapipe/wasm", location.href).href);
@@ -1169,7 +1191,7 @@ async function start() {
     el.loading.textContent = "The model didn't load. Check your internet connection and reload the page.";
     el.loading.classList.add("error");
   }
-  changed();
+  redraw();
 }
 
 // Small hook for automated tests and curious teachers (read-only use).
