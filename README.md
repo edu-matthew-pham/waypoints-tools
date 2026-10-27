@@ -12,6 +12,17 @@ Live at https://tools.learningwaypoints.com/ (GitHub Pages from `main`, root fol
 
 If a tool ever needs a build step or its own releases, it moves to its own repo.
 
+## Acknowledgements
+
+The Pattern Trainer is inspired by Google's [Teachable Machine](https://teachablemachine.withgoogle.com/) and built on
+Google's MediaPipe and TensorFlow.js; see [`trainer/README.md`](trainer/README.md#acknowledgements). Made by Matthew Pham with
+help from Claude (Anthropic).
+
 ## Licence
 
-MIT (see `LICENSE`). Third-party files in `trainer/vendor/` and the image model keep their own Apache-2.0 licences; see `trainer/vendor/README.md`.
+Free for teachers, students, schools and other non-commercial use under the
+[PolyForm Noncommercial License 1.0.0](LICENSE). Commercial use needs permission: contact
+[Matthew Pham on GitHub](https://github.com/edu-matthew-pham).
+
+Copyright 2026 Matthew Pham. Third-party files in `trainer/vendor/` and the models in `trainer/models/` keep their own
+Apache-2.0 licences; see `trainer/vendor/README.md`.

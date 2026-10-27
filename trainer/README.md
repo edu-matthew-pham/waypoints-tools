@@ -59,6 +59,18 @@ It uploads photos, records from a simulated webcam, trains, tests photos (includ
 with transparency, greyscale and a very wide image), downloads the model, and checks Python's predictions match
 the browser's.
 
+## Acknowledgements
+
+- **Inspired by** Google's [Teachable Machine](https://teachablemachine.withgoogle.com/) (Google Creative Lab): the
+  collect, train, test and export flow, and the "Background noise" class for sounds.
+- **Built on** Google's [MediaPipe](https://ai.google.dev/edge/mediapipe) (image, pose and sound models),
+  [TensorFlow.js](https://www.tensorflow.org/js), MobileNetV2 and YAMNet. All Apache-2.0.
+- **Design reference:** the open-source [Programmable Machine](https://github.com/DD-65/Programmable-Machine).
+- **What's different here, and why:** models export to Python starters and give the same answers there; an accuracy
+  check on held-back examples with a mix-up table; privacy by design (nothing leaves the computer, enforced by the
+  browser); body poses and sounds that match exactly or closely between browser and Python.
+- **Made with help from Claude** (Anthropic), with design, decisions and testing by Matthew Pham.
+
 ## Updating the libraries
 
 Keep the browser's `@mediapipe/tasks-vision` version and the starters' `mediapipe` version the same, and re-run
