@@ -222,11 +222,14 @@ def main():
         check(tag, "upload button can be reached by keyboard")
 
         # Third class from the webcam (double-click 'Turn on camera' must not leave it stuck)
+        pg.evaluate("() => { const s = window.__trainer.state; s.savedVersion = s.dataVersion; }")   # as if just saved
         pg.dblclick("#camera-btn")
         wait_js(pg, "document.querySelector('#video').readyState >= 2", timeout=20000)
         pg.wait_for_timeout(500)
         cam_ok = pg.evaluate("Boolean(window.__trainer.state.stream) && document.querySelector('#camera-btn').textContent === 'Turn off camera'")
         check(cam_ok, "double-clicking 'Turn on camera' starts it cleanly")
+        check(pg.evaluate("window.__trainer.state.savedVersion === window.__trainer.state.dataVersion"),
+              "turning the camera on doesn't make saved work look unsaved")
         pg.click("#add-class")
         cam_card = cards.nth(2)
         cam_card.locator(".class-name").fill("webcam")
