@@ -83,6 +83,8 @@ button.record.active { background: var(--rec); border-color: var(--rec); color: 
 .class-name { flex: 1; min-width: 0; font: inherit; font-weight: 600; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--text); }
 .count { color: var(--muted); font-size: .9rem; white-space: nowrap; }
 .class-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.project-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.project-bar + .hint { margin: 6px 0 0; }
 .thumbs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
 .thumbs img { width: 44px; height: 44px; object-fit: cover; border-radius: 4px; }
 .thumbs .more { align-self: center; color: var(--muted); font-size: .85rem; padding-left: 4px; }
