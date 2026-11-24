@@ -21,7 +21,7 @@ export const KEYS = [
 export const normaliseKey = (k) => (k === ' ' ? 'Space' : String(k).length === 1 ? String(k).toUpperCase() : String(k));
 
 const obj = (extra = {}) => ({ name: 'target', type: 'object', ...extra });
-const expr = (name = 'value') => ({ name, type: 'expr' });
+const expr = (name = 'value', def = '') => ({ name, type: 'expr', default: def });
 
 export const CONDITIONS = {
   onStart: {
@@ -76,6 +76,14 @@ export const CONDITIONS = {
       ctx.picked.set(p.target, keep);
       return keep.length > 0;
     },
+  },
+  onEvery: {
+    category: 'System', label: 'Every {seconds} seconds', trigger: 'timer', timer: 'every',
+    params: [expr('seconds', '1')],
+  },
+  onAfter: {
+    category: 'System', label: 'After {seconds} seconds', trigger: 'timer', timer: 'after',
+    params: [expr('seconds', '3')],
   },
   everyTick: {
     category: 'System', label: 'Every tick', params: [],
@@ -191,7 +199,7 @@ export function defaultParams(entry, scope) {
       case 'showhide': out[prm.name] = 'show'; break;
       case 'onoff': out[prm.name] = 'on'; break;
       case 'key': out[prm.name] = 'Enter'; break;
-      default: out[prm.name] = '';
+      default: out[prm.name] = prm.default ?? '';
     }
   }
   return out;

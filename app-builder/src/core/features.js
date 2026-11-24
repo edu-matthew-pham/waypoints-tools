@@ -16,7 +16,7 @@ const ALL_KINDS = Object.keys(COMPONENTS);
 const L1_COND = ['onStart', 'onClicked'];
 const L1_ACT = ['setText', 'setVar', 'addTo', 'subtractFrom', 'goToScreen', 'setVisible'];
 const L2_COND = [...L1_COND, 'everyTick', 'compareVar', 'compareValues', 'onChanged',
-  'onPressed', 'onReleased', 'onToggled', 'onSlid', 'onSubmitted', 'isOn', 'onKey', 'onKeyUp'];
+  'onPressed', 'onReleased', 'onToggled', 'onSlid', 'onSubmitted', 'isOn', 'onKey', 'onKeyUp', 'onEvery', 'onAfter'];
 const L3_COND = [...L2_COND, 'compareInst', 'keyHeld'];
 const L2_ACT = [...L1_ACT, 'setOn', 'setSlider'];
 const L3_ACT = [...L2_ACT, 'setInst', 'addToInst'];

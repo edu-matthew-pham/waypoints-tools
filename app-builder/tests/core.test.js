@@ -286,3 +286,65 @@ test('static check knows toggle and slider properties; keyed triggers validate',
   assert.match(check('Vol.on', sc), /no property/);
   assert.deepEqual(validateSheet(p.screens[0].events), []);
 });
+
+// ---- timers ----
+const timerProject = (events, extraVars = []) => ({
+  version: 1, name: 't', features: { level: 4 },
+  variables: [{ name: 'n', value: 0 }, { name: 'gap', value: 2 }, ...extraVars],
+  screens: [
+    { id: 'a', name: 'A', objects: [], events },
+    { id: 'b', name: 'B', objects: [], events: [] },
+  ],
+});
+const add = (v = '1', varName = 'n') => ({ type: 'addTo', value: v, var: varName });
+
+test('every N seconds fires once per N seconds of app time', () => {
+  const rt = new Runtime(timerProject([{ id: 'e', else: false, conds: [{ type: 'onEvery', seconds: '1' }], actions: [add()], children: [] }]));
+  rt.start();
+  rt.advance(999); assert.equal(rt.getVar('n'), 0);
+  rt.advance(1);   assert.equal(rt.getVar('n'), 1);
+  rt.advance(2500); assert.equal(rt.getVar('n'), 3);
+});
+
+test('after N seconds fires once', () => {
+  const rt = new Runtime(timerProject([{ id: 'e', else: false, conds: [{ type: 'onAfter', seconds: '3' }], actions: [add()], children: [] }]));
+  rt.start();
+  rt.advance(2000); assert.equal(rt.getVar('n'), 0);
+  rt.advance(1000); assert.equal(rt.getVar('n'), 1);
+  rt.advance(10000); assert.equal(rt.getVar('n'), 1);
+  assert.equal(rt.hasTimers, true); // done timers stay listed but never fire again
+});
+
+test('timer seconds can come from a variable; changing it changes the next gap', () => {
+  const rt = new Runtime(timerProject([
+    { id: 'e', else: false, conds: [{ type: 'onEvery', seconds: 'gap' }], actions: [add(), { type: 'setVar', var: 'gap', value: '1' }], children: [] },
+  ]));
+  rt.start();
+  rt.advance(2000); assert.equal(rt.getVar('n'), 1);  // first gap 2 s
+  rt.advance(1000); assert.equal(rt.getVar('n'), 2);  // then 1 s
+});
+
+test('timers reset on a screen change and belong to their screen', () => {
+  const rt = new Runtime(timerProject([
+    { id: 'e', else: false, conds: [{ type: 'onAfter', seconds: '1' }], actions: [{ type: 'goToScreen', screen: 'b' }], children: [] },
+    { id: 'f', else: false, conds: [{ type: 'onEvery', seconds: '0.5' }], actions: [add()], children: [] },
+  ]));
+  rt.start();
+  rt.advance(1000);
+  assert.equal(rt.screenId, 'b');
+  const n = rt.getVar('n');
+  rt.advance(5000);
+  assert.equal(rt.getVar('n'), n, 'screen B has no timers, so A\'s stop');
+});
+
+test('bad timer values give a friendly problem; a long pause never floods', () => {
+  const rt = new Runtime(timerProject([
+    { id: 'bad', else: false, conds: [{ type: 'onEvery', seconds: '0' }], actions: [add()], children: [] },
+    { id: 'ok', else: false, conds: [{ type: 'onEvery', seconds: '0.1' }], actions: [add('1', 'gap')], children: [] },
+  ]));
+  rt.start();
+  assert.match(rt.errors[0].message, /at least 0.1/);
+  rt.advance(60000);
+  assert.ok(rt.getVar('gap') - 2 <= 20, 'capped catch-up');
+  assert.equal(rt.getVar('n'), 0);
+});

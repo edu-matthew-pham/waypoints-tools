@@ -42,14 +42,15 @@ calls directly, just like clicks today.
 
 | Item | Kind | Level |
 |---|---|---|
-| **Every N seconds** | trigger | 2 |
-| **After N seconds** (once) | trigger | 2 |
+| **Every N seconds** *(done)* | trigger | 2 |
+| **After N seconds** (once) *(done)* | trigger | 2 |
 | **Wait N seconds, then...** | action | 3 |
 | Random number / pick from list | expression function (`random` exists) | 2 |
 | `if(test, yes, no)` and the **Choose between two values** builder *(done)* | expression function + dialog | 3 |
 | Current time / date | expression functions | 3 |
 
-Time runs from the interpreter's tick counter, not the wall clock, so tests are deterministic (`rt.advance(ms)`).
+Time is app time fed by the renderer (`rt.advance(ms)`), not the wall clock, so tests are exact. Seconds can be a variable
+(re-read after each firing), must be at least 0.1, timers reset on a screen change, and a hidden tab never causes a burst.
 
 ## 4. Data
 
@@ -78,5 +79,5 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
 
 ## Suggested order
 
-1. Toggle, Slider. *(done, with `if()` + builder)*  2. Key pressed + Enter-submits + pressed/released. *(done)*  3. Timers.
+1. Toggle, Slider. *(done, with `if()` + builder)*  2. Key pressed + Enter-submits + pressed/released. *(done)*  3. Timers. *(done, except Wait)*
 4. Image + asset panel.  5. Lists + for-each + Repeater.  6. Rename.  7. Layout/Tabs.  8. Custom HTML widget and JS view.

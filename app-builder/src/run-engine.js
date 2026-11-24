@@ -44,8 +44,11 @@ export class Runner {
     this.rt = rt;
     rt.start(screenId);
     this.#draw();
-    const loop = () => {
+    let last = performance.now();
+    const loop = (now = performance.now()) => {
       if (this.rt !== rt) return;
+      if (rt.hasTimers) rt.advance(Math.min(now - last, 250)); // capped, so a hidden tab doesn't fire a burst
+      last = now;
       if (rt.needsTick) rt.tick();
       if (this.dirty) { this.dirty = false; this.#draw(); }
       this.raf = requestAnimationFrame(loop);

@@ -32,6 +32,8 @@ export class Runtime {
     this.version = 0;
     this.ticks = 0;
     this.keysDown = new Set();
+    this.time = 0;      // milliseconds of app time; the renderer feeds it with advance()
+    this.timers = [];
   }
 
   // ---------- lifecycle ----------
@@ -39,10 +41,51 @@ export class Runtime {
     this.globals = new Map(this.project.variables.map((v) => [v.name, v.value]));
     this.errors = [];
     this.keysDown = new Set();
+    this.time = 0;
     this.queue = [{ name: 'start' }];
     this.pendingScreen = null;
     this.#load(screenId ?? this.project.screens[0].id);
     this.#pump();
+  }
+
+  // Timers run on app time, not the wall clock, so tests can say advance(1000) and get exactly one second.
+  get hasTimers() { return this.timers.length > 0; }
+  advance(ms) {
+    if (!this.screen || this.busy || !this.timers.length) return;
+    this.time += ms;
+    const list = this.timers;
+    for (const t of [...list]) {
+      let n = 0;
+      while (!t.done && t.due <= this.time && n++ < 20) {
+        this.fire('timer', { eventId: t.ev.id });
+        if (this.timers !== list) return;            // the event changed screen: these timers are gone
+        if (t.kind === 'after') { t.done = true; break; }
+        const gap = this.#timerGap(t.ev);
+        if (gap === null) { t.done = true; break; }
+        t.due += gap;
+      }
+      if (!t.done && t.due <= this.time) t.due = this.time + (this.#timerGap(t.ev) ?? 1000); // fell far behind (tab was hidden): skip ahead
+    }
+  }
+  #timerGap(ev) {
+    const trig = triggerOf(ev);
+    try {
+      const secs = this.evalExpr(trig.seconds, this.#ctx());
+      if (typeof secs !== 'number' || !(secs >= 0.1)) throw new ExprError('A timer needs a number of seconds of at least 0.1');
+      return secs * 1000;
+    } catch (e) {
+      if (e instanceof ExprError) { this.#error(ev.id, e.message); return null; }
+      throw e;
+    }
+  }
+  #setUpTimers() {
+    this.timers = [];
+    for (const ev of this.screen.events || []) {
+      const entry = CONDITIONS[triggerOf(ev)?.type];
+      if (!entry?.timer) continue;
+      const gap = this.#timerGap(ev);
+      if (gap !== null) this.timers.push({ ev, kind: entry.timer, due: this.time + gap, done: false });
+    }
   }
 
   get needsTick() { return !!this.screen && (this.screen.events || []).some((ev) => !triggerOf(ev)); }
@@ -198,6 +241,7 @@ export class Runtime {
       });
       this.objects.set(od.name, { def: od, kind: od.kind, instances });
     }
+    this.#setUpTimers();
     this.hooks.onScreen?.(scr);
     this.#changed();
   }
@@ -231,10 +275,11 @@ export class Runtime {
     }
   }
 
-  #matches(trig, occ, ctx) {
+  #matches(trig, occ, ctx, ev) {
     const entry = CONDITIONS[trig.type];
     if (!entry || entry.trigger !== occ.name) return false;
     if (entry.keyed && trig.key !== 'any' && trig.key !== occ.key) return false;
+    if (entry.timer && occ.eventId !== ev.id) return false;
     if (entry.object) {
       if (trig[entry.object] !== occ.object) return false;
       ctx.picked.set(occ.object, [occ.instance]);
@@ -249,7 +294,7 @@ export class Runtime {
       const ctx = { picked: new Map(parentCtx.picked) };
       if (top) {
         // trigger pass runs only matching trigger events; tick pass runs only non-trigger events
-        if (occ ? (!trig || !this.#matches(trig, occ, ctx)) : !!trig) { chainRan = true; continue; }
+        if (occ ? (!trig || !this.#matches(trig, occ, ctx, ev)) : !!trig) { chainRan = true; continue; }
       }
       let ok;
       if (ev.else) {
