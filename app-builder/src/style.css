@@ -144,9 +144,11 @@ select.ctl { padding-right: 4px; }
 .problems h3 { color: var(--bad); }
 .problem { background: var(--bad-soft); color: var(--bad); border-radius: 8px; padding: 6px 10px; margin: 4px 0; font-size: 13px; }
 
-@media (max-width: 900px) {
+@media (max-width: 600px) {
   #app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; height: auto; min-height: 100vh; }
   .side { border-right: 0; border-bottom: 1px solid var(--line); max-height: 40vh; }
+}
+@media (max-width: 900px) {
   .view-design, .view-run { flex-direction: column; }
   .ev-main { grid-template-columns: 1fr; }
   .ev-conds { border-right: 0; border-bottom: 1px dashed var(--line); padding: 0 0 8px; }
@@ -182,7 +184,7 @@ select.ctl { padding-right: 4px; }
   .ev-tools { grid-column: 1 / -1; justify-content: flex-end; }
   .ev-children { margin-left: 14px; }
 }
-@media (max-width: 1100px) { .view-events { flex-direction: column-reverse; } .preview-col { position: static; width: auto; } }
+@media (max-width: 1100px) { .view-events { flex-direction: column; align-items: stretch; } .preview-col { position: static; width: 100%; } }
 
 /* guided event view */
 .sheet-bar { display: flex; align-items: center; gap: 12px; justify-content: space-between; margin-bottom: 8px; }
@@ -401,3 +403,20 @@ select.ctl { padding-right: 6px; }
 .stage.phone { border-radius: 28px; }
 .top .ctl.name { width: 180px; }
 .top { flex-wrap: nowrap; overflow-x: auto; }
+
+/* narrow windows, such as App Builder inside a lesson page (about 600-900 px wide) */
+@media (min-width: 601px) and (max-width: 900px) {
+  #app { grid-template-columns: 190px 1fr; }
+  .side { padding: 6px 10px 16px; }
+  .tabs { padding: 6px 10px 0; }
+  .tab { padding: 8px 12px; }
+}
+@media (max-width: 900px) {
+  .top { gap: 6px; padding: 6px 10px; }
+  .top .tag:not(.lvl) { display: none; }
+  .top .ctl.name { width: auto; flex: 1 1 90px; min-width: 70px; }
+  .top select.ctl { max-width: 130px; }
+  .view { padding: 12px; }
+}
+.sheet-bar { flex-wrap: wrap; }
+.sheet-bar .hint { flex: 1 1 260px; }

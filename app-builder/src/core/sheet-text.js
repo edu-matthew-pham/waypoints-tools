@@ -37,7 +37,7 @@ export function sheetText(project) {
     out.push(`screen ${s.name}`);
     for (const o of s.objects || []) {
       const i = o.instances[0] || {};
-      out.push(`object ${o.name} (${COMPONENTS[o.kind]?.label.toLowerCase() ?? o.kind}) text ${val(i.text ?? '')}${o.instances.length > 1 ? ` copies ${o.instances.length}` : ''}`);
+      out.push(`object ${o.name} (${COMPONENTS[o.kind]?.label.toLowerCase() ?? o.kind}) text ${val(i.text ?? '')}${o.kind === 'list' && i.source ? ` shows ${i.source}` : ''}${o.instances.length > 1 ? ` copies ${o.instances.length}` : ''}`);
       for (const iv of o.instanceVars || []) out.push(`object variable ${o.name}.${iv.name} = ${val(iv.value)}`);
     }
     const walk = (events, path) => {

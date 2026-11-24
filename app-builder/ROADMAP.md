@@ -85,7 +85,8 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
 For lessons, tests and (later) guided tutorials:
 - **Stable labels:** every button, menu item, tile, dialog button and field carries `data-ab="..."` (for example `add-event`,
   `add-condition`, `group:System`, `group:object:SaveButton`, `entry:onClicked`, `param:value`, `done`, `tab:events`,
-  `object:SaveButton`, `prop:x`, `menu:delete`). Change a label only with the lessons and tests that use it.
+  `object:SaveButton`, `prop:x`, `menu:delete`). Every object on the app itself carries `widget:<Name>` (copies share it; tell
+  them apart with `data-id`). Change a label only with the lessons and tests that use it.
 - **Open a project from the page:** `?sample=<id>` (and `-start`), `?code=<project JSON>` with `?id=` or `?store=` (each keeps its
   own saved work), or `postMessage({ type: 'appbuilder', cmd: 'start' | 'reset' | 'get', project })` (src/embed.js).
 - **Report back:** `{ type: 'appbuilder', event: 'project', project, sheet }` after every change, and for Waypoints lesson steps

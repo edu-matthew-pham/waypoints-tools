@@ -14,8 +14,9 @@ function addRow(placeholder, onAdd, withValue) {
   const key = placeholder.toLowerCase().replace(/[^a-z]+/g, '-');
   const name = h('input', { class: 'ctl', placeholder, 'aria-label': placeholder, 'data-ab': key + '-name' });
   const val = withValue ? h('input', { class: 'ctl small', placeholder: 'start', value: '0', 'aria-label': 'Starting value', 'data-ab': key + '-value' }) : null;
-  const go = () => { if (name.value.trim() && onAdd(name.value.trim(), val ? parseValue(val.value) : null) !== false) name.value = ''; };
+  const go = () => { if (name.value.trim() && onAdd(name.value.trim(), val ? parseValue(val.value) : null) !== false) { name.value = ''; if (val) val.value = '0'; } };
   name.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  val?.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   return h('div', { class: 'add-row' }, name, val, h('button', { class: 'btn', onclick: go, title: 'Add', 'data-ab': key + '-add' }, '+'));
 }
 

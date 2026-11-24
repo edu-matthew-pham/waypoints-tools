@@ -67,7 +67,7 @@ export class Runner {
     const rt = this.rt;
     if (!rt) return;
     this.hint.hidden = !usesKeys(rt.screen?.events);
-    this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, kind: i.kind, props: i.kind === 'list' ? { ...i.props, items: rt.globals.get(i.props.source) } : i.props })));
+    this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, name: i.object, kind: i.kind, props: i.kind === 'list' ? { ...i.props, items: rt.globals.get(i.props.source) } : i.props })));
     if (this.watchEl) {
       const w = rt.watch();
       this.watchEl.replaceChildren(

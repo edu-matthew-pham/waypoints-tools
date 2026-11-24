@@ -110,6 +110,7 @@ export class Stage {
       let n = this.nodes.get(it.id);
       if (n && n.kind !== it.kind) { n.wrap.remove(); this.nodes.delete(it.id); n = null; }
       if (!n) { n = this.#make(it); this.nodes.set(it.id, n); this.el.append(n.wrap); }
+      if (it.name) n.wrap.dataset.ab = 'widget:' + it.name;
       const p = it.props, s = n.wrap.style;
       s.left = p.x + 'px'; s.top = p.y + 'px'; s.width = p.w + 'px'; s.height = p.h + 'px';
       n.wrap.classList.toggle('hidden', p.visible === false);

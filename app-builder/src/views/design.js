@@ -29,7 +29,7 @@ export function initDesign(root) {
 
   const listItems = (name) => S.project.variables.find((v) => v.name === name && Array.isArray(v.value))?.value;
   stage.fitTo(stageCol, () => innerHeight - 170);
-  const items = () => screen().objects.flatMap((o) => o.instances.map((i) => ({ id: i.id, kind: o.kind, props: o.kind === 'list' ? withItems(i) : i })));
+  const items = () => screen().objects.flatMap((o) => o.instances.map((i) => ({ id: i.id, name: o.name, kind: o.kind, props: o.kind === 'list' ? withItems(i) : i })));
   // a live view of the instance plus its list items, so dragging still moves the real instance
   const withItems = (i) => new Proxy(i, { get: (t, k) => (k === 'items' ? listItems(t.source) : t[k]) });
   function sync() { stage.sync(items()); stage.setSelected(S.selId); }
