@@ -61,20 +61,14 @@ export class Runner {
 
   focus() { this.stage.el.focus({ preventScroll: true }); }
 
-  stop() { cancelAnimationFrame(this.raf); this.rt = null; this.stage.setPick(null); }
+  stop() { cancelAnimationFrame(this.raf); this.rt = null; this.stage.setPick(null); showNow(null); }
 
   #draw() {
     const rt = this.rt;
     if (!rt) return;
     this.hint.hidden = !usesKeys(rt.screen?.events);
     this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, name: i.object, kind: i.kind, props: i.kind === 'list' ? { ...i.props, items: rt.globals.get(i.props.source) } : i.props })));
-    if (this.watchEl) {
-      const w = rt.watch();
-      this.watchEl.replaceChildren(
-        h('h3', {}, 'Watch'),
-        h('div', { class: 'var' }, h('span', { class: 'vname' }, 'screen'), h('span', { class: 'val' }, w.screen)),
-        ...Object.entries(w.vars).map(([k, v]) => h('div', { class: 'var' }, h('span', { class: 'vname' }, k), h('span', { class: 'val' }, Array.isArray(v) ? `[${v.map((x) => (typeof x === 'string' ? `"${x}"` : String(x))).join(', ')}]` : typeof v === 'string' ? `"${v}"` : String(v)))));
-    }
+    showNow(rt.watch());
     if (this.problemsEl) {
       this.problemsEl.replaceChildren(...(rt.errors.length ? [
         h('h3', {}, 'Problems'),
@@ -82,4 +76,23 @@ export class Runner {
       ] : []));
     }
   }
+}
+
+// Live values sit beside each variable in the sidebar (one place for a variable: what it starts at, and what it is now).
+const fmt = (v) => (typeof v === 'string' ? `"${v}"` : String(v));
+let lastNow = null;
+export const nowText = (name, w = lastNow) => { const v = w?.vars[name]; return !w || v === undefined ? '' : Array.isArray(v) ? `${v.length} item${v.length === 1 ? '' : 's'}` : fmt(v); };
+export function showNow(w) {
+  lastNow = w;
+  document.documentElement.classList.toggle('ab-running', !!w);
+  for (const el of document.querySelectorAll('[data-now]')) {
+    const v = w?.vars[el.dataset.now];
+    const text = nowText(el.dataset.now, w);
+    if (el.textContent !== text) {
+      if (w && el.textContent !== '') { el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+      el.textContent = text;
+      el.title = Array.isArray(v) ? v.map(fmt).join(', ') || 'empty' : '';
+    }
+  }
+  for (const el of document.querySelectorAll('[data-now-screen]')) el.textContent = w?.screen ? `Running: ${w.screen}` : '';
 }

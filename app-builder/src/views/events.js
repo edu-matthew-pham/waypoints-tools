@@ -11,11 +11,10 @@ export function initEvents(root) {
   const sheet = document.createElement('event-sheet');
   const banner = h('div', { class: 'pick-banner', hidden: true }, 'Click an object in the preview to choose it. Esc to cancel.');
   const stageHost = h('div', { class: 'stage-host' });
-  const watch = h('div', { class: 'watch' });
   const problems = h('div', { class: 'problems' });
   let active = false, auto = true, timer = 0, pickCancel = null;
 
-  const runner = new Runner(stageHost, { watch, problems, flash: (id) => sheet.flash(id) });
+  const runner = new Runner(stageHost, { problems, flash: (id) => sheet.flash(id) });
   const restart = () => { if (active) { cancelPick(); runner.start(S.project, S.screenId); } };
   const later = () => { clearTimeout(timer); if (auto) timer = setTimeout(restart, 250); };
 
@@ -38,7 +37,7 @@ export function initEvents(root) {
         h('button', { class: 'btn', 'data-ab': 'restart', onclick: restart }, '↻ Restart'),
         h('label', { class: 'check-inline' }, autoBox, 'Restart when I edit')),
       banner, stageHost,
-      h('details', { class: 'dbg' }, h('summary', {}, 'Watch values and problems'), watch, problems)));
+      problems));
 
   runner.stage.fitTo(root.querySelector('.preview-col'), () => innerHeight - 200);
   sheet.addEventListener('sheetchange', () => hooks.commit('sheet'));

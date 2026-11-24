@@ -9,6 +9,7 @@ import { renameObject, renameVariable } from '../core/rename.js';
 import { pickPicture } from '../ui/upload.js';
 import { assetName } from '../core/assets.js';
 import { S, screen, hooks } from '../state.js';
+import { nowText } from '../run-engine.js';
 
 function addRow(placeholder, onAdd, withValue) {
   const key = placeholder.toLowerCase().replace(/[^a-z]+/g, '-');
@@ -121,7 +122,8 @@ export function renderSide(el) {
         onDone: () => { renamingVar = null; hooks.refresh(); },
         onSave: (nv) => { renameVariable(S.project, v.name, nv); renamingVar = null; hooks.commit(); } })
       : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingVar = v.name; hooks.refresh(); } }, v.name),
-    h('input', { class: 'ctl small', value: String(v.value), 'aria-label': `Starting value of ${v.name}`, onchange: (e) => { v.value = parseValue(e.target.value); hooks.commit(); } }),
+    h('input', { class: 'ctl small', value: String(v.value), title: 'Starting value', 'aria-label': `Starting value of ${v.name}`, onchange: (e) => { v.value = parseValue(e.target.value); hooks.commit(); } }),
+    h('span', { class: 'now', 'data-now': v.name }, nowText(v.name)),
     h('button', { class: 'icon danger', title: 'Delete variable', onclick: () => { S.project.variables.splice(i, 1); hooks.commit(); } }, '×')));
 
   el.replaceChildren(
@@ -133,7 +135,7 @@ export function renderSide(el) {
       const sc2 = newScreen('Screen ' + n); S.project.screens.push(sc2); S.screenId = sc2.id; S.selId = null; renaming = sc2.id; hooks.commit();
     } }, '+ Screen'),
     h('h3', {}, 'Variables (whole app)'),
-    ...(vars.some(Boolean) ? vars.filter(Boolean) : [h('p', { class: 'muted' }, 'None yet.')]),
+    ...(vars.some(Boolean) ? [h('div', { class: 'var var-head' }, h('span', { class: 'vname' }), h('span', { class: 'col-start' }, 'starts at'), h('span', { class: 'col-now' }, 'now'), h('span', { class: 'col-x' })), ...vars.filter(Boolean)] : [h('p', { class: 'muted' }, 'None yet.')]),
     addRow('New variable', (name, value) => {
       if (!isIdentifier(name)) { hooks.notify('Variable names use letters, numbers and _ only, and can’t start with a number.'); return false; }
       if (S.project.variables.some((v) => v.name === name)) { hooks.notify('There is already a variable called ' + name); return false; }
@@ -175,7 +177,8 @@ function listSection() {
           onDone: () => { renamingVar = null; hooks.refresh(); },
           onSave: (nv) => { renameVariable(S.project, v.name, nv); renamingVar = null; hooks.commit(); } })
         : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingVar = v.name; hooks.refresh(); } }, v.name),
-      h('span', { class: 'muted' }, `${v.value.length} item${v.value.length === 1 ? '' : 's'}`),
+      h('span', { class: 'muted start-count' }, `${v.value.length} at start`),
+      h('span', { class: 'now', 'data-now': v.name }, nowText(v.name)),
       h('button', { class: 'icon danger', title: 'Delete list', onclick: () => { S.project.variables = S.project.variables.filter((x) => x !== v); hooks.commit(); } }, '\u00d7')),
     h('input', { class: 'ctl list-start', value: v.value.join(', '), placeholder: 'Starting items, e.g. Milk, Eggs', 'aria-label': `Starting items of ${v.name}`,
       onchange: (e) => { v.value = e.target.value.split(',').map((x) => x.trim()).filter(Boolean).map(parseValue); hooks.commit(); } })));
