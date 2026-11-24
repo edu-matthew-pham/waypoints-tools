@@ -337,3 +337,4 @@ select.ctl { padding-right: 6px; }
 .kb-hint { margin: 8px 2px 0; font-size: 12px; color: var(--muted); }
 .stage.kb-focus ~ .kb-hint { display: none; }
 .kb-hint[hidden] { display: none; }
+.es-entry small.help { color: var(--muted); font-size: 12px; margin-top: 2px; }

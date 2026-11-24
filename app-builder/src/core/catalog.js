@@ -85,6 +85,11 @@ export const CONDITIONS = {
     category: 'System', label: 'After {seconds} seconds', trigger: 'timer', timer: 'after',
     params: [expr('seconds', '3')],
   },
+  triggerOnce: {
+    category: 'System', label: 'Trigger once while true', params: [], once: true,
+    help: 'Runs the event once when the conditions above become true, then waits until they are false again. Once for the whole event, not once per copy. Keep it last.',
+    // the runtime handles this one itself (it needs to remember the event between ticks)
+  },
   everyTick: {
     category: 'System', label: 'Every tick', params: [],
     test: () => true,
@@ -206,7 +211,7 @@ export function defaultParams(entry, scope) {
 }
 
 // Structural checks the editor shows as warnings. Returns [{ id, message }].
-export function validateSheet(events, depth = 0, out = []) {
+export function validateSheet(events, depth = 0, out = [], underTrigger = false) {
   let prevOk = false; // can an Else follow the previous event?
   for (const ev of events) {
     const trigs = (ev.conds || []).filter((c) => CONDITIONS[c.type]?.trigger);
@@ -221,8 +226,11 @@ export function validateSheet(events, depth = 0, out = []) {
     if (trigs.length && depth > 0) out.push({ id: ev.id, message: "Triggers can't go in sub-events." });
     if (ev.else && !prevOk) out.push({ id: ev.id, message: 'Else needs a normal (non-trigger) event right above it.' });
     if (ev.else && trigs.length) out.push({ id: ev.id, message: "An Else event can't have a trigger." });
+    const onceAt = (ev.conds || []).findIndex((c) => c.type === 'triggerOnce');
+    if (onceAt >= 0 && onceAt !== ev.conds.length - 1) out.push({ id: ev.id, message: 'Trigger once should be the last condition (it only looks at the ones above it).' });
+    if (onceAt >= 0 && (trigs.length || underTrigger)) out.push({ id: ev.id, message: 'Trigger once is only needed in events checked every tick. ⚡ events already run once.' });
     prevOk = ev.else ? prevOk : trigs.length === 0;
-    if (ev.children?.length) validateSheet(ev.children, depth + 1, out);
+    if (ev.children?.length) validateSheet(ev.children, depth + 1, out, underTrigger || trigs.length > 0);
   }
   return out;
 }

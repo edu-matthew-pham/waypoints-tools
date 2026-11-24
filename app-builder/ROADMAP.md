@@ -44,6 +44,7 @@ calls directly, just like clicks today.
 |---|---|---|
 | **Every N seconds** *(done)* | trigger | 2 |
 | **After N seconds** (once) *(done)* | trigger | 2 |
+| **Trigger once while true** *(done)* | condition | 2 | Construct behaviour: once per event (not per copy), re-arms when false; kept last; warns in ⚡ events |
 | **Wait N seconds, then...** | action | 3 |
 | Random number / pick from list | expression function (`random` exists) | 2 |
 | `if(test, yes, no)` and the **Choose between two values** builder *(done)* | expression function + dialog | 3 |

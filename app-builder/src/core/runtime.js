@@ -34,6 +34,7 @@ export class Runtime {
     this.keysDown = new Set();
     this.time = 0;      // milliseconds of app time; the renderer feeds it with advance()
     this.timers = [];
+    this.once = new Map(); // event id -> tick its 'Trigger once' last passed
   }
 
   // ---------- lifecycle ----------
@@ -241,6 +242,7 @@ export class Runtime {
       });
       this.objects.set(od.name, { def: od, kind: od.kind, instances });
     }
+    this.once = new Map();
     this.#setUpTimers();
     this.hooks.onScreen?.(scr);
     this.#changed();
@@ -317,6 +319,14 @@ export class Runtime {
       const entry = CONDITIONS[c.type];
       if (!entry) { this.#error(ev.id, `Unknown condition "${c.type}"`); return false; }
       if (entry.trigger) { this.#error(ev.id, "A trigger can only be the first condition of a top-level event."); return false; }
+      if (entry.once) {
+        // Construct-style: true only if the conditions above were NOT all true on the previous tick.
+        // Per event, not per copy. Re-arms after a tick where the event didn't get this far.
+        const prev = this.once.get(ev.id);
+        this.once.set(ev.id, this.ticks);
+        if (prev === this.ticks - 1 || prev === this.ticks) return false;
+        continue;
+      }
       try {
         if (!entry.test(this, ctx, c)) return false;
       } catch (e) {

@@ -38,7 +38,7 @@ export function openChooser(sheet, kind, ev, depth, onPick) {
         list.append(h('button', {
           class: 'es-entry' + (entry.trigger ? ' trig' : ''), type: 'button', disabled: !!why, title: why,
           onclick: () => { m.close(); onPick(type); },
-        }, entry.trigger ? '\u26a1 ' : '', plain(entry.label), why ? h('small', {}, why) : null));
+        }, entry.trigger ? '\u26a1 ' : '', plain(entry.label), why ? h('small', {}, why) : entry.help ? h('small', { class: 'help' }, entry.help) : null));
       }
     }
     if (!list.children.length) list.append(h('p', { class: 'muted' }, 'Nothing matches.'));

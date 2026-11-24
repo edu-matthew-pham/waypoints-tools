@@ -205,7 +205,10 @@ export class EventSheet extends HTMLElement {
       const draft = { type, ...defaultParams(entry, this._scope) };
       const insert = (item) => {
         const target = kind === 'cond' ? ev.conds : ev.actions;
-        if (kind === 'cond' && entry.trigger) target.unshift(item); else target.push(item);
+        const onceAt = target.findIndex((c) => c.type === 'triggerOnce');
+        if (kind === 'cond' && entry.trigger) target.unshift(item);
+        else if (kind === 'cond' && !entry.once && onceAt >= 0) target.splice(onceAt, 0, item); // keep Trigger once last
+        else target.push(item);
         this._sel = ev.id;
         this._changed();
       };

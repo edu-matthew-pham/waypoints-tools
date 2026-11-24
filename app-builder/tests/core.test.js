@@ -348,3 +348,32 @@ test('bad timer values give a friendly problem; a long pause never floods', () =
   assert.ok(rt.getVar('gap') - 2 <= 20, 'capped catch-up');
   assert.equal(rt.getVar('n'), 0);
 });
+
+// ---- Trigger once while true ----
+test('trigger once: runs once when it becomes true, re-arms after it is false again', () => {
+  const p = timerProject([
+    { id: 'e', else: false, conds: [{ type: 'compareVar', var: 'n', op: '≥', value: '10' }, { type: 'triggerOnce' }], actions: [add('1', 'gap')], children: [] },
+  ]);
+  const rt = new Runtime(p); rt.start();
+  const ups = () => rt.getVar('gap') - 2;
+  rt.tick(); assert.equal(ups(), 0);
+  rt.setVar('n', 10); rt.tick(); rt.tick(); rt.tick();
+  assert.equal(ups(), 1, 'once, not every tick');
+  rt.setVar('n', 12); rt.tick();
+  assert.equal(ups(), 1, 'still true: nothing more');
+  rt.setVar('n', 3); rt.tick();
+  rt.setVar('n', 11); rt.tick();
+  assert.equal(ups(), 2, 're-armed after being false');
+  assert.deepEqual(rt.errors, []);
+});
+
+test('trigger once: warnings when misplaced or in a ⚡ event', () => {
+  const w = validateSheet([
+    { id: 'a', else: false, conds: [{ type: 'triggerOnce' }, { type: 'everyTick' }], actions: [], children: [] },
+    { id: 'b', else: false, conds: [{ type: 'onStart' }, { type: 'triggerOnce' }], actions: [], children: [] },
+    { id: 'c', else: false, conds: [{ type: 'everyTick' }, { type: 'triggerOnce' }], actions: [], children: [] },
+  ]);
+  assert.ok(w.some((x) => x.id === 'a' && /last condition/.test(x.message)));
+  assert.ok(w.some((x) => x.id === 'b' && /already run once/.test(x.message)));
+  assert.ok(!w.some((x) => x.id === 'c'));
+});
