@@ -133,6 +133,11 @@ export const ACTIONS = {
     params: [obj(), expr()],
     run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => rt.setProp(inst, 'text', fmt(rt.evalExpr(p.value, c)))),
   },
+  setImage: {
+    category: 'Object', label: 'Set {target} picture to {image}',
+    params: [obj({ kinds: ['image'] }), { name: 'image', type: 'picture' }],
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.setProp(inst, 'image', p.image)),
+  },
   setSize: {
     category: 'Object', label: 'Set {target} {prop} to {value}',
     params: [obj(), { name: 'prop', type: 'posSize' }, expr()],
@@ -223,6 +228,7 @@ export function defaultParams(entry, scope) {
       case 'onoff': out[prm.name] = 'on'; break;
       case 'key': out[prm.name] = 'Enter'; break;
       case 'posSize': out[prm.name] = 'w'; break;
+      case 'picture': out[prm.name] = scope.pictures?.[0] ?? 'star'; break;
       default: out[prm.name] = prm.default ?? '';
     }
   }

@@ -7,6 +7,7 @@
 // event   = { id, else, conds:[{type,...params}], actions:[{type,...params}], children:[event] }
 
 import { OBJECT_KINDS } from './catalog.js';
+import { imageNames } from './assets.js';
 
 export const STAGE = { w: 390, h: 700 };
 export const PROP_NAMES = ['text', 'x', 'y', 'w', 'h', 'visible'];
@@ -66,6 +67,7 @@ export function scopeFor(project, screen) {
     objects: (screen?.objects || []).map((o) => ({ name: o.name, kind: o.kind, vars: o.instanceVars.map((v) => v.name) })),
     variables: project.variables.map((v) => v.name),
     screens: project.screens.map((s) => ({ id: s.id, name: s.name })),
+    pictures: imageNames(project),
   };
 }
 
@@ -101,6 +103,7 @@ export function parseValue(s) {
 export function checkProject(p) {
   if (!p || typeof p !== 'object' || !Array.isArray(p.screens) || !p.screens.length) throw new Error('This file is not an app project.');
   p.variables ||= [];
+  p.assets ||= [];
   p.features ||= { level: 4 }; // older projects: nothing hidden
   for (const s of p.screens) {
     s.objects ||= []; s.events ||= [];

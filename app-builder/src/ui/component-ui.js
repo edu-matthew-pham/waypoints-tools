@@ -2,6 +2,9 @@
 // Keyed by the ids in core/components.js. Icons are tiny inline SVGs (trusted, static) that use currentColor.
 import { h } from './dom.js';
 
+// name -> picture data; the app points this at the current project (uploads + built-ins)
+export const pictures = { lookup: () => '' };
+
 const svg = (body) => `<svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 
 export const ICONS = {
@@ -9,6 +12,7 @@ export const ICONS = {
   text:   svg('<path d="M10 14h28M24 14v22M18 36h12"/>'),
   input:  svg('<rect x="6" y="14" width="36" height="20" rx="4"/><path d="M14 20v8"/>'),
   shape:  svg('<rect x="8" y="14" width="32" height="20" rx="3" fill="currentColor" fill-opacity=".25"/>'),
+  image:  svg('<rect x="7" y="9" width="34" height="30" rx="4"/><circle cx="17" cy="19" r="3.5"/><path d="M8 36l11-11 8 8 5-5 9 9"/>'),
   toggle: svg('<rect x="6" y="15" width="36" height="18" rx="9"/><circle cx="33" cy="24" r="5"/>'),
   slider: svg('<path d="M8 24h32"/><circle cx="20" cy="24" r="5" fill="currentColor"/>'),
 };
@@ -30,6 +34,10 @@ export const RENDER = {
   input: {
     make: (design) => h('input', { type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: design ? 'Text input' : '' }),
     write: (inner, p) => { if (inner.value !== p.text) inner.value = p.text; },
+  },
+  image: {
+    make: () => h('img', { alt: '', draggable: 'false' }),
+    write: (inner, p) => { const src = pictures.lookup(p.image); if (inner.getAttribute('src') !== src) inner.setAttribute('src', src); inner.alt = p.text || ''; },
   },
   shape: {
     make: () => h('div', { class: 'box' }),

@@ -387,3 +387,24 @@ test('help: every value box has a help line; every function has help; highlighte
     assert.equal(highlight(src).map(([, t]) => t).join(''), src, 'highlighting keeps every character: ' + src);
   }
 });
+
+test('images: built-in and uploaded pictures, Set picture action, names stay unique', async () => {
+  const { imageData, assetName, BUILTIN_IMAGES } = await import('../src/core/assets.js');
+  const p = {
+    version: 1, name: 'i', features: { level: 2 }, variables: [], assets: [{ name: 'cat', data: 'data:image/png;base64,AAAA' }],
+    screens: [{ id: 's', name: 'S', objects: [
+      { name: 'Pic', kind: 'image', instanceVars: [], instances: [{ id: 'p1', x: 0, y: 0, w: 100, h: 100, text: 'a cat', visible: true, vars: {}, image: 'cat' }] },
+      { name: 'Go', kind: 'button', instanceVars: [], instances: [{ id: 'g', x: 0, y: 120, w: 100, h: 40, text: 'Go', visible: true, vars: {} }] },
+    ], events: [{ id: 'e', else: false, conds: [{ type: 'onClicked', target: 'Go' }], actions: [{ type: 'setImage', target: 'Pic', image: 'trophy' }], children: [] }] }],
+  };
+  assert.equal(imageData(p, 'cat'), 'data:image/png;base64,AAAA');
+  assert.equal(imageData(p, 'star'), BUILTIN_IMAGES.star);
+  assert.equal(assetName(p, 'Cat.PNG'), 'cat_2');
+  assert.equal(assetName(p, 'star.png'), 'star_2');
+  assert.equal(assetName(p, '2 dogs!.jpg'), 'p2_dogs');
+  const rt = new Runtime(p); rt.start();
+  assert.equal(rt.instancesOf('Pic')[0].props.image, 'cat');
+  rt.click('g');
+  assert.equal(rt.instancesOf('Pic')[0].props.image, 'trophy');
+  assert.deepEqual(validateSheet(p.screens[0].events), []);
+});

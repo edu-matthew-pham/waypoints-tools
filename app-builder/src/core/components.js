@@ -19,6 +19,7 @@ export const COMPONENTS = {
   text:   { id: 'text',   label: 'Text',       category: 'Basics', hint: 'Words on the screen. Events can change them.', base: 'Text',   props: { text: 'Text',   w: 220, h: 32 } },
   input:  { id: 'input',  label: 'Text input', category: 'Basics', hint: 'A box where the user types.',           base: 'Input',  props: { text: '',       w: 220, h: 42 } },
   shape:  { id: 'shape',  label: 'Box',        category: 'Basics', hint: 'A coloured rectangle: bars, backgrounds, dividers.', base: 'Box', props: { text: '', w: 200, h: 24 }, extra: { color: '#2f6fdd' } },
+  image:  { id: 'image',  label: 'Image',      category: 'Media', hint: 'A picture: upload one or pick a built-in.', base: 'Image', props: { text: '', w: 120, h: 120 }, extra: { image: 'star' } },
   toggle: { id: 'toggle', label: 'Toggle',     category: 'Choices', hint: 'An on/off switch with a label.',        base: 'Toggle', props: { text: 'Switch', w: 180, h: 32 }, extra: { on: false }, exposes: ['on'] },
   slider: { id: 'slider', label: 'Slider',     category: 'Choices', hint: 'Drag to pick a number.',                base: 'Slider', props: { text: '',       w: 240, h: 32 }, extra: { min: 0, max: 100, value: 50 }, exposes: ['value', 'min', 'max'] },
 };

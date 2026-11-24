@@ -10,6 +10,9 @@ import { initEvents } from './views/events.js';
 import { initRun } from './views/run.js';
 import { checkProject, newProject, findInstance } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './core/features.js';
+import { pictures } from './ui/component-ui.js';
+import { imageData } from './core/assets.js';
+pictures.lookup = (name) => imageData(S.project, name);
 import { SAMPLES } from './samples.js';
 
 const STORE_KEY = 'appbuilder.prototype.v1';

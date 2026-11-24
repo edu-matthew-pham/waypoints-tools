@@ -13,7 +13,7 @@ The picker groups tiles by category and only shows what the current level / less
 |---|---|---|---|
 | Basics | Button, Text, Text input, Box (coloured rectangle) *(done)* | 1-2 | Box + "Set width / height / x / y" make progress bars |
 | Choices | Toggle *(done)*, Slider *(done)*, Dropdown, Checkbox | 2 | Toggle has `Name.on` and an "is on / off" condition (pair with Else); Slider has `Name.value`, `min`, `max`. Both have a "changes" trigger. |
-| Media | Image (+ asset panel, built-in icons), Emoji/icon | 2 | Assets stored as data URLs in the project file (size cap and warning). |
+| Media | Image *(done)* with Pictures panel and 8 built-in pictures | 2 | Uploads stored as data URLs in the project file; photos shrunk to 800 px, GIFs kept (they animate); in-use pictures can't be deleted. |
 | Data | List (shows items), Repeater (one row per list item), Gallery | 3-4 | Needs the list value type and "for each" first (section 4). |
 | Layout | Stack (row/column), Container, Tabs, Scroll area | 3-4 | Needs children inside containers (section 5). |
 | Advanced | Custom HTML widget (sandboxed iframe) | 4 | Escape hatch; talks to events through postMessage. |

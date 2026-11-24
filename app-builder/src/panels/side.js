@@ -6,6 +6,8 @@ import { openMenu } from '../ui/menu.js';
 import { openObjectPicker } from '../ui/object-picker.js';
 import { renameInput } from '../ui/rename-input.js';
 import { renameObject, renameVariable } from '../core/rename.js';
+import { pickPicture } from '../ui/upload.js';
+import { assetName } from '../core/assets.js';
 import { S, screen, hooks } from '../state.js';
 
 function addRow(placeholder, onAdd, withValue) {
@@ -135,6 +137,28 @@ export function renderSide(el) {
       if (S.project.variables.some((v) => v.name === name)) { hooks.notify('There is already a variable called ' + name); return false; }
       S.project.variables.push({ name, value }); hooks.commit();
     }, true),
+    ...(!S.rf || S.rf.kinds.includes('image') ? [
+      h('h3', {}, 'Pictures (whole app)'),
+      ...(S.project.assets.length ? [h('div', { class: 'pic-list' }, S.project.assets.map((a) => h('div', { class: 'var pic-row' },
+        h('img', { src: a.data, alt: '' }), h('span', { class: 'vname' }, a.name),
+        h('button', { class: 'icon danger', title: 'Delete picture', onclick: () => {
+          const users = pictureUsers(a.name);
+          if (users.length) { hooks.notify(`${a.name} is still used by ${users.join(', ')}. Change those first.`); return; }
+          S.project.assets = S.project.assets.filter((x) => x !== a); hooks.commit();
+        } }, '\u00d7'))))] : [h('p', { class: 'muted' }, 'Built-in pictures are ready to use. Upload your own here or on an Image.')]),
+      h('button', { class: 'btn add-screen', type: 'button', onclick: () => pickPicture(({ fileName, data }) => {
+        S.project.assets.push({ name: assetName(S.project, fileName), data }); hooks.commit();
+      }, hooks.notify) }, '+ Upload picture')] : []),
     h('p', { class: 'muted legal' }, 'Free for education. Commercial use by permission only.'),
   );
+}
+
+// objects and events that use a picture (so it isn't deleted out from under them)
+function pictureUsers(name) {
+  const out = new Set();
+  for (const sc of S.project.screens) {
+    for (const o of sc.objects) if (o.instances.some((i) => i.image === name)) out.add(o.name);
+    (function walk(evs) { for (const ev of evs) { if (ev.actions.some((a) => a.type === 'setImage' && a.image === name)) out.add('an event on ' + sc.name); walk(ev.children || []); } })(sc.events);
+  }
+  return [...out];
 }

@@ -5,6 +5,8 @@ import { OBJECT_KINDS } from '../core/catalog.js';
 import { duplicateInstance, deleteInstance, findInstance, isIdentifier, parseValue } from '../core/project.js';
 import { S, screen, hooks } from '../state.js';
 import { renameInput } from '../ui/rename-input.js';
+import { pickPicture } from '../ui/upload.js';
+import { imageNames, imageData, assetName } from '../core/assets.js';
 import { renameInstVar } from '../core/rename.js';
 
 let renamingIvar = null;
@@ -83,6 +85,18 @@ export function initDesign(root) {
     if (obj.kind === 'toggle') {
       extra.push(h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: !!inst.on, onchange: (e) => { inst.on = e.target.checked; hooks.commit(); } }), h('span', {}, 'Starts on')));
     }
+    if (obj.kind === 'image') {
+      const choose = (name) => { inst.image = name; hooks.commit(); };
+      extra.push(h('div', { class: 'f wide' }, h('span', {}, 'Picture'),
+        h('div', { class: 'pic-grid' },
+          ...imageNames(S.project).map((n) => h('button', { class: 'pic' + (inst.image === n ? ' on' : ''), type: 'button', title: n, 'aria-label': 'Use picture ' + n, 'aria-pressed': String(inst.image === n), onclick: () => choose(n) },
+            h('img', { src: imageData(S.project, n), alt: '' }))),
+          h('button', { class: 'pic add', type: 'button', title: 'Upload a picture', onclick: () => pickPicture(({ fileName, data }) => {
+            const name = assetName(S.project, fileName);
+            S.project.assets.push({ name, data });
+            choose(name);
+          }, hooks.notify) }, '+ Upload'))));
+    }
     if (obj.kind === 'shape') {
       extra.push(h('label', { class: 'f' }, h('span', {}, 'Colour'), h('input', { type: 'color', value: inst.color || '#2f6fdd', 'aria-label': 'Colour', oninput: (e) => { inst.color = e.target.value; sync(); }, onchange: () => hooks.commit() })));
     }
@@ -99,7 +113,7 @@ export function initDesign(root) {
 
     props.replaceChildren(
       h('h3', {}, obj.name, h('small', {}, ` ${OBJECT_KINDS[obj.kind]?.label ?? obj.kind}${obj.instances.length > 1 ? ` · copy ${n} of ${obj.instances.length}` : ''}`)),
-      ...(obj.kind === 'slider' || obj.kind === 'shape' ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : 'Text'), text)]),
+      ...(obj.kind === 'slider' || obj.kind === 'shape' ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : obj.kind === 'image' ? 'Description (read aloud by screen readers)' : 'Text'), text)]),
       h('div', { class: 'grid4' }, numField('X', 'x', inst), numField('Y', 'y', inst), numField('Width', 'w', inst, 24), numField('Height', 'h', inst, 20)),
       ...extra,
       h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: inst.visible !== false, onchange: (e) => { inst.visible = e.target.checked; hooks.commit(); } }), h('span', {}, 'Visible at start')),

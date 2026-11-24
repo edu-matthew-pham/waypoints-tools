@@ -238,6 +238,7 @@ export class EventSheet extends HTMLElement {
       case 'showhide': return [['show', 'Show'], ['hide', 'Hide']];
       case 'onoff': return [['on', 'on'], ['off', 'off']];
       case 'key': return KEYS;
+      case 'picture': return (sc.pictures || []).map((n) => [n, n]);
       case 'posSize': return [['w', 'width'], ['h', 'height'], ['x', 'x position'], ['y', 'y position']];
     }
     return [];

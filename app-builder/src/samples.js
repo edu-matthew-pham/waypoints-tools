@@ -118,7 +118,7 @@ export function y7MusicTracker() {
         obj('TextInput', 'input', [inst('m2', 24, 110, 200, 42, '')]),
         obj('Button', 'button', [inst('m3', 236, 108, 130, 46, 'Add hours')]),
         obj('TextDisplayHours', 'text', [inst('m4', 24, 180, 342, 32, 'You have practiced for 0 hours')]),
-        obj('GreatWork', 'text', [{ ...inst('m5', 24, 240, 342, 48, '🎉 Great work! 10 hours!'), visible: false }]),
+        obj('GreatWork', 'image', [{ ...inst('m5', 135, 240, 120, 120, 'Great work trophy'), visible: false, image: 'trophy' }]),
       ],
       events: [
         ev('t1', [{ type: 'onClicked', target: 'Button' }], [
