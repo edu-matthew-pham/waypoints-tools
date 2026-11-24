@@ -293,3 +293,16 @@ select.ctl { padding-right: 6px; }
 
 .caret { border: 0; background: none; padding: 2px 4px; border-radius: 4px; cursor: pointer; color: var(--muted); }
 .caret:hover { background: #eceff5; color: var(--ink); }
+
+/* hide until needed: more buttons, deletes */
+.tree-row.screen.on { align-items: center; }
+.screen-name { flex: 1; font-weight: 600; padding: 4px 6px; border-radius: 6px; border: 1px solid transparent; cursor: default; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-row.screen.on .ctl { font-weight: 600; flex: 1; }
+.icon.more { flex: none; }
+.add-obj, .add-screen { margin-top: 6px; font-size: 13px; }
+.add-screen { margin: 6px 0 0; }
+.var .icon.danger { opacity: 0; transition: opacity .12s; }
+.var:hover .icon.danger, .var:focus-within .icon.danger { opacity: 1; }
+.props .var .icon.danger { opacity: 0; }
+.props .var:hover .icon.danger, .props .var:focus-within .icon.danger { opacity: 1; }
+@media (hover: none) { .var .icon.danger, .props .var .icon.danger { opacity: 1; } }

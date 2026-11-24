@@ -25,6 +25,7 @@ export class Stage {
   #wire() {
     if (this.design) {
       this.el.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0) return; // right-click opens the context menu; it must not start a drag
         const w = e.target.closest('.w');
         if (!w) { this.on.select?.(null); return; }
         const id = w.dataset.id;

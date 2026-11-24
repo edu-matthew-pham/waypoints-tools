@@ -19,6 +19,7 @@ import { newEvent } from '../core/project.js';
 import { canUse } from '../core/features.js';
 import { h } from './dom.js';
 import { openChooser, openItemDialog } from './sheet-dialogs.js';
+import { openMenu } from './menu.js';
 
 export class EventSheet extends HTMLElement {
   constructor() {
@@ -148,23 +149,19 @@ export class EventSheet extends HTMLElement {
     );
   }
 
-  // guided "..." menu
-  _eventMenu(btn, list, i, ev) {
-    const r = btn.getBoundingClientRect();
-    const close = () => { menu.remove(); document.removeEventListener('pointerdown', onDoc, true); document.removeEventListener('keydown', onKey, true); };
-    const onDoc = (e) => { if (!menu.contains(e.target)) close(); };
-    const onKey = (e) => { if (e.key === 'Escape') { close(); btn.focus(); } };
-    const item = (label, fn, cls = '', disabled = false) => h('button', { class: 'pm-item ' + cls, type: 'button', role: 'menuitem', disabled, onclick: () => { close(); fn(); } }, label);
-    const menu = h('div', { class: 'popmenu', role: 'menu', style: `top:${r.bottom + 4}px;left:${Math.max(8, r.right - 200)}px` },
-      item('Move up', () => this._moveBy(list, i, -1), '', i === 0),
-      item('Move down', () => this._moveBy(list, i, 1), '', i === list.length - 1),
-      this._ui('sub') ? item('Add a sub-event', () => this._addSub(ev)) : null,
-      this._ui('else') ? item('Add an Else below', () => this._addElse(list, i)) : null,
-      item('Delete this event', () => { list.splice(i, 1); this._sel = null; this._changed(); }, 'danger'));
-    document.body.append(menu);
-    document.addEventListener('pointerdown', onDoc, true);
-    document.addEventListener('keydown', onKey, true);
-    menu.querySelector('button:not(:disabled)')?.focus();
+  // guided "..." menu, opened from the button
+  _eventMenu(btn, list, i, ev, at) {
+    const r = btn?.getBoundingClientRect();
+    openMenu({
+      x: at ? at.x : r.right - 200, y: at ? at.y : r.bottom + 4, returnFocus: btn,
+      items: [
+        { label: 'Move up', fn: () => this._moveBy(list, i, -1), disabled: i === 0 },
+        { label: 'Move down', fn: () => this._moveBy(list, i, 1), disabled: i === list.length - 1 },
+        this._ui('sub') ? { label: 'Add a sub-event', fn: () => this._addSub(ev) } : null,
+        this._ui('else') ? { label: 'Add an Else below', fn: () => this._addElse(list, i) } : null,
+        { label: 'Delete this event', danger: true, fn: () => { list.splice(i, 1); this._sel = null; this._changed(); } },
+      ],
+    });
   }
 
   // ---------- items (one condition or action) ----------
