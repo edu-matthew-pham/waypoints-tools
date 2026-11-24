@@ -16,14 +16,15 @@ Add these to `https://tools.learningwaypoints.com/app-builder/`:
 
 | Link | Opens |
 |---|---|
-| `?sample=music` / `?sample=music-start` | Y7 Music tracker: finished / design only (no events or variables) |
-| `?sample=chores` / `?sample=chores-start` | Y7 Daily chores |
-| `?sample=water` / `?sample=water-start` | Y7 Water tracker |
-| `?sample=journal` / `?sample=journal-start` | Y7 Values journal |
-| `?sample=practice`, `?sample=copies` | Other samples |
+| `?sample=tracker` / `?sample=tracker-start` | Practice tracker: finished / design only (no events or variables) |
+| `?sample=chores` / `?sample=chores-start` | Chores checklist |
+| `?sample=water` / `?sample=water-start` | Water tracker |
+| `?sample=journal` / `?sample=journal-start` | Values journal |
+| `?sample=creatures` / `?sample=creatures-start` | Creature stats |
+| `?sample=goal`, `?sample=copies` | Other samples (`music` and `practice` still work) |
 
 Combine with `&level=2` (blocks offered), `&allow=onClicked,addTo,setText` (a lesson's own block list) and `&lock=1`
-(hides the level switch and Samples menu). Example: `?sample=water-start&level=2&lock=1`.
+(hides the level switch and Samples menu). Example: `?sample=water-start&level=2&lock=1`. Embedding, stable labels and project reports: ROADMAP.md › Automation hooks.
 
 Each lesson link keeps its own saved work in the browser, so students carry on where they were; **Start again**
 (press twice) reloads the original. Save/Open still work for handing in a file.
