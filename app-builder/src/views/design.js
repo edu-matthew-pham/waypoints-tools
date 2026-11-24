@@ -2,7 +2,7 @@
 import { h } from '../ui/dom.js';
 import { Stage } from '../ui/stage.js';
 import { OBJECT_KINDS } from '../core/catalog.js';
-import { duplicateInstance, deleteInstance, findInstance, isIdentifier, parseValue } from '../core/project.js';
+import { duplicateInstance, deleteInstance, findInstance, isIdentifier, parseValue, sizeOf } from '../core/project.js';
 import { S, screen, hooks } from '../state.js';
 import { renameInput } from '../ui/rename-input.js';
 import { pickPicture } from '../ui/upload.js';
@@ -15,7 +15,8 @@ export function initDesign(root) {
   const stageHost = h('div', { class: 'stage-host' });
   const title = h('div', { class: 'screen-title' });
   const props = h('div', { class: 'props' });
-  root.append(h('div', { class: 'stage-col' }, title, stageHost), props);
+  const stageCol = h('div', { class: 'stage-col' }, title, stageHost);
+  root.append(stageCol, props);
 
   const stage = new Stage(stageHost, {
     design: true,
@@ -27,6 +28,7 @@ export function initDesign(root) {
   });
 
   const listItems = (name) => S.project.variables.find((v) => v.name === name && Array.isArray(v.value))?.value;
+  stage.fitTo(stageCol, () => innerHeight - 170);
   const items = () => screen().objects.flatMap((o) => o.instances.map((i) => ({ id: i.id, kind: o.kind, props: o.kind === 'list' ? withItems(i) : i })));
   // a live view of the instance plus its list items, so dragging still moves the real instance
   const withItems = (i) => new Proxy(i, { get: (t, k) => (k === 'items' ? listItems(t.source) : t[k]) });
@@ -132,7 +134,7 @@ export function initDesign(root) {
         ...(ivars.length ? ivars : [h('p', { class: 'muted' }, 'No variables of its own. Add one so each copy can have its own value (like done, or hearts).')]),
         showCopies ? addVar : null] : []),
       h('div', { class: 'btn-row' },
-        showCopies || obj.instances.length > 1 ? h('button', { class: 'btn', onclick: () => { const c = duplicateInstance(obj, inst); S.selId = c.id; hooks.commit(); } }, 'Duplicate (new copy)') : null,
+        showCopies || obj.instances.length > 1 ? h('button', { class: 'btn', onclick: () => { const c = duplicateInstance(obj, inst, sizeOf(S.project)); S.selId = c.id; hooks.commit(); } }, 'Duplicate (new copy)') : null,
         h('button', { class: 'btn danger', onclick: () => { deleteInstance(screen(), inst.id); S.selId = null; hooks.commit(); } }, 'Delete')),
     );
   }
@@ -149,7 +151,7 @@ export function initDesign(root) {
   }
 
   return {
-    render() { title.textContent = screen().name; sync(); renderProps(); },
+    render() { title.textContent = screen().name; stage.setSize(sizeOf(S.project)); sync(); renderProps(); },
     select() { stage.setSelected(S.selId); renderProps(); },
     onKey,
   };

@@ -246,11 +246,25 @@ export function y7ValuesJournal() {
   };
 }
 
+// The samples were laid out as a phone-width column; on a web page that column is centred.
+const WEB_SHIFT = Math.round((800 - 390) / 2);
+function onWebPage(make) {
+  return () => {
+    const p = make();
+    p.device = 'web';
+    for (const sc of p.screens) for (const o of sc.objects) for (const i of o.instances) {
+      i.x += WEB_SHIFT;
+      if (i.y + i.h > 600) i.y = 600 - i.h - 24; // the web page is a little shorter than a phone
+    }
+    return p;
+  };
+}
+
 export const SAMPLES = {
-  'Y7: Music tracker': y7MusicTracker,
-  'Y7: Daily chores': y7DailyChores,
-  'Y7: Water tracker': y7WaterTracker,
-  'Y7: Values journal': y7ValuesJournal,
-  'Practice tracker': musicTracker,
-  'Daily chores (copies)': dailyChores,
+  'Y7: Music tracker': onWebPage(y7MusicTracker),
+  'Y7: Daily chores': onWebPage(y7DailyChores),
+  'Y7: Water tracker': onWebPage(y7WaterTracker),
+  'Y7: Values journal': onWebPage(y7ValuesJournal),
+  'Practice tracker': onWebPage(musicTracker),
+  'Daily chores (copies)': onWebPage(dailyChores),
 };

@@ -4,6 +4,7 @@ import { Runtime } from './core/runtime.js';
 import { Stage } from './ui/stage.js';
 import { h } from './ui/dom.js';
 import { usesKeys } from './core/catalog.js';
+import { sizeOf } from './core/project.js';
 
 export class Runner {
   constructor(stageHost, { watch, problems, flash, onScreen } = {}) {
@@ -34,6 +35,7 @@ export class Runner {
   start(project, screenId) {
     this.stop();
     this.stage.clear();
+    this.stage.setSize(sizeOf(project));
     const rt = new Runtime(structuredClone(project), {
       hooks: {
         onChange: () => { this.dirty = true; },

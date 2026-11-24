@@ -4,7 +4,7 @@
 //
 // item = { id, kind: 'button'|'text'|'input', props: { x, y, w, h, text, visible } }
 import { h } from './dom.js';
-import { STAGE } from '../core/project.js';
+import { DEVICES } from '../core/project.js';
 import { RENDER } from './component-ui.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -18,8 +18,12 @@ export class Stage {
     this.selected = null;
     this.drag = null;
     this.pick = null;
-    this.el = h('div', { class: 'stage' + (design ? ' design' : ''), style: `width:${STAGE.w}px;height:${STAGE.h}px`, tabindex: '-1' });
+    this.host = host;
+    this.size = DEVICES.web;
+    this.scale = 1;
+    this.el = h('div', { class: 'stage' + (design ? ' design' : ''), tabindex: '-1' });
     host.append(this.el);
+    this.setSize(DEVICES.web);
     this.#wire();
   }
 
@@ -40,11 +44,11 @@ export class Stage {
       this.el.addEventListener('pointermove', (e) => {
         const d = this.drag;
         if (!d) return;
-        const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
+        const dx = (e.clientX - d.sx) / this.scale, dy = (e.clientY - d.sy) / this.scale; // the stage may be shown smaller
         if (!d.moved && Math.abs(dx) + Math.abs(dy) < 3) return;
         d.moved = true;
-        if (d.mode === 'move') this.on.move?.(d.id, { x: clamp(Math.round(d.x + dx), 0, STAGE.w - d.w), y: clamp(Math.round(d.y + dy), 0, STAGE.h - d.h) });
-        else this.on.move?.(d.id, { w: clamp(Math.round(d.w + dx), 24, STAGE.w - d.x), h: clamp(Math.round(d.h + dy), 20, STAGE.h - d.y) });
+        if (d.mode === 'move') this.on.move?.(d.id, { x: clamp(Math.round(d.x + dx), 0, this.size.w - d.w), y: clamp(Math.round(d.y + dy), 0, this.size.h - d.h) });
+        else this.on.move?.(d.id, { w: clamp(Math.round(d.w + dx), 24, this.size.w - d.x), h: clamp(Math.round(d.h + dy), 20, this.size.h - d.y) });
       });
       const end = () => { if (this.drag?.moved) this.on.commit?.(); this.drag = null; };
       this.el.addEventListener('pointerup', end);
@@ -115,6 +119,33 @@ export class Stage {
       if (!this.items.has(id)) { n.wrap.remove(); this.nodes.delete(id); }
     }
     this.#applySelection();
+  }
+
+  // App screen size (Web page or Phone).
+  setSize(size) {
+    if (this.size === size && this.el.style.width) return;
+    this.size = size;
+    this.el.style.width = size.w + 'px';
+    this.el.style.height = size.h + 'px';
+    this.el.classList.toggle('phone', size.h > size.w);
+    this.#applyScale();
+  }
+  // Shrink the stage to fit the width of `box` (never enlarge). Clicks and drags still use app pixels.
+  fitTo(box, maxHeight = () => Infinity) {
+    this.fitBox = box;
+    this.maxHeight = maxHeight;
+    new ResizeObserver(() => this.#applyScale()).observe(box);
+    addEventListener('resize', () => this.#applyScale());
+    this.#applyScale();
+  }
+  #applyScale() {
+    const box = this.fitBox;
+    const avail = box ? box.clientWidth : this.size.w;
+    const s = box ? Math.min(1, avail / this.size.w, this.maxHeight() / this.size.h) : 1;
+    this.scale = s > 0 ? s : 1;
+    this.el.style.transform = this.scale === 1 ? '' : `scale(${this.scale})`;
+    this.host.style.width = this.size.w * this.scale + 'px';
+    this.host.style.height = this.size.h * this.scale + 'px';
   }
 
   // Pick mode: the next click on an item calls cb(id) instead of acting like a user click.

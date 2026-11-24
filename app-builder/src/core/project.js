@@ -9,14 +9,19 @@
 import { OBJECT_KINDS } from './catalog.js';
 import { imageNames } from './assets.js';
 
-export const STAGE = { w: 390, h: 700 };
+// Screen size of the app being built. Web page is the default; Phone is a per-project option.
+export const DEVICES = {
+  web:   { w: 800, h: 600, label: 'Web page' },
+  phone: { w: 390, h: 700, label: 'Phone' },
+};
+export const sizeOf = (project) => DEVICES[project?.device] || DEVICES.web;
 export const PROP_NAMES = ['text', 'x', 'y', 'w', 'h', 'visible'];
 
 export const uid = (prefix = '') => prefix + Math.random().toString(36).slice(2, 8);
 
 export function newScreen(name = 'Screen') { return { id: uid('s'), name, objects: [], events: [] }; }
 export function newProject(name = 'My app') {
-  return { version: 1, name, features: { level: 2 }, variables: [], screens: [newScreen('Home')] };
+  return { version: 1, name, device: 'web', features: { level: 2 }, variables: [], screens: [newScreen('Home')] };
 }
 export function newEvent(extra = {}) { return { id: uid('e'), else: false, conds: [], actions: [], children: [], ...extra }; }
 
@@ -27,22 +32,22 @@ export function uniqueObjectName(screen, base) {
   return base + n;
 }
 
-export function addObject(screen, kind) {
+export function addObject(screen, kind, size = DEVICES.web) {
   const k = OBJECT_KINDS[kind];
   const name = uniqueObjectName(screen, k.base);
   const bottom = screen.objects.flatMap((o) => o.instances).reduce((m, i) => Math.max(m, i.y + i.h), 8);
-  const y = Math.min(bottom + 16, STAGE.h - k.props.h - 8);
-  const inst = { id: uid('i'), x: Math.round((STAGE.w - k.props.w) / 2), y, w: k.props.w, h: k.props.h, text: k.props.text, visible: true, vars: {}, ...(k.extra || {}) };
+  const y = Math.min(bottom + 16, size.h - k.props.h - 8);
+  const inst = { id: uid('i'), x: Math.round((size.w - k.props.w) / 2), y, w: k.props.w, h: k.props.h, text: k.props.text, visible: true, vars: {}, ...(k.extra || {}) };
   const obj = { name, kind, instanceVars: [], instances: [inst] };
   screen.objects.push(obj);
   return { obj, inst };
 }
 
-export function duplicateInstance(obj, inst) {
+export function duplicateInstance(obj, inst, size = DEVICES.web) {
   const copy = JSON.parse(JSON.stringify(inst));
   copy.id = uid('i');
-  copy.x = Math.min(inst.x + 16, STAGE.w - inst.w);
-  copy.y = Math.min(inst.y + inst.h + 12, STAGE.h - inst.h);
+  copy.x = Math.min(inst.x + 16, size.w - inst.w);
+  copy.y = Math.min(inst.y + inst.h + 12, size.h - inst.h);
   obj.instances.push(copy);
   return copy;
 }
@@ -105,6 +110,7 @@ export function checkProject(p) {
   if (!p || typeof p !== 'object' || !Array.isArray(p.screens) || !p.screens.length) throw new Error('This file is not an app project.');
   p.variables ||= [];
   p.assets ||= [];
+  p.device ||= 'phone'; // projects from before the Web page option were phone-sized
   p.features ||= { level: 4 }; // older projects: nothing hidden
   for (const s of p.screens) {
     s.objects ||= []; s.events ||= [];

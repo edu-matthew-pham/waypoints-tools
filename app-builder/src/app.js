@@ -8,7 +8,7 @@ import { renderSide } from './panels/side.js';
 import { initDesign } from './views/design.js';
 import { initEvents } from './views/events.js';
 import { initRun } from './views/run.js';
-import { checkProject, newProject, findInstance } from './core/project.js';
+import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './core/features.js';
 import { pictures } from './ui/component-ui.js';
 import { imageData } from './core/assets.js';
@@ -91,7 +91,7 @@ function renderTop() {
     : (() => {
       const l = h('select', { class: 'ctl', 'aria-label': 'Level', title: 'How many blocks to show. Nothing you built is ever removed.' },
         S.rf.custom ? h('option', { value: 'custom', selected: true }, 'Level: Custom') : null,
-        Object.entries(LEVELS).map(([n, d]) => h('option', { value: n, selected: !S.rf.custom && f.level === Number(n) }, `Level ${n}: ${d.name}`)));
+        Object.entries(LEVELS).map(([n, d]) => h('option', { value: n, selected: !S.rf.custom && f.level === Number(n) }, `L${n}: ${d.name}`)));
       l.addEventListener('change', () => { if (l.value === 'custom') return; S.project.features = { level: Number(l.value) }; S.rf = resolve(S.project.features); commit(); });
       return l;
     })();
@@ -99,6 +99,12 @@ function renderTop() {
     h('strong', { class: 'brand' }, 'App Builder', h('span', { class: 'tag' }, 'prototype')),
     h('input', { class: 'ctl name', value: S.project.name, 'aria-label': 'Project name', oninput: (e) => { S.project.name = e.target.value; }, onchange: () => commit() }),
     h('span', { class: 'spacer' }),
+    (() => {
+      const d = h('select', { class: 'ctl', 'aria-label': 'Screen size', title: 'The size of the app you are building' },
+        Object.entries(DEVICES).map(([k, v]) => h('option', { value: k, selected: S.project.device === k, title: `${v.w} \u00d7 ${v.h}` }, v.label)));
+      d.addEventListener('change', () => { S.project.device = d.value; commit(); });
+      return d;
+    })(),
     level,
     h('button', { class: 'btn', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, 'Undo'),
     h('button', { class: 'btn', disabled: !history.canRedo, title: 'Redo (Ctrl+Shift+Z)', onclick: () => undo(1) }, 'Redo'),

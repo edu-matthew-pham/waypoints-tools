@@ -40,6 +40,7 @@ export function initEvents(root) {
       banner, stageHost,
       h('details', { class: 'dbg' }, h('summary', {}, 'Watch values and problems'), watch, problems)));
 
+  runner.stage.fitTo(root.querySelector('.preview-col'), () => innerHeight - 200);
   sheet.addEventListener('sheetchange', () => hooks.commit('sheet'));
   sheet.addEventListener('pickobject', (e) => beginPick(e.detail));
 

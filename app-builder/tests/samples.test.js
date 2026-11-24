@@ -82,3 +82,19 @@ test('Y7 values journal: choose a value, write, save to the list, see it on the 
   assert.equal(text(rt, 'TextSubtitle'), 'Entries so far: 1');
   assert.deepEqual(rt.errors, []);
 });
+
+test('web page is the default; older projects stay phone-sized; samples fit the web page', async () => {
+  const { newProject, checkProject, sizeOf, addObject } = await import('../src/core/project.js');
+  assert.equal(sizeOf(newProject()).w, 800);
+  assert.equal(checkProject({ screens: [{ id: 's', objects: [], events: [] }] }).device, 'phone');
+  for (const [name, make] of Object.entries(SAMPLES)) {
+    const p = make();
+    assert.equal(p.device, 'web', name);
+    for (const s of p.screens) for (const o of s.objects) for (const i of o.instances) {
+      assert.ok(i.x >= 0 && i.y >= 0 && i.x + i.w <= 800 && i.y + i.h <= 600, `${name}: ${o.name} is off the page`);
+    }
+  }
+  const p = newProject();
+  const { inst } = addObject(p.screens[0], 'button', sizeOf(p));
+  assert.ok(inst.x > 250, 'new objects are centred on the web page');
+});

@@ -1,7 +1,8 @@
 # App Builder (prototype)
 
 
-A small, no-event-cap tool for prototyping simple apps (Years 7-8). Screens, buttons, text and
+A small, no-event-cap tool for prototyping simple apps (Years 7-8). Apps are web pages (800×600) by default;
+each project can switch to Phone (390×700). The stage scales down to fit the window. Screens, buttons, text and
 inputs, driven by an event sheet: *when this happens, do that*. Runs in the browser, no accounts, no server.
 
 **Use it:** https://tools.learningwaypoints.com/app-builder/  (plain ES modules, no build step; Chrome, Edge, Firefox, Safari)

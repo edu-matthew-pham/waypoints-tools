@@ -1,7 +1,7 @@
 // Left panel: one project tree (screens > objects > copies) plus whole-app variables.
 import { h } from '../ui/dom.js';
 import { OBJECT_KINDS } from '../core/catalog.js';
-import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue } from '../core/project.js';
+import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue, sizeOf } from '../core/project.js';
 import { openMenu } from '../ui/menu.js';
 import { openObjectPicker } from '../ui/object-picker.js';
 import { renameInput } from '../ui/rename-input.js';
@@ -24,7 +24,7 @@ function objectMenu(at, o, inst, returnFocus) {
   const many = o.instances.length > 1;
   openMenu({ x: at.x, y: at.y, returnFocus, items: [
     { label: 'Rename', fn: () => { renamingObj = o.name; hooks.refresh(); } },
-    !S.rf || S.rf.instVars || many ? { label: 'Duplicate', fn: () => { const c = duplicateInstance(o, inst); S.selId = c.id; hooks.commit(); } } : null,
+    !S.rf || S.rf.instVars || many ? { label: 'Duplicate', fn: () => { const c = duplicateInstance(o, inst, sizeOf(S.project)); S.selId = c.id; hooks.commit(); } } : null,
     { label: many ? 'Delete this copy' : 'Delete', danger: true, fn: () => { deleteInstance(screen(), inst.id); S.selId = null; hooks.commit(); } },
   ] });
 }
@@ -109,7 +109,7 @@ export function renderSide(el) {
         ...(s.objects.length ? s.objects.map(objectRow) : [h('p', { class: 'muted' }, 'Nothing on this screen yet.')]),
         h('button', { class: 'btn add-obj', type: 'button', onclick: () => openObjectPicker({
           allowed: kindsAllowed().map(([k]) => k),
-          onPick: (k) => { const { inst } = addObject(s, k); S.selId = inst.id; hooks.commit(); },
+          onPick: (k) => { const { inst } = addObject(s, k, sizeOf(S.project)); S.selId = inst.id; hooks.commit(); },
         }) }, '+ Add object')));
   });
 
