@@ -290,3 +290,6 @@ select.ctl { padding-right: 6px; }
 :root { --bg: #f6f7f9; --line: #dde2e8; --line-strong: #cbd2dc; --ink: #1c2430; --muted: #5b6676; --accent: #2f6fdd; --accent-soft: #e6eefb; }
 .btn.primary:hover { background: #2760c4; }
 .btn.primary { box-shadow: 0 1px 2px rgba(47, 111, 221, .35); }
+
+.caret { border: 0; background: none; padding: 2px 4px; border-radius: 4px; cursor: pointer; color: var(--muted); }
+.caret:hover { background: #eceff5; color: var(--ink); }

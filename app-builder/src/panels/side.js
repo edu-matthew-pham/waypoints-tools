@@ -28,6 +28,9 @@ function objectRow(o) {
     }, String(n + 1)))) : null);
 }
 
+// screens whose object list the user has folded away (the screen stays selected)
+const collapsed = new Set();
+
 export function renderSide(el) {
   const sc = screen();
 
@@ -35,17 +38,19 @@ export function renderSide(el) {
     if (s.id !== sc.id) {
       return h('div', { class: 'tree-node' },
         h('div', { class: 'tree-row screen' },
-          h('button', { class: 'link', onclick: () => { S.screenId = s.id; S.selId = null; hooks.refresh(); } }, '▸ ' + s.name)));
+          h('button', { class: 'link', onclick: () => { S.screenId = s.id; S.selId = null; collapsed.delete(s.id); hooks.refresh(); } }, '▸ ' + s.name)));
     }
+    const folded = collapsed.has(s.id);
     return h('div', { class: 'tree-node open' },
       h('div', { class: 'tree-row screen on' },
-        h('span', { class: 'caret' }, '▾'),
+        h('button', { class: 'caret', type: 'button', 'aria-expanded': String(!folded), title: folded ? 'Show objects' : 'Hide objects',
+          onclick: () => { if (folded) collapsed.delete(s.id); else collapsed.add(s.id); hooks.refresh(); } }, folded ? '▸' : '▾'),
         h('input', { class: 'ctl', value: s.name, 'aria-label': 'Screen name', oninput: (e) => { s.name = e.target.value; }, onchange: () => hooks.commit() }),
         S.project.screens.length > 1 ? h('button', { class: 'icon danger', title: 'Delete this screen', onclick: () => {
           S.project.screens = S.project.screens.filter((x) => x !== s);
           S.screenId = S.project.screens[0].id; S.selId = null; hooks.commit();
         } }, '×') : null),
-      h('div', { class: 'tree-children' },
+      folded ? null : h('div', { class: 'tree-children' },
         ...(s.objects.length ? s.objects.map(objectRow) : [h('p', { class: 'muted' }, 'Nothing on this screen yet.')]),
         h('div', { class: 'add-kinds' }, Object.entries(OBJECT_KINDS).filter(([k]) => !S.rf || S.rf.kinds.includes(k)).map(([k, d]) =>
           h('button', { class: 'btn', onclick: () => { const { inst } = addObject(s, k); S.selId = inst.id; hooks.commit(); } }, '+ ' + d.label)))));
