@@ -69,9 +69,22 @@ export function scopeFor(project, screen) {
   };
 }
 
-// Scope for expression checking: { vars:Set, objects:Map<name,Set<prop>> }
+// Scope for expression checking: { vars:Set, objects:Map<name,Set<prop>>, start }
+// start = starting values, used to preview what a value box will give before the app runs.
 export function exprScopeFor(project, screen) {
+  const start = {
+    vars: Object.fromEntries(project.variables.map((v) => [v.name, v.value])),
+    objects: Object.fromEntries((screen?.objects || []).map((o) => {
+      const i = o.instances[0] || {};
+      const k = OBJECT_KINDS[o.kind] || {};
+      const vals = { text: i.text ?? '', x: i.x ?? 0, y: i.y ?? 0, w: i.w ?? 0, h: i.h ?? 0, visible: i.visible !== false };
+      for (const [key, v] of Object.entries(k.extra || {})) vals[key] = i[key] ?? v;
+      for (const iv of o.instanceVars) vals[iv.name] = i.vars && iv.name in i.vars ? i.vars[iv.name] : iv.value;
+      return [o.name, vals];
+    })),
+  };
   return {
+    start,
     vars: new Set(project.variables.map((v) => v.name)),
     objects: new Map((screen?.objects || []).map((o) => [o.name, new Set([...PROP_NAMES, ...(OBJECT_KINDS[o.kind]?.exposes || []), ...o.instanceVars.map((v) => v.name)])])),
   };

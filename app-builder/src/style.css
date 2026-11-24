@@ -366,3 +366,11 @@ select.ctl { padding-right: 6px; }
 .xb-item code { font-family: ui-monospace, Menlo, Consolas, monospace; color: #1d3a8a; font-size: 13px; }
 .xb-desc { font-size: 13px; }
 .xb-item small { grid-column: 2; color: var(--muted); font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+
+.es-preview { margin: 0; font-size: 13px; padding: 6px 10px; background: #f2f8f4; border-radius: 7px; }
+.es-preview code { font-family: ui-monospace, Menlo, Consolas, monospace; color: #0b5c38; white-space: pre-wrap; }
+.es-preview.warn { background: #fff6e0; color: #8a5a00; }
+
+.link-name { border: 0; background: none; padding: 3px 4px; margin-left: -4px; text-align: left; border-radius: 5px; cursor: text; color: inherit; }
+.link-name:hover { background: #eef1f7; }
+.ctl.rename { flex: 1; min-width: 0; font-weight: 600; }

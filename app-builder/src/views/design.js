@@ -4,6 +4,10 @@ import { Stage } from '../ui/stage.js';
 import { OBJECT_KINDS } from '../core/catalog.js';
 import { duplicateInstance, deleteInstance, findInstance, isIdentifier, parseValue } from '../core/project.js';
 import { S, screen, hooks } from '../state.js';
+import { renameInput } from '../ui/rename-input.js';
+import { renameInstVar } from '../core/rename.js';
+
+let renamingIvar = null;
 
 export function initDesign(root) {
   const stageHost = h('div', { class: 'stage-host' });
@@ -47,7 +51,11 @@ export function initDesign(root) {
     const ivars = obj.instanceVars.map((v) => {
       const cur = v.name in inst.vars ? inst.vars[v.name] : v.value;
       return h('div', { class: 'var' },
-        h('span', { class: 'vname' }, v.name),
+        renamingIvar === obj.name + '.' + v.name
+          ? renameInput({ value: v.name, label: 'Variable name', notify: hooks.notify, taken: [...obj.instanceVars.map((x) => x.name), 'text', 'x', 'y', 'w', 'h', 'visible', ...(OBJECT_KINDS[obj.kind]?.exposes || [])],
+            onDone: () => { renamingIvar = null; renderProps(); },
+            onSave: (nv) => { renameInstVar(screen(), obj.name, v.name, nv); renamingIvar = null; hooks.commit(); } })
+          : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingIvar = obj.name + '.' + v.name; renderProps(); } }, v.name),
         h('input', { class: 'ctl small', value: String(cur), 'aria-label': `${v.name} for this copy`, onchange: (e) => { inst.vars[v.name] = parseValue(e.target.value); hooks.commit(); } }),
         h('button', { class: 'icon danger', title: `Remove ${v.name} from every ${obj.name}`, onclick: () => {
           obj.instanceVars = obj.instanceVars.filter((x) => x !== v);

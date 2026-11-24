@@ -4,6 +4,8 @@ import { OBJECT_KINDS } from '../core/catalog.js';
 import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue } from '../core/project.js';
 import { openMenu } from '../ui/menu.js';
 import { openObjectPicker } from '../ui/object-picker.js';
+import { renameInput } from '../ui/rename-input.js';
+import { renameObject, renameVariable } from '../core/rename.js';
 import { S, screen, hooks } from '../state.js';
 
 function addRow(placeholder, onAdd, withValue) {
@@ -19,6 +21,7 @@ const kindsAllowed = () => Object.entries(OBJECT_KINDS).filter(([k]) => !S.rf ||
 function objectMenu(at, o, inst, returnFocus) {
   const many = o.instances.length > 1;
   openMenu({ x: at.x, y: at.y, returnFocus, items: [
+    { label: 'Rename', fn: () => { renamingObj = o.name; hooks.refresh(); } },
     !S.rf || S.rf.instVars || many ? { label: 'Duplicate', fn: () => { const c = duplicateInstance(o, inst); S.selId = c.id; hooks.commit(); } } : null,
     { label: many ? 'Delete this copy' : 'Delete', danger: true, fn: () => { deleteInstance(screen(), inst.id); S.selId = null; hooks.commit(); } },
   ] });
@@ -29,8 +32,17 @@ function objectRow(o) {
   const first = o.instances[0];
   const sel = o.instances.find((i) => i.id === S.selId);
   const on = !!sel;
+  if (renamingObj === o.name) {
+    const done = () => { renamingObj = null; hooks.refresh(); };
+    return h('div', { class: 'tree-row obj on' }, renameInput({
+      value: o.name, label: 'Object name', notify: hooks.notify, onDone: done,
+      taken: screen().objects.map((x) => x.name),
+      onSave: (v) => { renameObject(screen(), o.name, v); renamingObj = null; hooks.commit(); },
+    }));
+  }
   const row = h('div', { class: 'tree-row obj' + (on ? ' on' : '') },
-    h('button', { class: 'obj-btn', title: `Select ${o.name}`, 'aria-current': on ? 'true' : null,
+    h('button', { class: 'obj-btn', title: `Select ${o.name} (double-click to rename)`, 'aria-current': on ? 'true' : null,
+      ondblclick: () => { renamingObj = o.name; hooks.refresh(); },
       onclick: () => hooks.select(on && many ? S.selId : first.id) },
       h('span', { class: 'obj-name' }, o.name),
       h('span', { class: 'kind' }, OBJECT_KINDS[o.kind]?.label ?? o.kind)),
@@ -47,6 +59,8 @@ function objectRow(o) {
 // screens whose object list the user has folded away (the screen stays selected)
 const collapsed = new Set();
 let renaming = null; // id of the screen whose name is being edited
+let renamingObj = null; // name of the object being renamed
+let renamingVar = null; // name of the variable being renamed
 
 export function renderSide(el) {
   const sc = screen();
@@ -98,7 +112,11 @@ export function renderSide(el) {
   });
 
   const vars = S.project.variables.map((v, i) => h('div', { class: 'var' },
-    h('span', { class: 'vname' }, v.name),
+    renamingVar === v.name
+      ? renameInput({ value: v.name, label: 'Variable name', notify: hooks.notify, taken: S.project.variables.map((x) => x.name),
+        onDone: () => { renamingVar = null; hooks.refresh(); },
+        onSave: (nv) => { renameVariable(S.project, v.name, nv); renamingVar = null; hooks.commit(); } })
+      : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingVar = v.name; hooks.refresh(); } }, v.name),
     h('input', { class: 'ctl small', value: String(v.value), 'aria-label': `Starting value of ${v.name}`, onchange: (e) => { v.value = parseValue(e.target.value); hooks.commit(); } }),
     h('button', { class: 'icon danger', title: 'Delete variable', onclick: () => { S.project.variables.splice(i, 1); hooks.commit(); } }, '×')));
 

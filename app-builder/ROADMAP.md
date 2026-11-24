@@ -59,7 +59,7 @@ Time is app time fed by the renderer (`rt.advance(ms)`), not the wall clock, so 
   item, runs the actions, and sub-events inherit it. The expression language gets `list.count` and `list[1]` (no loops, no eval).
 - **Remember between visits** (localStorage-backed variables; fails safe when storage is blocked).
 - **Screen stack**: "Go back" action alongside "Go to screen".
-- **Rename** objects, variables and screens with references updated in events and expressions (rewrite identifiers via the tokenizer).
+- **Rename** objects, variables, object variables and screens *(done)*: events and expressions are updated; text in quotes is never touched; built-in words are refused.
 
 ## 5. Layout
 

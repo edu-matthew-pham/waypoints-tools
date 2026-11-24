@@ -2,7 +2,7 @@
 // fill-in-the-blanks form for one condition or action. Native <dialog>: focus trap, Esc, backdrop.
 import { h } from './dom.js';
 import { CONDITIONS, ACTIONS } from '../core/catalog.js';
-import { check, OPERATORS, highlight, FUNCTION_HELP, OPERATOR_HELP } from '../core/expr.js';
+import { check, OPERATORS, highlight, FUNCTION_HELP, OPERATOR_HELP, parse, evaluate, fmt, ExprError } from '../core/expr.js';
 import { COMPONENTS } from '../core/components.js';
 import { ICONS, FALLBACK_ICON } from './component-ui.js';
 
@@ -110,6 +110,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
   const errs = h('div', { class: 'es-errs', 'aria-live': 'polite' });
   const exprs = [];
   let lastExpr = null;
+  let dlgBody = null;
 
   const done = h('button', { class: 'btn primary', type: 'button' }, isNew ? 'Add' : 'Done');
   const validate = () => {
@@ -118,10 +119,36 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
       const msg = check(input.value, sheet._exprScope);
       input.classList.toggle('bad', !!msg);
       if (msg) msgs.push(msg);
+      showPreview(input, msg);
     }
     errs.replaceChildren(...msgs.map((t) => h('p', {}, '\u26a0 ' + t)));
     done.disabled = msgs.length > 0;
   };
+  // "With starting values this gives: ..." under each valid box. A problem that only shows when the app
+  // runs (like maths on text) is a warning: values may be different by then, so it doesn't block Done.
+  function showPreview(input, msg) {
+    const wrap = input.closest('.hl') || input;
+    let line = wrap._preview;
+    if (!line) { line = wrap._preview = h('p', { class: 'es-preview', 'aria-live': 'polite' }); helps.after(line); }
+    const start = sheet._exprScope.start;
+    if (msg || !start || !input.value.trim()) { line.hidden = true; return; }
+    line.hidden = false;
+    try {
+      const v = evaluate(parse(input.value), {
+        random: () => 0,
+        getVar: (n) => start.vars[n],
+        getProp: (o, p) => start.objects[o]?.[p],
+      });
+      const uses = /random\(/.test(input.value) ? ' (random picks vary)' : '';
+      line.className = 'es-preview';
+      line.replaceChildren(h('span', { class: 'muted' }, 'With starting values this gives: '),
+        h('code', {}, typeof v === 'string' ? v || '(empty text)' : fmt(v)), h('span', { class: 'muted' }, uses));
+    } catch (e) {
+      if (!(e instanceof ExprError)) throw e;
+      line.className = 'es-preview warn';
+      line.replaceChildren('\u26a0 With starting values: ' + e.message);
+    }
+  }
 
   const ctx = {
     interactive: true,
@@ -144,6 +171,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
 
   function draw() {
     exprs.length = 0;
+    dlgBody?.querySelectorAll('.es-preview').forEach((x) => x.remove());
     sentence.replaceChildren();
     for (const part of entry.label.split(/(\{\w+\})/)) {
       const mt = part.match(/^\{(\w+)\}$/);
@@ -194,6 +222,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
   const m = modal(title, [h('p', { class: 'muted' }, kind === 'cond' ? 'This must be true for the event to run.' : 'Do this when the event runs.'), sentence, helps, errs, chips],
     [del, h('span', { class: 'spacer' }), cancel, done]);
   const dlg = m.dlg;
+  dlgBody = dlg.querySelector('.dlg-body');
   draw();
   sentence.querySelector('select, input')?.focus();
 }
