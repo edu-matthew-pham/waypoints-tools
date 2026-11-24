@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { parse, evaluate, check, ExprError } from '../src/core/expr.js';
 import { Runtime } from '../src/core/runtime.js';
 import { validateSheet } from '../src/core/catalog.js';
+import { exprScopeFor } from '../src/core/project.js';
 import { musicTracker, dailyChores } from '../src/samples.js';
 
 const run = (src, vars = {}, props = {}) => evaluate(parse(src), {
@@ -188,4 +189,100 @@ test('if(): friendly errors', () => {
   assert.match(check('if(nope ≥ goal, 1, 2)', scope), /no variable called "nope"/);
   assert.match(check('minutes ≥ goal', scope), /only work inside if/);
   assert.equal(check('if(minutes ≥ goal, "a", "b")', scope), null);
+});
+
+// ---- toggle, slider, keyboard, pointer ----
+const inputsProject = () => ({
+  version: 1, name: 't', features: { level: 4 },
+  variables: [{ name: 'n', value: 0 }, { name: 'held', value: 0 }],
+  screens: [{
+    id: 's', name: 'S',
+    objects: [
+      { name: 'Sound', kind: 'toggle', instanceVars: [], instances: [{ id: 'i_t', x: 0, y: 0, w: 100, h: 30, text: 'Sound', visible: true, vars: {} }] },
+      { name: 'Vol', kind: 'slider', instanceVars: [], instances: [{ id: 'i_v', x: 0, y: 40, w: 200, h: 30, text: '', visible: true, vars: {}, min: 0, max: 10, value: 5 }] },
+      { name: 'Msg', kind: 'text', instanceVars: [], instances: [{ id: 'i_m', x: 0, y: 80, w: 200, h: 30, text: '', visible: true, vars: {} }] },
+      { name: 'Box', kind: 'input', instanceVars: [], instances: [{ id: 'i_b', x: 0, y: 120, w: 200, h: 30, text: '', visible: true, vars: {} }] },
+      { name: 'Go', kind: 'button', instanceVars: [], instances: [{ id: 'i_g', x: 0, y: 160, w: 100, h: 30, text: 'Go', visible: true, vars: {} }] },
+    ],
+    events: [
+      { id: 'e1', else: false, conds: [{ type: 'onToggled', target: 'Sound' }], actions: [], children: [
+        { id: 'e1a', else: false, conds: [{ type: 'isOn', target: 'Sound', state: 'on' }], actions: [{ type: 'setText', target: 'Msg', value: '"Sound on"' }], children: [] },
+        { id: 'e1b', else: true, conds: [], actions: [{ type: 'setText', target: 'Msg', value: '"Sound off"' }], children: [] },
+      ] },
+      { id: 'e2', else: false, conds: [{ type: 'onSlid', target: 'Vol' }], actions: [{ type: 'setText', target: 'Msg', value: '"Volume " & Vol.value' }], children: [] },
+      { id: 'e3', else: false, conds: [{ type: 'onKey', key: 'Space' }], actions: [{ type: 'addTo', value: '1', var: 'n' }], children: [] },
+      { id: 'e4', else: false, conds: [{ type: 'onKey', key: 'A' }], actions: [{ type: 'addTo', value: '10', var: 'n' }], children: [] },
+      { id: 'e5', else: false, conds: [{ type: 'onSubmitted', target: 'Box' }], actions: [{ type: 'setText', target: 'Msg', value: '"Hi " & Box.text' }], children: [] },
+      { id: 'e6', else: false, conds: [{ type: 'onPressed', target: 'Go' }], actions: [{ type: 'setText', target: 'Go', value: '"Down"' }], children: [] },
+      { id: 'e7', else: false, conds: [{ type: 'onReleased', target: 'Go' }], actions: [{ type: 'setText', target: 'Go', value: '"Up"' }], children: [] },
+      { id: 'e8', else: false, conds: [{ type: 'keyHeld', key: 'ArrowRight' }], actions: [{ type: 'setVar', var: 'held', value: '1' }], children: [] },
+    ],
+  }],
+});
+const msgOf = (rt) => rt.instancesOf('Msg')[0].props.text;
+
+test('toggle: switching fires the trigger; "is on" with Else tells the two states apart', () => {
+  const rt = new Runtime(inputsProject()); rt.start();
+  assert.equal(rt.instancesOf('Sound')[0].props.on, false);
+  rt.userChange('i_t', true);
+  assert.equal(msgOf(rt), 'Sound on');
+  rt.userChange('i_t', false);
+  assert.equal(msgOf(rt), 'Sound off');
+});
+
+test('slider: moving fires the trigger, value is readable and clamped to min and max', () => {
+  const rt = new Runtime(inputsProject()); rt.start();
+  assert.equal(rt.instancesOf('Vol')[0].props.value, 5);
+  rt.userChange('i_v', 8);
+  assert.equal(msgOf(rt), 'Volume 8');
+  rt.userChange('i_v', 99);
+  assert.equal(rt.instancesOf('Vol')[0].props.value, 10);
+});
+
+test('actions can turn a toggle on and set a slider (kept within its range)', () => {
+  const p = inputsProject();
+  p.screens[0].events.push({ id: 'e9', else: false, conds: [{ type: 'onStart' }], actions: [
+    { type: 'setOn', target: 'Sound', state: 'on' }, { type: 'setSlider', target: 'Vol', value: '50' }], children: [] });
+  const rt = new Runtime(p); rt.start();
+  assert.equal(rt.instancesOf('Sound')[0].props.on, true);
+  assert.equal(rt.instancesOf('Vol')[0].props.value, 10);
+  assert.deepEqual(rt.errors, []);
+});
+
+test('keys: pressed fires once while held (no repeat), case does not matter, held is a condition', () => {
+  const rt = new Runtime(inputsProject()); rt.start();
+  rt.key(' ', true); rt.key(' ', true); rt.key(' ', true);
+  assert.equal(rt.getVar('n'), 1);
+  rt.key(' ', false); rt.key(' ', true);
+  assert.equal(rt.getVar('n'), 2);
+  rt.key('a', true);          // lowercase from the browser
+  assert.equal(rt.getVar('n'), 12);
+  rt.key('b', true);          // no event for B: nothing happens
+  assert.equal(rt.getVar('n'), 12);
+  assert.equal(rt.getVar('held'), 0);
+  rt.key('ArrowRight', true); rt.tick();
+  assert.equal(rt.getVar('held'), 1);
+  assert.ok(rt.keysDown.has('ArrowRight'));
+  rt.releaseKeys();
+  assert.equal(rt.keysDown.size, 0);
+});
+
+test('Enter in a text input, and pressed / released on an object', () => {
+  const rt = new Runtime(inputsProject()); rt.start();
+  rt.userChange('i_b', 'Sam');
+  rt.submit('i_b');
+  assert.equal(msgOf(rt), 'Hi Sam');
+  rt.press('i_g');
+  assert.equal(rt.instancesOf('Go')[0].props.text, 'Down');
+  rt.release('i_g');
+  assert.equal(rt.instancesOf('Go')[0].props.text, 'Up');
+});
+
+test('static check knows toggle and slider properties; keyed triggers validate', () => {
+  const p = inputsProject();
+  const sc = exprScopeFor(p, p.screens[0]);
+  assert.equal(check('if(Sound.on = true, 1, 2)', sc), null);
+  assert.equal(check('Vol.value + Vol.max', sc), null);
+  assert.match(check('Vol.on', sc), /no property/);
+  assert.deepEqual(validateSheet(p.screens[0].events), []);
 });

@@ -13,9 +13,10 @@
 //
 // It only knows the catalog and plain JSON. Nothing here depends on the stage or runtime,
 // so the same element can sit in a lesson page or in the editor.
-import { OPERATORS, defaultParams, validateSheet, entryFor, CONDITIONS } from '../core/catalog.js';
+import { OPERATORS, defaultParams, validateSheet, entryFor, CONDITIONS, KEYS } from '../core/catalog.js';
 import { check } from '../core/expr.js';
 import { newEvent } from '../core/project.js';
+import { COMPONENTS } from '../core/components.js';
 import { canUse } from '../core/features.js';
 import { h } from './dom.js';
 import { openChooser, openItemDialog } from './sheet-dialogs.js';
@@ -227,6 +228,8 @@ export class EventSheet extends HTMLElement {
       case 'operator': return OPERATORS.map((o) => [o, o]);
       case 'screen': return sc.screens.map((s) => [s.id, s.name]);
       case 'showhide': return [['show', 'Show'], ['hide', 'Hide']];
+      case 'onoff': return [['on', 'on'], ['off', 'off']];
+      case 'key': return KEYS;
     }
     return [];
   }
@@ -294,7 +297,7 @@ export class EventSheet extends HTMLElement {
   _missing(entry) {
     const sc = this._scope;
     for (const prm of entry.params) {
-      if (prm.type === 'object' && !sc.objects.some((o) => !prm.kinds || prm.kinds.includes(o.kind))) return prm.kinds ? 'Add a text input first' : 'Add an object first';
+      if (prm.type === 'object' && !sc.objects.some((o) => !prm.kinds || prm.kinds.includes(o.kind))) return prm.kinds ? `Add a ${(COMPONENTS[prm.kinds[0]]?.label || 'matching object').toLowerCase()} first` : 'Add an object first';
       if (prm.type === 'variable' && !sc.variables.length) return 'Add a variable first';
       if (prm.type === 'instVar' && !sc.objects.some((o) => o.vars.length)) return 'Needs an object with a variable of its own';
     }

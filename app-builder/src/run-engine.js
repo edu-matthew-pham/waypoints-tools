@@ -3,12 +3,24 @@
 import { Runtime } from './core/runtime.js';
 import { Stage } from './ui/stage.js';
 import { h } from './ui/dom.js';
+import { usesKeys } from './core/catalog.js';
 
 export class Runner {
   constructor(stageHost, { watch, problems, flash, onScreen } = {}) {
     this.stage = new Stage(stageHost, {
-      on: { click: (id) => this.rt?.click(id), input: (id, text) => this.rt?.typeInto(id, text) },
+      on: {
+        click: (id) => this.rt?.click(id),
+        input: (id, v) => this.rt?.userChange(id, v),
+        press: (id) => this.rt?.press(id),
+        release: (id) => this.rt?.release(id),
+        submit: (id) => this.rt?.submit(id),
+        key: (name, down) => this.rt?.key(name, down),
+        keysReset: () => this.rt?.releaseKeys(),
+      },
     });
+    // shown under the app when its events use the keyboard, until the app has focus
+    this.hint = h('p', { class: 'kb-hint', hidden: true }, 'This app uses the keyboard: click it first, then press keys.');
+    stageHost.append(this.hint);
     this.watchEl = watch;
     this.problemsEl = problems;
     this.flash = flash;
@@ -41,11 +53,14 @@ export class Runner {
     this.raf = requestAnimationFrame(loop);
   }
 
+  focus() { this.stage.el.focus({ preventScroll: true }); }
+
   stop() { cancelAnimationFrame(this.raf); this.rt = null; this.stage.setPick(null); }
 
   #draw() {
     const rt = this.rt;
     if (!rt) return;
+    this.hint.hidden = !usesKeys(rt.screen?.events);
     this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, kind: i.kind, props: i.props })));
     if (this.watchEl) {
       const w = rt.watch();

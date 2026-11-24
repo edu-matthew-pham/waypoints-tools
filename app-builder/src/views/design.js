@@ -70,10 +70,27 @@ export function initDesign(root) {
       return h('div', { class: 'add-row' }, name, val, h('button', { class: 'btn', onclick: go, title: 'Add' }, '+'));
     })();
 
+    // extra fields for components that have more than text and size
+    const extra = [];
+    if (obj.kind === 'toggle') {
+      extra.push(h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: !!inst.on, onchange: (e) => { inst.on = e.target.checked; hooks.commit(); } }), h('span', {}, 'Starts on')));
+    }
+    if (obj.kind === 'slider') {
+      const num = (label, key) => h('label', { class: 'f' }, h('span', {}, label),
+        h('input', { class: 'ctl small', type: 'number', value: inst[key], 'aria-label': label, onchange: (e) => {
+          inst[key] = Number(e.target.value) || 0;
+          if (inst.max <= inst.min) inst.max = inst.min + 1;
+          inst.value = Math.max(inst.min, Math.min(inst.max, inst.value));
+          hooks.commit();
+        } }));
+      extra.push(h('div', { class: 'grid4' }, num('Smallest', 'min'), num('Largest', 'max'), num('Starts at', 'value')));
+    }
+
     props.replaceChildren(
       h('h3', {}, obj.name, h('small', {}, ` ${OBJECT_KINDS[obj.kind]?.label ?? obj.kind}${obj.instances.length > 1 ? ` · copy ${n} of ${obj.instances.length}` : ''}`)),
-      h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : 'Text'), text),
+      ...(obj.kind === 'slider' ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : 'Text'), text)]),
       h('div', { class: 'grid4' }, numField('X', 'x', inst), numField('Y', 'y', inst), numField('Width', 'w', inst, 24), numField('Height', 'h', inst, 20)),
+      ...extra,
       h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: inst.visible !== false, onchange: (e) => { inst.visible = e.target.checked; hooks.commit(); } }), h('span', {}, 'Visible at start')),
       ...(showCopies || ivars.length ? [
         h('h4', {}, 'Each copy remembers…'),

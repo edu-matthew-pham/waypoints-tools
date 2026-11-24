@@ -31,7 +31,7 @@ export function addObject(screen, kind) {
   const name = uniqueObjectName(screen, k.base);
   const bottom = screen.objects.flatMap((o) => o.instances).reduce((m, i) => Math.max(m, i.y + i.h), 8);
   const y = Math.min(bottom + 16, STAGE.h - k.props.h - 8);
-  const inst = { id: uid('i'), x: Math.round((STAGE.w - k.props.w) / 2), y, w: k.props.w, h: k.props.h, text: k.props.text, visible: true, vars: {} };
+  const inst = { id: uid('i'), x: Math.round((STAGE.w - k.props.w) / 2), y, w: k.props.w, h: k.props.h, text: k.props.text, visible: true, vars: {}, ...(k.extra || {}) };
   const obj = { name, kind, instanceVars: [], instances: [inst] };
   screen.objects.push(obj);
   return { obj, inst };
@@ -73,7 +73,7 @@ export function scopeFor(project, screen) {
 export function exprScopeFor(project, screen) {
   return {
     vars: new Set(project.variables.map((v) => v.name)),
-    objects: new Map((screen?.objects || []).map((o) => [o.name, new Set([...PROP_NAMES, ...o.instanceVars.map((v) => v.name)])])),
+    objects: new Map((screen?.objects || []).map((o) => [o.name, new Set([...PROP_NAMES, ...(OBJECT_KINDS[o.kind]?.exposes || []), ...o.instanceVars.map((v) => v.name)])])),
   };
 }
 

@@ -12,6 +12,14 @@ import { ExprError, fmt, OPERATORS, compare } from './expr.js';
 export const OBJECT_KINDS = COMPONENTS; // kept under the old name for the interpreter and project helpers
 export { OPERATORS, compare };
 
+// Keys students can pick. e.key is normalised so "a" and "A" are the same key.
+export const KEYS = [
+  ['any', 'Any key'], ['Enter', 'Enter'], ['Space', 'Space'], ['Escape', 'Escape'],
+  ['ArrowUp', 'Up arrow'], ['ArrowDown', 'Down arrow'], ['ArrowLeft', 'Left arrow'], ['ArrowRight', 'Right arrow'],
+  ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('').map((c) => [c, c]),
+];
+export const normaliseKey = (k) => (k === ' ' ? 'Space' : String(k).length === 1 ? String(k).toUpperCase() : String(k));
+
 const obj = (extra = {}) => ({ name: 'target', type: 'object', ...extra });
 const expr = (name = 'value') => ({ name, type: 'expr' });
 
@@ -26,6 +34,48 @@ export const CONDITIONS = {
   onChanged: {
     category: 'Object', label: '{target} text changes', trigger: 'changed', object: 'target',
     params: [obj({ kinds: ['input'] })],
+  },
+  onPressed: {
+    category: 'Object', label: '{target} is pressed', trigger: 'pressed', object: 'target', params: [obj()],
+  },
+  onReleased: {
+    category: 'Object', label: '{target} is released', trigger: 'released', object: 'target', params: [obj()],
+  },
+  onToggled: {
+    category: 'Object', label: '{target} is switched', trigger: 'changed', object: 'target',
+    params: [obj({ kinds: ['toggle'] })],
+  },
+  onSlid: {
+    category: 'Object', label: '{target} is moved', trigger: 'changed', object: 'target',
+    params: [obj({ kinds: ['slider'] })],
+  },
+  onSubmitted: {
+    category: 'Object', label: 'Enter is pressed in {target}', trigger: 'submitted', object: 'target',
+    params: [obj({ kinds: ['input'] })],
+  },
+  onKey: {
+    category: 'Keyboard', label: 'Key {key} is pressed', trigger: 'keyDown', keyed: true,
+    params: [{ name: 'key', type: 'key' }],
+  },
+  onKeyUp: {
+    category: 'Keyboard', label: 'Key {key} is released', trigger: 'keyUp', keyed: true,
+    params: [{ name: 'key', type: 'key' }],
+  },
+  keyHeld: {
+    category: 'Keyboard', label: 'Key {key} is held down',
+    params: [{ name: 'key', type: 'key' }],
+    test: (rt, ctx, p) => (p.key === 'any' ? rt.keysDown.size > 0 : rt.keysDown.has(p.key)),
+  },
+  isOn: {
+    category: 'Object', label: '{target} is {state}',
+    params: [obj({ kinds: ['toggle'] }), { name: 'state', type: 'onoff' }],
+    // Picking: keeps only the toggles in that state.
+    test: (rt, ctx, p) => {
+      const want = p.state !== 'off';
+      const keep = rt.pickList(ctx, p.target).filter((inst) => !!inst.props.on === want);
+      ctx.picked.set(p.target, keep);
+      return keep.length > 0;
+    },
   },
   everyTick: {
     category: 'System', label: 'Every tick', params: [],
@@ -59,6 +109,16 @@ export const ACTIONS = {
     category: 'Object', label: 'Set {target} text to {value}',
     params: [obj(), expr()],
     run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => rt.setProp(inst, 'text', fmt(rt.evalExpr(p.value, c)))),
+  },
+  setOn: {
+    category: 'Object', label: 'Turn {target} {state}',
+    params: [obj({ kinds: ['toggle'] }), { name: 'state', type: 'onoff' }],
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.setProp(inst, 'on', p.state !== 'off')),
+  },
+  setSlider: {
+    category: 'Object', label: 'Set {target} value to {value}',
+    params: [obj({ kinds: ['slider'] }), expr()],
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => rt.setProp(inst, 'value', clampTo(inst, num(rt.evalExpr(p.value, c))))),
   },
   setVisible: {
     category: 'Object', label: '{visible} {target}',
@@ -98,6 +158,8 @@ export const ACTIONS = {
   },
 };
 
+const clampTo = (inst, n) => Math.max(inst.props.min, Math.min(inst.props.max, n));
+
 function num(v) {
   if (typeof v !== 'number') throw new ExprError(`Adding needs numbers, but this is ${typeof v === 'string' ? `text: "${v}"` : 'not a number'}. Use int(...) to turn text into a number.`);
   return v;
@@ -127,6 +189,8 @@ export function defaultParams(entry, scope) {
       case 'operator': out[prm.name] = '='; break;
       case 'screen': out[prm.name] = scope.screens[0]?.id ?? ''; break;
       case 'showhide': out[prm.name] = 'show'; break;
+      case 'onoff': out[prm.name] = 'on'; break;
+      case 'key': out[prm.name] = 'Enter'; break;
       default: out[prm.name] = '';
     }
   }
@@ -153,4 +217,9 @@ export function validateSheet(events, depth = 0, out = []) {
     if (ev.children?.length) validateSheet(ev.children, depth + 1, out);
   }
   return out;
+}
+
+// true if any event on a screen reacts to the keyboard (the preview then asks the user to click it first)
+export function usesKeys(events = []) {
+  return events.some((ev) => (ev.conds || []).some((c) => CONDITIONS[c.type]?.keyed || c.type === 'keyHeld') || usesKeys(ev.children));
 }

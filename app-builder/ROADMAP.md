@@ -12,7 +12,7 @@ The picker groups tiles by category and only shows what the current level / less
 | Category | Components | Level | Notes |
 |---|---|---|---|
 | Basics | Button, Text, Text input *(done)* | 1-2 | |
-| Choices | Toggle (on/off), Slider, Dropdown, Checkbox | 2 | Each has a value you can compare and an "on changed" trigger. Reuse `onChanged`. |
+| Choices | Toggle *(done)*, Slider *(done)*, Dropdown, Checkbox | 2 | Toggle has `Name.on` and an "is on / off" condition (pair with Else); Slider has `Name.value`, `min`, `max`. Both have a "changes" trigger. |
 | Media | Image (+ asset panel, built-in icons), Emoji/icon | 2 | Assets stored as data URLs in the project file (size cap and warning). |
 | Data | List (shows items), Repeater (one row per list item), Gallery | 3-4 | Needs the list value type and "for each" first (section 4). |
 | Layout | Stack (row/column), Container, Tabs, Scroll area | 3-4 | Needs children inside containers (section 5). |
@@ -25,17 +25,17 @@ Pointer Events cover mouse, pen and touch with one code path, so nothing depends
 
 | Event | Kind | Level | How |
 |---|---|---|---|
-| Object **pressed** / **released** | trigger | 2 | `pointerdown` / `pointerup` on the object |
+| Object **pressed** / **released** *(done)* | trigger | 2 | `pointerdown` / `pointerup` on the object; release goes to the pressed object even if the pointer slid off |
 | Object **double-clicked**, **long-pressed** | trigger | 3 | Timer on pointerdown (long press 500 ms) |
 | Pointer **enters / leaves** object (hover) | trigger | 3 | Desktop only; hidden on touch devices |
-| **Key pressed** `{key}` / **key released** | trigger | 2-3 | Keys offered in a picker: Enter, Escape, Space, arrows, letters, digits. `Enter` in a text input is the beginner case ("submit"). |
-| **Key is down** `{key}` | condition, every tick | 3 | Held keys; same mechanism as every-tick events |
-| Text input **changed** / **submitted** | trigger | 2 | `onChanged` exists; add `onSubmitted` (Enter) |
+| **Key pressed** `{key}` / **key released** *(done)* | trigger | 2 | Keys offered in a picker: Enter, Escape, Space, arrows, letters, digits. `Enter` in a text input is the beginner case ("submit"). |
+| **Key is held down** `{key}` *(done)* | condition, every tick | 3 | Held keys; same mechanism as every-tick events |
+| Text input **changed** / **submitted** *(done)* | trigger | 2 | Enter in a text box fires "Enter is pressed in ..." |
 | Object **is visible / is hovered / has focus** | condition | 3 | |
 | **Swipe** left/right/up/down on screen or object | trigger | 4 | Pointer delta threshold |
 
-Runtime: add `rt.key(name, down)`, `rt.hover(id, over)`, `rt.pointer(id, 'down'|'up')` next to `rt.click`. Keys only reach the
-app when the preview has focus, so the preview shows "Click the app, then press keys" until it does. Headless tests feed these
+Runtime *(done except hover)*: `rt.key(name, down)`, `rt.press/release(id)`, `rt.submit(id)`, `rt.userChange(id, value)` next to `rt.click`. Keys only reach the
+app when it has focus: the Run tab focuses it automatically, and the Events preview shows "click it first" when the screen uses keys. Keys typed into a text box are ignored by key events (the box has its own). Headless tests feed these
 calls directly, just like clicks today.
 
 ## 3. Time and chance
@@ -78,5 +78,5 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
 
 ## Suggested order
 
-1. Toggle, Slider (small, prove the registry). *(`if()` + builder done.)*  2. Key pressed + Enter-submits + pressed/released.  3. Timers.
+1. Toggle, Slider. *(done, with `if()` + builder)*  2. Key pressed + Enter-submits + pressed/released. *(done)*  3. Timers.
 4. Image + asset panel.  5. Lists + for-each + Repeater.  6. Rename.  7. Layout/Tabs.  8. Custom HTML widget and JS view.

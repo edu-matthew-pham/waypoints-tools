@@ -11,7 +11,7 @@
 //  - "Go to screen" happens after the current event finishes. Globals survive, copies reset.
 
 import { evaluate, parse, ExprError } from './expr.js';
-import { CONDITIONS, ACTIONS, OBJECT_KINDS } from './catalog.js';
+import { CONDITIONS, ACTIONS, OBJECT_KINDS, normaliseKey } from './catalog.js';
 
 export const triggerOf = (ev) => (ev.conds || []).find((c) => CONDITIONS[c.type]?.trigger);
 
@@ -31,12 +31,14 @@ export class Runtime {
     this.byId = new Map();
     this.version = 0;
     this.ticks = 0;
+    this.keysDown = new Set();
   }
 
   // ---------- lifecycle ----------
   start(screenId) {
     this.globals = new Map(this.project.variables.map((v) => [v.name, v.value]));
     this.errors = [];
+    this.keysDown = new Set();
     this.queue = [{ name: 'start' }];
     this.pendingScreen = null;
     this.#load(screenId ?? this.project.screens[0].id);
@@ -62,6 +64,39 @@ export class Runtime {
     inst.props.text = String(text);
     this.fire('changed', { object: inst.object, instance: inst });
   }
+  // The user changed a value: text typed, toggle switched, slider moved.
+  userChange(instanceId, value) {
+    const inst = this.byId.get(instanceId);
+    if (!inst) return;
+    if (inst.kind === 'input') inst.props.text = String(value);
+    else if (inst.kind === 'toggle') inst.props.on = !!value;
+    else if (inst.kind === 'slider') {
+      const n = Number(value);
+      if (Number.isNaN(n)) return;
+      inst.props.value = Math.max(inst.props.min, Math.min(inst.props.max, n));
+    } else return;
+    this.fire('changed', { object: inst.object, instance: inst });
+  }
+  press(instanceId) { this.#touch('pressed', instanceId); }
+  release(instanceId) { this.#touch('released', instanceId); }
+  submit(instanceId) { this.#touch('submitted', instanceId); }
+  #touch(name, instanceId) {
+    const inst = this.byId.get(instanceId);
+    if (inst) this.fire(name, { object: inst.object, instance: inst });
+  }
+  // Keyboard: name is a browser key ("a", "Enter", " ", "ArrowUp"). Holding a key fires once, not repeatedly.
+  key(name, down) {
+    const k = normaliseKey(name);
+    if (down) {
+      if (this.keysDown.has(k)) return;
+      this.keysDown.add(k);
+      this.fire('keyDown', { key: k });
+    } else {
+      this.keysDown.delete(k);
+      this.fire('keyUp', { key: k });
+    }
+  }
+  releaseKeys() { this.keysDown.clear(); }
   fire(name, occ = {}) {
     this.queue.push({ name, ...occ });
     if (!this.busy) this.#pump();
@@ -157,6 +192,7 @@ export class Runtime {
           id: d.id, object: od.name, kind: od.kind, vars,
           props: { x: d.x ?? 0, y: d.y ?? 0, w: d.w ?? kind.props.w, h: d.h ?? kind.props.h, text: d.text ?? kind.props.text, visible: d.visible !== false },
         };
+        for (const [k, v] of Object.entries(kind.extra || {})) inst.props[k] = d[k] ?? v;
         this.byId.set(inst.id, inst);
         return inst;
       });
@@ -198,6 +234,7 @@ export class Runtime {
   #matches(trig, occ, ctx) {
     const entry = CONDITIONS[trig.type];
     if (!entry || entry.trigger !== occ.name) return false;
+    if (entry.keyed && trig.key !== 'any' && trig.key !== occ.key) return false;
     if (entry.object) {
       if (trig[entry.object] !== occ.object) return false;
       ctx.picked.set(occ.object, [occ.instance]);

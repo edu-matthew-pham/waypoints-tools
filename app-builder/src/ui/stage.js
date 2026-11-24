@@ -50,6 +50,7 @@ export class Stage {
       this.el.addEventListener('pointerup', end);
       this.el.addEventListener('pointercancel', end);
     } else {
+      this.el.tabIndex = 0; // the app can be focused, so key events reach it
       this.el.addEventListener('click', (e) => {
         const w = e.target.closest('.w');
         if (this.pick) { e.preventDefault(); e.stopPropagation(); if (w) this.pick(w.dataset.id); return; }
@@ -57,7 +58,35 @@ export class Stage {
       });
       this.el.addEventListener('input', (e) => {
         const w = e.target.closest('.w');
-        if (w) this.on.input?.(w.dataset.id, e.target.value);
+        if (!w) return;
+        const read = RENDER[this.nodes.get(w.dataset.id)?.kind]?.read;
+        this.on.input?.(w.dataset.id, read ? read(e.target) : e.target.value);
+      });
+      // pressed / released: release goes to the object that was pressed, even if the pointer slid off it
+      let pressed = null;
+      this.el.addEventListener('pointerdown', (e) => {
+        if (this.pick || e.button !== 0) return;
+        const w = e.target.closest('.w');
+        if (w) { pressed = w.dataset.id; this.on.press?.(pressed); }
+      });
+      const up = () => { if (pressed) { const id = pressed; pressed = null; this.on.release?.(id); } };
+      this.el.addEventListener('pointerup', up);
+      this.el.addEventListener('pointercancel', up);
+      // keyboard: ignored while typing in a text box (that box has its own events); Enter in a text box = submit
+      const typing = (t) => t.tagName === 'INPUT' && t.type === 'text';
+      this.el.addEventListener('keydown', (e) => {
+        if (this.pick || e.ctrlKey || e.metaKey || e.altKey) return;
+        const w = e.target.closest?.('.w');
+        if (typing(e.target)) { if (e.key === 'Enter' && w) this.on.submit?.(w.dataset.id); return; }
+        this.on.key?.(e.key, true);
+        if (e.target === this.el && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault(); // don't scroll the page
+      });
+      this.el.addEventListener('keyup', (e) => { if (!typing(e.target)) this.on.key?.(e.key, false); });
+      this.el.addEventListener('focusin', () => this.el.classList.add('kb-focus'));
+      this.el.addEventListener('focusout', (e) => {
+        if (this.el.contains(e.relatedTarget)) return;
+        this.el.classList.remove('kb-focus');
+        this.on.keysReset?.(); // a key released while the app wasn't focused would otherwise stay "held"
       });
     }
   }

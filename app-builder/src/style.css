@@ -322,3 +322,18 @@ select.ctl { padding-right: 6px; }
 .cb-preview { padding: 8px 10px; background: #f7f8fc; border-radius: 8px; font-size: 13px; overflow-wrap: anywhere; }
 .cb-code { font-family: ui-monospace, Menlo, Consolas, monospace; }
 .choice-btn { font-size: 13px; padding: 4px 10px; margin-left: auto; }
+
+/* toggle + slider on the stage */
+.w-toggle > .tg { display: flex; align-items: center; gap: 10px; font-size: 16px; cursor: pointer; user-select: none; }
+.tg input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.tg-track { flex: none; width: 46px; height: 26px; border-radius: 99px; background: #cdd3de; position: relative; transition: background .15s; }
+.tg-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(20, 30, 60, .3); transition: transform .15s; }
+.tg input:checked + .tg-track { background: var(--accent); }
+.tg input:checked + .tg-track::after { transform: translateX(20px); }
+.tg input:focus-visible + .tg-track { box-shadow: 0 0 0 3px var(--accent-soft); }
+.w-slider > input[type=range] { accent-color: var(--accent); margin: 0; cursor: pointer; }
+.stage:not(.design):focus { outline: none; }
+.stage.kb-focus:not(.design) { box-shadow: 0 0 0 3px var(--accent-soft), 0 10px 30px rgba(20, 30, 60, .12); }
+.kb-hint { margin: 8px 2px 0; font-size: 12px; color: var(--muted); }
+.stage.kb-focus ~ .kb-hint { display: none; }
+.kb-hint[hidden] { display: none; }

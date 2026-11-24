@@ -4,7 +4,7 @@ import { h } from './dom.js';
 import { CONDITIONS, ACTIONS } from '../core/catalog.js';
 import { check, OPERATORS } from '../core/expr.js';
 
-const CATEGORIES = ['Screen', 'Object', 'Variables', 'System'];
+const CATEGORIES = ['Screen', 'Object', 'Keyboard', 'Variables', 'System'];
 const plain = (label) => label.replace(/\{\w+\}/g, '\u2026');
 
 export function modal(title, body, foot) {

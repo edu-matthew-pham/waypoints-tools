@@ -21,7 +21,7 @@ export function initRun(root) {
     flash: (id) => sheet.flash(id),
     onScreen: (scr, project) => sheet.setData({ events: scr.events, scope: scopeFor(project, scr), exprScope: exprScopeFor(project, scr), mode: 'readonly' }),
   });
-  const start = () => runner.start(S.project, S.screenId);
+  const start = () => { runner.start(S.project, S.screenId); runner.focus(); }; // so keys work straight away
   restartBtn.addEventListener('click', start);
   return { activate: start, deactivate: () => runner.stop() };
 }
