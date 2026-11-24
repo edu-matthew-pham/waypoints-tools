@@ -238,6 +238,7 @@ export class EventSheet extends HTMLElement {
       case 'showhide': return [['show', 'Show'], ['hide', 'Hide']];
       case 'onoff': return [['on', 'on'], ['off', 'off']];
       case 'key': return KEYS;
+      case 'list': return (sc.lists || []).map((n) => [n, n]);
       case 'picture': return (sc.pictures || []).map((n) => [n, n]);
       case 'posSize': return [['w', 'width'], ['h', 'height'], ['x', 'x position'], ['y', 'y position']];
     }
@@ -309,6 +310,7 @@ export class EventSheet extends HTMLElement {
     for (const prm of entry.params) {
       if (prm.type === 'object' && !sc.objects.some((o) => !prm.kinds || prm.kinds.includes(o.kind))) return prm.kinds ? `Add a ${(COMPONENTS[prm.kinds[0]]?.label || 'matching object').toLowerCase()} first` : 'Add an object first';
       if (prm.type === 'variable' && !sc.variables.length) return 'Add a variable first';
+      if (prm.type === 'list' && !(sc.lists || []).length) return 'Add a list first (left side, under Lists)';
       if (prm.type === 'instVar' && !sc.objects.some((o) => o.vars.length)) return 'Needs an object with a variable of its own';
     }
     return '';

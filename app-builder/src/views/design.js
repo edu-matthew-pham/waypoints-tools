@@ -26,7 +26,10 @@ export function initDesign(root) {
     },
   });
 
-  const items = () => screen().objects.flatMap((o) => o.instances.map((i) => ({ id: i.id, kind: o.kind, props: i })));
+  const listItems = (name) => S.project.variables.find((v) => v.name === name && Array.isArray(v.value))?.value;
+  const items = () => screen().objects.flatMap((o) => o.instances.map((i) => ({ id: i.id, kind: o.kind, props: o.kind === 'list' ? withItems(i) : i })));
+  // a live view of the instance plus its list items, so dragging still moves the real instance
+  const withItems = (i) => new Proxy(i, { get: (t, k) => (k === 'items' ? listItems(t.source) : t[k]) });
   function sync() { stage.sync(items()); stage.setSelected(S.selId); }
 
   function numField(label, key, inst, min = 0) {
@@ -97,6 +100,13 @@ export function initDesign(root) {
             choose(name);
           }, hooks.notify) }, '+ Upload'))));
     }
+    if (obj.kind === 'list') {
+      const lists = S.project.variables.filter((v) => Array.isArray(v.value)).map((v) => v.name);
+      const sel = h('select', { class: 'ctl', 'aria-label': 'Shows list', onchange: (e) => { inst.source = e.target.value; hooks.commit(); } },
+        h('option', { value: '' }, lists.length ? '\u2014 choose \u2014' : 'Add a list on the left first'),
+        lists.map((n) => h('option', { value: n, selected: inst.source === n }, n)));
+      extra.push(h('label', { class: 'f wide' }, h('span', {}, 'Shows list'), sel));
+    }
     if (obj.kind === 'shape') {
       extra.push(h('label', { class: 'f' }, h('span', {}, 'Colour'), h('input', { type: 'color', value: inst.color || '#2f6fdd', 'aria-label': 'Colour', oninput: (e) => { inst.color = e.target.value; sync(); }, onchange: () => hooks.commit() })));
     }
@@ -113,7 +123,7 @@ export function initDesign(root) {
 
     props.replaceChildren(
       h('h3', {}, obj.name, h('small', {}, ` ${OBJECT_KINDS[obj.kind]?.label ?? obj.kind}${obj.instances.length > 1 ? ` · copy ${n} of ${obj.instances.length}` : ''}`)),
-      ...(obj.kind === 'slider' || obj.kind === 'shape' ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : obj.kind === 'image' ? 'Description (read aloud by screen readers)' : 'Text'), text)]),
+      ...(['slider', 'shape', 'list'].includes(obj.kind) ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : obj.kind === 'image' ? 'Description (read aloud by screen readers)' : 'Text'), text)]),
       h('div', { class: 'grid4' }, numField('X', 'x', inst), numField('Y', 'y', inst), numField('Width', 'w', inst, 24), numField('Height', 'h', inst, 20)),
       ...extra,
       h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: inst.visible !== false, onchange: (e) => { inst.visible = e.target.checked; hooks.commit(); } }), h('span', {}, 'Visible at start')),

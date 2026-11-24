@@ -14,7 +14,7 @@ The picker groups tiles by category and only shows what the current level / less
 | Basics | Button, Text, Text input, Box (coloured rectangle) *(done)* | 1-2 | Box + "Set width / height / x / y" make progress bars |
 | Choices | Toggle *(done)*, Slider *(done)*, Dropdown, Checkbox | 2 | Toggle has `Name.on` and an "is on / off" condition (pair with Else); Slider has `Name.value`, `min`, `max`. Both have a "changes" trigger. |
 | Media | Image *(done)* with Pictures panel and 8 built-in pictures | 2 | Uploads stored as data URLs in the project file; photos shrunk to 800 px, GIFs kept (they animate); in-use pictures can't be deleted. |
-| Data | List (shows items), Repeater (one row per list item), Gallery | 3-4 | Needs the list value type and "for each" first (section 4). |
+| Data | List *(done)*, Repeater (one row per list item), Gallery | 3-4 | List shows a list variable; tapping an item gives ClickedItem / ClickedIndex. |
 | Layout | Stack (row/column), Container, Tabs, Scroll area | 3-4 | Needs children inside containers (section 5). |
 | Advanced | Custom HTML widget (sandboxed iframe) | 4 | Escape hatch; talks to events through postMessage. |
 
@@ -55,8 +55,8 @@ Time is app time fed by the renderer (`rt.advance(ms)`), not the wall clock, so 
 
 ## 4. Data
 
-- **Lists** as a value type: `add / remove / clear / count / item N / for each`. "For each" works like picking: it narrows to one
-  item, runs the actions, and sub-events inherit it. The expression language gets `list.count` and `list[1]` (no loops, no eval).
+- **Lists** *(done)*: list variables with starting items; Add / Remove item N / Remove value / Set item / Clear; `count()`, `item(list, n)`,
+  `join()`; "For each item" and "Repeat N times" conditions with `LoopItem` / `LoopIndex` (numbered from 1); loops over 1000 rounds stop.
 - **Remember between visits** (localStorage-backed variables; fails safe when storage is blocked).
 - **Screen stack**: "Go back" action alongside "Go to screen".
 - **Rename** objects, variables, object variables and screens *(done)*: events and expressions are updated; text in quotes is never touched; built-in words are refused.
@@ -77,7 +77,7 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
 - Headless project checks for lesson pages: "click 3 times, then `minutes` should be 30".
 - Events -> JavaScript read-only view, then a *Run script* action (Level 4), so students can graduate to code.
 - **Year 7 tutorial samples** *(done)*: Music tracker, Daily chores (Option B: sub-event + Else), Water tracker, using the same object and
-  variable names as the Construct 3 tutorials. Values journal waits for lists and images. `uppercase()`/`lowercase()` work, and
+  variable names as the Construct 3 tutorials. Values journal *(done)* uses lists, pictures and three screens. `uppercase()`/`lowercase()` work, and
   `Name.Text` gets a "use small letters" hint, so Construct habits transfer.
 - Teacher view: share a project link with `?level=` / `?allow=` / `?lock=1` (done); later, a starter-project link.
 

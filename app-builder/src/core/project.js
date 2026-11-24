@@ -65,7 +65,8 @@ export function deleteInstance(screen, id) {
 export function scopeFor(project, screen) {
   return {
     objects: (screen?.objects || []).map((o) => ({ name: o.name, kind: o.kind, vars: o.instanceVars.map((v) => v.name) })),
-    variables: project.variables.map((v) => v.name),
+    variables: project.variables.filter((v) => !Array.isArray(v.value)).map((v) => v.name),
+    lists: project.variables.filter((v) => Array.isArray(v.value)).map((v) => v.name),
     screens: project.screens.map((s) => ({ id: s.id, name: s.name })),
     pictures: imageNames(project),
   };

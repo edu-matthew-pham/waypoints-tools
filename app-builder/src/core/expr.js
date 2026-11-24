@@ -146,6 +146,7 @@ export function parse(src) {
 }
 
 export function fmt(v) {
+  if (Array.isArray(v)) return v.map(fmt).join(', ');
   if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(Math.round(v * 1e6) / 1e6);
   return String(v);
 }
@@ -171,10 +172,19 @@ const FUNCS = {
   lower:  { n: 1, f: (v) => String(v).toLowerCase() },
   str:    { n: 1, f: (v) => fmt(v) },
 };
+const needList = (v, fn) => { if (!Array.isArray(v)) throw new ExprError(`${fn}() needs a list, like ${fn}(myList${fn === 'item' ? ', 1' : ''})`); return v; };
+FUNCS.count = { n: 1, f: (l) => needList(l, 'count').length };
+FUNCS.item = { n: 2, f: (l, i) => {
+  needList(l, 'item'); needNum(i);
+  if (i < 1 || i > l.length || !Number.isInteger(i)) throw new ExprError(`The list has ${l.length} item${l.length === 1 ? '' : 's'}, so there is no item ${fmt(i)}. Items are numbered from 1.`);
+  return l[i - 1];
+} };
+FUNCS.join = { n: 2, f: (l, sep) => needList(l, 'join').map(fmt).join(fmt(sep)) };
 // Construct names, so code copied from a Construct tutorial still works
 FUNCS.uppercase = FUNCS.upper;
 FUNCS.lowercase = FUNCS.lower;
-export const FUNCTION_NAMES = [...Object.keys(FUNCS), 'random', 'if'];
+export const LOOP_NAMES = ['LoopIndex', 'LoopItem', 'ClickedIndex', 'ClickedItem'];
+export const FUNCTION_NAMES = () => [...Object.keys(FUNCS), 'random', 'if'];
 
 // env = { getVar(name), getProp(obj, prop), random() }
 export function evaluate(n, env) {
@@ -220,7 +230,7 @@ export function check(src, scope) {
     (function walk(n) {
       switch (n.k) {
         case 'var':
-          if (!scope.vars.has(n.name)) throw new ExprError(`There's no variable called "${n.name}"`);
+          if (!scope.vars.has(n.name) && !LOOP_NAMES.includes(n.name)) throw new ExprError(`There's no variable called "${n.name}"`);
           break;
         case 'prop': {
           const props = scope.objects.get(n.obj);
@@ -241,7 +251,7 @@ export function check(src, scope) {
         }
         case 'bin': walk(n.l); walk(n.r); break;
         case 'call':
-          if (!FUNCTION_NAMES.includes(n.name)) throw new ExprError(`There's no function called "${n.name}"`);
+          if (!FUNCTION_NAMES().includes(n.name)) throw new ExprError(`There's no function called "${n.name}"`);
           n.args.forEach(walk);
           break;
       }
@@ -268,6 +278,9 @@ export const FUNCTION_HELP = {
   str:    ['str(x)', 'Turns a number into text.', 'str(score)'],
   len:    ['len(text)', 'How many characters are in some text.', 'len(Name.text)'],
   upper:  ['upper(text)', 'Text in CAPITALS. (uppercase() also works.)', 'upper(Name.text)'],
+  count:  ['count(list)', 'How many items are in a list.', 'count(journal)'],
+  item:   ['item(list, n)', 'Item number n of a list (the first is 1).', 'item(journal, 1)'],
+  join:   ['join(list, between)', 'All the items as one piece of text.', 'join(chores, ", ")'],
   lower:  ['lower(text)', 'Text in lower case. (lowercase() also works.)', 'lower(Name.text)'],
   uppercase: ['uppercase(text)', 'Same as upper().', 'uppercase(Name.text)'],
   lowercase: ['lowercase(text)', 'Same as lower().', 'lowercase(Name.text)'],

@@ -384,3 +384,11 @@ select.ctl { padding-right: 6px; }
 .pic.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .pic.add { font-size: 11px; color: var(--muted); border-style: dashed; padding: 2px; }
 .pic-row img { width: 28px; height: 28px; object-fit: contain; border-radius: 4px; background: #f4f5f8; }
+
+.lst { overflow: auto; border: 1px solid #dfe3ec; border-radius: 10px; background: #fff; }
+.lst-row { padding: 10px 12px; border-bottom: 1px solid #eef0f5; font-size: 15px; cursor: pointer; }
+.lst-row:last-child { border-bottom: 0; }
+.lst-row:hover { background: #f4f7fd; }
+.lst-empty { padding: 12px; color: #98a0b0; font-size: 14px; }
+.list-var { margin: 6px 0 10px; }
+.list-start { width: 100%; font-size: 13px; }

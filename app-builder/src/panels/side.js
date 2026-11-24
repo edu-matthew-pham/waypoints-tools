@@ -113,7 +113,7 @@ export function renderSide(el) {
         }) }, '+ Add object')));
   });
 
-  const vars = S.project.variables.map((v, i) => h('div', { class: 'var' },
+  const vars = S.project.variables.map((v, i) => Array.isArray(v.value) ? null : h('div', { class: 'var' },
     renamingVar === v.name
       ? renameInput({ value: v.name, label: 'Variable name', notify: hooks.notify, taken: S.project.variables.map((x) => x.name),
         onDone: () => { renamingVar = null; hooks.refresh(); },
@@ -131,12 +131,13 @@ export function renderSide(el) {
       const sc2 = newScreen('Screen ' + n); S.project.screens.push(sc2); S.screenId = sc2.id; S.selId = null; renaming = sc2.id; hooks.commit();
     } }, '+ Screen'),
     h('h3', {}, 'Variables (whole app)'),
-    ...(vars.length ? vars : [h('p', { class: 'muted' }, 'None yet.')]),
+    ...(vars.some(Boolean) ? vars.filter(Boolean) : [h('p', { class: 'muted' }, 'None yet.')]),
     addRow('New variable', (name, value) => {
       if (!isIdentifier(name)) { hooks.notify('Variable names use letters, numbers and _ only, and can’t start with a number.'); return false; }
       if (S.project.variables.some((v) => v.name === name)) { hooks.notify('There is already a variable called ' + name); return false; }
       S.project.variables.push({ name, value }); hooks.commit();
     }, true),
+    ...(!S.rf || S.rf.lists ? listSection() : []),
     ...(!S.rf || S.rf.kinds.includes('image') ? [
       h('h3', {}, 'Pictures (whole app)'),
       ...(S.project.assets.length ? [h('div', { class: 'pic-list' }, S.project.assets.map((a) => h('div', { class: 'var pic-row' },
@@ -161,4 +162,28 @@ function pictureUsers(name) {
     (function walk(evs) { for (const ev of evs) { if (ev.actions.some((a) => a.type === 'setImage' && a.image === name)) out.add('an event on ' + sc.name); walk(ev.children || []); } })(sc.events);
   }
   return [...out];
+}
+
+// Lists (whole app): name, starting items typed as  a, b, c
+function listSection() {
+  const rows = S.project.variables.filter((v) => Array.isArray(v.value)).map((v) => h('div', { class: 'list-var' },
+    h('div', { class: 'var' },
+      renamingVar === v.name
+        ? renameInput({ value: v.name, label: 'List name', notify: hooks.notify, taken: S.project.variables.map((x) => x.name),
+          onDone: () => { renamingVar = null; hooks.refresh(); },
+          onSave: (nv) => { renameVariable(S.project, v.name, nv); renamingVar = null; hooks.commit(); } })
+        : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingVar = v.name; hooks.refresh(); } }, v.name),
+      h('span', { class: 'muted' }, `${v.value.length} item${v.value.length === 1 ? '' : 's'}`),
+      h('button', { class: 'icon danger', title: 'Delete list', onclick: () => { S.project.variables = S.project.variables.filter((x) => x !== v); hooks.commit(); } }, '\u00d7')),
+    h('input', { class: 'ctl list-start', value: v.value.join(', '), placeholder: 'Starting items, e.g. Milk, Eggs', 'aria-label': `Starting items of ${v.name}`,
+      onchange: (e) => { v.value = e.target.value.split(',').map((x) => x.trim()).filter(Boolean).map(parseValue); hooks.commit(); } })));
+  return [
+    h('h3', {}, 'Lists (whole app)'),
+    ...(rows.length ? rows : [h('p', { class: 'muted' }, 'None yet.')]),
+    addRow('New list', (name) => {
+      if (!isIdentifier(name)) { hooks.notify('List names use letters, numbers and _ only, and can\u2019t start with a number.'); return false; }
+      if (S.project.variables.some((v) => v.name === name)) { hooks.notify('There is already something called ' + name); return false; }
+      S.project.variables.push({ name, value: [] }); hooks.commit();
+    }),
+  ];
 }

@@ -10,6 +10,7 @@ export class Runner {
     this.stage = new Stage(stageHost, {
       on: {
         click: (id) => this.rt?.click(id),
+        itemClick: (id, index) => this.rt?.itemClick(id, index),
         input: (id, v) => this.rt?.userChange(id, v),
         press: (id) => this.rt?.press(id),
         release: (id) => this.rt?.release(id),
@@ -64,13 +65,13 @@ export class Runner {
     const rt = this.rt;
     if (!rt) return;
     this.hint.hidden = !usesKeys(rt.screen?.events);
-    this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, kind: i.kind, props: i.props })));
+    this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, kind: i.kind, props: i.kind === 'list' ? { ...i.props, items: rt.globals.get(i.props.source) } : i.props })));
     if (this.watchEl) {
       const w = rt.watch();
       this.watchEl.replaceChildren(
         h('h3', {}, 'Watch'),
         h('div', { class: 'var' }, h('span', { class: 'vname' }, 'screen'), h('span', { class: 'val' }, w.screen)),
-        ...Object.entries(w.vars).map(([k, v]) => h('div', { class: 'var' }, h('span', { class: 'vname' }, k), h('span', { class: 'val' }, typeof v === 'string' ? `"${v}"` : String(v)))));
+        ...Object.entries(w.vars).map(([k, v]) => h('div', { class: 'var' }, h('span', { class: 'vname' }, k), h('span', { class: 'val' }, Array.isArray(v) ? `[${v.map((x) => (typeof x === 'string' ? `"${x}"` : String(x))).join(', ')}]` : typeof v === 'string' ? `"${v}"` : String(v)))));
     }
     if (this.problemsEl) {
       this.problemsEl.replaceChildren(...(rt.errors.length ? [

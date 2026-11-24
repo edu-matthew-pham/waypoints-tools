@@ -4,7 +4,7 @@ import { CONDITIONS, ACTIONS } from './catalog.js';
 import { highlight, FUNCTION_NAMES } from './expr.js';
 import { isIdentifier } from './project.js';
 
-const RESERVED = new Set([...FUNCTION_NAMES, 'true', 'false', 'and', 'or', 'not']);
+const RESERVED = new Set([...FUNCTION_NAMES(), 'true', 'false', 'and', 'or', 'not']);
 
 // Why a new name can't be used, or '' if it's fine. taken = names already in use.
 export function nameProblem(name, taken) {
@@ -34,8 +34,9 @@ export function renameVariable(project, from, to) {
   if (!v) return;
   v.name = to;
   for (const s of project.screens) {
+    for (const o of s.objects) for (const i of o.instances) if (i.source === from) i.source = to; // List components showing it
     eachItem(s.events, (item, entry) => {
-      for (const p of entry?.params || []) if (p.type === 'variable' && item[p.name] === from) item[p.name] = to;
+      for (const p of entry?.params || []) if ((p.type === 'variable' || p.type === 'list') && item[p.name] === from) item[p.name] = to;
       for (const p of exprParams(entry)) item[p.name] = rewrite(item[p.name], (t) => (t === from ? to : t));
     });
   }

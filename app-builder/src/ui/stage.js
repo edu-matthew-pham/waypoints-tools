@@ -55,6 +55,8 @@ export class Stage {
         const w = e.target.closest('.w');
         if (this.pick) { e.preventDefault(); e.stopPropagation(); if (w) this.pick(w.dataset.id); return; }
         if (w) this.on.click?.(w.dataset.id);
+        const row = e.target.closest('.lst-row');
+        if (w && row) this.on.itemClick?.(w.dataset.id, Number(row.dataset.index));
       });
       this.el.addEventListener('input', (e) => {
         const w = e.target.closest('.w');

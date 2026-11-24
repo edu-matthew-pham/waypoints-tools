@@ -191,10 +191,66 @@ export function y7WaterTracker() {
   };
 }
 
+// Values journal: buttons set a variable and change screen, Save pushes to a list, a List shows the journal
+export function y7ValuesJournal() {
+  const values = [['Integrity', 'tick'], ['Courage', 'star'], ['Respect', 'heart'], ['Inclusion', 'smile']];
+  const pick = values.map(([v, pic], i) => {
+    const x = 24 + (i % 2) * 177, y = 150 + Math.floor(i / 2) * 210;
+    return [
+      obj('Sprite' + v, 'image', [{ ...inst('v' + i + 'p', x + 34, y, 100, 100, v), image: pic }]),
+      obj('Button' + v, 'button', [inst('v' + i + 'b', x, y + 112, 165, 46, v)]),
+    ];
+  }).flat();
+  return {
+    version: 1, name: 'Values journal', features: { level: 3 },
+    variables: [{ name: 'CurrentValue', value: '' }, { name: 'ArrayJournal', value: [] }],
+    screens: [
+      { id: 'pick', name: 'Choose a value',
+        objects: [
+          obj('TextTitle', 'text', [inst('j1', 24, 40, 342, 36, 'My values journal')]),
+          obj('TextInstructions', 'text', [inst('j2', 24, 84, 342, 48, 'Choose a value you showed today')]),
+          ...pick,
+        ],
+        events: values.map(([v], i) => ev('jv' + i, [{ type: 'onClicked', target: 'Button' + v }], [
+          { type: 'setVar', var: 'CurrentValue', value: `"${v}"` },
+          { type: 'goToScreen', screen: 'entry' },
+        ])),
+      },
+      { id: 'entry', name: 'Write an entry',
+        objects: [
+          obj('TextInstructions', 'text', [inst('j3', 24, 40, 342, 64, '')]),
+          obj('TextInput', 'input', [inst('j4', 24, 120, 342, 46, '')]),
+          obj('ButtonSave', 'button', [inst('j5', 24, 184, 342, 48, 'Save')]),
+        ],
+        events: [
+          ev('je1', [{ type: 'onStart' }], [{ type: 'setText', target: 'TextInstructions', value: '"What did you do to demonstrate " & CurrentValue & "?"' }]),
+          ev('je2', [{ type: 'onClicked', target: 'ButtonSave' }], [
+            { type: 'listAdd', value: 'uppercase(CurrentValue) & ": " & TextInput.text', list: 'ArrayJournal' },
+            { type: 'goToScreen', screen: 'journal' },
+          ]),
+        ],
+      },
+      { id: 'journal', name: 'My journal',
+        objects: [
+          obj('TextTitle', 'text', [inst('j6', 24, 40, 342, 36, 'My journal')]),
+          obj('TextSubtitle', 'text', [inst('j7', 24, 80, 342, 32, '')]),
+          obj('List', 'list', [{ ...inst('j8', 24, 124, 342, 380, ''), source: 'ArrayJournal' }]),
+          obj('ButtonCelebrate', 'button', [inst('j9', 24, 524, 342, 48, '🎉 Add another')]),
+        ],
+        events: [
+          ev('jj1', [{ type: 'onStart' }], [{ type: 'setText', target: 'TextSubtitle', value: '"Entries so far: " & count(ArrayJournal)' }]),
+          ev('jj2', [{ type: 'onClicked', target: 'ButtonCelebrate' }], [{ type: 'goToScreen', screen: 'pick' }]),
+        ],
+      },
+    ],
+  };
+}
+
 export const SAMPLES = {
   'Y7: Music tracker': y7MusicTracker,
   'Y7: Daily chores': y7DailyChores,
   'Y7: Water tracker': y7WaterTracker,
+  'Y7: Values journal': y7ValuesJournal,
   'Practice tracker': musicTracker,
   'Daily chores (copies)': dailyChores,
 };

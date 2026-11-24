@@ -13,6 +13,7 @@ export const ICONS = {
   input:  svg('<rect x="6" y="14" width="36" height="20" rx="4"/><path d="M14 20v8"/>'),
   shape:  svg('<rect x="8" y="14" width="32" height="20" rx="3" fill="currentColor" fill-opacity=".25"/>'),
   image:  svg('<rect x="7" y="9" width="34" height="30" rx="4"/><circle cx="17" cy="19" r="3.5"/><path d="M8 36l11-11 8 8 5-5 9 9"/>'),
+  list:   svg('<path d="M16 14h24M16 24h24M16 34h24"/><circle cx="9" cy="14" r="1.5" fill="currentColor"/><circle cx="9" cy="24" r="1.5" fill="currentColor"/><circle cx="9" cy="34" r="1.5" fill="currentColor"/>'),
   toggle: svg('<rect x="6" y="15" width="36" height="18" rx="9"/><circle cx="33" cy="24" r="5"/>'),
   slider: svg('<path d="M8 24h32"/><circle cx="20" cy="24" r="5" fill="currentColor"/>'),
 };
@@ -38,6 +39,18 @@ export const RENDER = {
   image: {
     make: () => h('img', { alt: '', draggable: 'false' }),
     write: (inner, p) => { const src = pictures.lookup(p.image); if (inner.getAttribute('src') !== src) inner.setAttribute('src', src); inner.alt = p.text || ''; },
+  },
+  list: {
+    make: () => h('div', { class: 'lst', role: 'list' }),
+    write: (inner, p) => {
+      const items = Array.isArray(p.items) ? p.items : [];
+      const key = JSON.stringify(items);
+      if (inner._key === key) return;
+      inner._key = key;
+      inner.replaceChildren(...(items.length
+        ? items.map((it, i) => h('div', { class: 'lst-row', role: 'listitem', 'data-index': String(i + 1) }, Array.isArray(it) ? it.join(', ') : String(it)))
+        : [h('div', { class: 'lst-empty' }, p.source ? 'Empty list' : 'Choose a list in Properties')]));
+    },
   },
   shape: {
     make: () => h('div', { class: 'box' }),

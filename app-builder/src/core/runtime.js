@@ -39,7 +39,7 @@ export class Runtime {
 
   // ---------- lifecycle ----------
   start(screenId) {
-    this.globals = new Map(this.project.variables.map((v) => [v.name, v.value]));
+    this.globals = new Map(this.project.variables.map((v) => [v.name, structuredClone(v.value)])); // lists are copied, so a run never changes the project
     this.errors = [];
     this.keysDown = new Set();
     this.time = 0;
@@ -121,6 +121,12 @@ export class Runtime {
     } else return;
     this.fire('changed', { object: inst.object, instance: inst });
   }
+  itemClick(instanceId, index) {
+    const inst = this.byId.get(instanceId);
+    const items = inst && this.globals.get(inst.props.source);
+    if (!Array.isArray(items) || index < 1 || index > items.length) return;
+    this.fire('itemClicked', { object: inst.object, instance: inst, clicked: { index, item: items[index - 1] } });
+  }
   press(instanceId) { this.#touch('pressed', instanceId); }
   release(instanceId) { this.#touch('released', instanceId); }
   submit(instanceId) { this.#touch('submitted', instanceId); }
@@ -156,7 +162,17 @@ export class Runtime {
   }
   setVar(name, value) {
     if (!this.globals.has(name)) throw new ExprError(`There's no variable called "${name}"`);
+    if (Array.isArray(this.globals.get(name))) throw new ExprError(`${name} is a list: use the list actions (Add to list, Clear list ...)`);
     if (this.globals.get(name) !== value) { this.globals.set(name, value); this.#changed(); }
+  }
+  listOf(name) {
+    const l = this.globals.get(name);
+    if (!Array.isArray(l)) throw new ExprError(`There's no list called "${name}"`);
+    return l;
+  }
+  listChange(name, fn) { fn(this.listOf(name)); this.#changed(); }
+  checkIndex(l, i) {
+    if (!Number.isInteger(i) || i < 1 || i > l.length) throw new ExprError(`The list has ${l.length} item${l.length === 1 ? '' : 's'}, so there is no item ${i}. Items are numbered from 1.`);
   }
   instVar(inst, name) {
     if (!(name in inst.vars)) throw new ExprError(`${inst.object} has no variable called "${name}"`);
@@ -182,7 +198,7 @@ export class Runtime {
   ctxWith(ctx, objName, inst) {
     const picked = new Map(ctx.picked);
     picked.set(objName, [inst]);
-    return { picked };
+    return { picked, loop: ctx.loop, clicked: ctx.clicked };
   }
   // Run fn once per picked copy; expressions see just that copy.
   each(ctx, objName, fn) {
@@ -191,7 +207,18 @@ export class Runtime {
   evalExpr(src, ctx) {
     return evaluate(parse(String(src ?? '')), {
       random: this.random,
-      getVar: (n) => this.getVar(n),
+      getVar: (n) => {
+        if (n === 'ClickedIndex' || n === 'ClickedItem') {
+          if (!ctx.clicked) throw new ExprError(`${n} only works in an "item in ... is clicked" event`);
+          return n === 'ClickedIndex' ? ctx.clicked.index : ctx.clicked.item;
+        }
+        if (n === 'LoopIndex' || n === 'LoopItem') {
+          const l = ctx.loop?.[ctx.loop.length - 1];
+          if (!l) throw new ExprError(`${n} only works inside a "For each" or "Repeat" event`);
+          return n === 'LoopIndex' ? l.index : l.item;
+        }
+        return this.getVar(n);
+      },
       getProp: (o, p) => {
         const list = this.pickList(ctx, o);
         const inst = list[0];
@@ -204,11 +231,11 @@ export class Runtime {
   }
 
   watch() {
-    return { screen: this.screen?.name, vars: Object.fromEntries(this.globals) };
+    return { screen: this.screen?.name, vars: Object.fromEntries([...this.globals].map(([k, v]) => [k, Array.isArray(v) ? [...v] : v])) };
   }
 
   // ---------- internals ----------
-  #ctx() { return { picked: new Map() }; }
+  #ctx() { return { picked: new Map(), loop: [], clicked: null }; }
 
   #changed() { this.version++; this.hooks.onChange?.(); }
 
@@ -284,6 +311,7 @@ export class Runtime {
     if (entry.timer && occ.eventId !== ev.id) return false;
     if (entry.object) {
       if (trig[entry.object] !== occ.object) return false;
+      if (occ.clicked) ctx.clicked = occ.clicked;
       ctx.picked.set(occ.object, [occ.instance]);
     }
     return true;
@@ -293,23 +321,43 @@ export class Runtime {
     let chainRan = true; // an Else with nothing normal above it never runs
     for (const ev of events) {
       const trig = triggerOf(ev);
-      const ctx = { picked: new Map(parentCtx.picked) };
+      const ctx = { picked: new Map(parentCtx.picked), loop: parentCtx.loop, clicked: parentCtx.clicked };
       if (top) {
         // trigger pass runs only matching trigger events; tick pass runs only non-trigger events
         if (occ ? (!trig || !this.#matches(trig, occ, ctx, ev)) : !!trig) { chainRan = true; continue; }
       }
-      let ok;
-      if (ev.else) {
-        ok = chainRan ? false : this.#testConds(ev, ctx, trig);
-        if (ok) chainRan = true;
-      } else {
-        ok = this.#testConds(ev, ctx, trig);
-        chainRan = ok;
+      if (ev.else && chainRan) continue;
+      const loopC = (ev.conds || []).find((c) => CONDITIONS[c.type]?.loop);
+      const rounds = loopC ? this.#loopRounds(ev, loopC, ctx) : [null];
+      let ran = false;
+      for (const round of rounds) {
+        const rctx = round ? { picked: new Map(ctx.picked), loop: [...ctx.loop, round], clicked: ctx.clicked } : ctx;
+        if (!this.#testConds(ev, rctx, trig)) continue;
+        ran = true;
+        this.hooks.onEventRan?.(ev.id);
+        this.#runActions(ev, rctx);
+        this.#runChain(ev.children || [], rctx, false, null);
       }
-      if (!ok) continue;
-      this.hooks.onEventRan?.(ev.id);
-      this.#runActions(ev, ctx);
-      this.#runChain(ev.children || [], ctx, false, null);
+      if (ev.else) { if (ran) chainRan = true; } else chainRan = ran;
+    }
+  }
+
+  // the rounds of a For each / Repeat event: [{ index, item }]. The list is copied first, so adding to it
+  // inside the loop can't make the loop run forever.
+  #loopRounds(ev, c, ctx) {
+    try {
+      let items;
+      if (CONDITIONS[c.type].loop === 'each') items = [...this.listOf(c.list)];
+      else {
+        const n = this.evalExpr(c.count, ctx);
+        if (typeof n !== 'number' || n < 0) throw new ExprError('Repeat needs a number of times, like 3');
+        items = Array.from({ length: Math.floor(n) }, (_, i) => i + 1);
+      }
+      if (items.length > 1000) { this.#error(ev.id, 'That loop would run more than 1000 times, so it was stopped.'); items = items.slice(0, 1000); }
+      return items.map((item, i) => ({ index: i + 1, item }));
+    } catch (e) {
+      if (e instanceof ExprError) { this.#error(ev.id, e.message); return []; }
+      throw e;
     }
   }
 
@@ -319,6 +367,7 @@ export class Runtime {
       const entry = CONDITIONS[c.type];
       if (!entry) { this.#error(ev.id, `Unknown condition "${c.type}"`); return false; }
       if (entry.trigger) { this.#error(ev.id, "A trigger can only be the first condition of a top-level event."); return false; }
+      if (entry.loop) continue; // handled by #loopRounds
       if (entry.once) {
         // Construct-style: true only if the conditions above were NOT all true on the previous tick.
         // Per event, not per copy. Re-arms after a tick where the event didn't get this far.

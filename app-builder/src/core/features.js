@@ -17,15 +17,15 @@ const L1_COND = ['onStart', 'onClicked'];
 const L1_ACT = ['setText', 'setVar', 'addTo', 'subtractFrom', 'goToScreen', 'setVisible'];
 const L2_COND = [...L1_COND, 'everyTick', 'compareVar', 'compareValues', 'onChanged',
   'onPressed', 'onReleased', 'onToggled', 'onSlid', 'onSubmitted', 'isOn', 'onKey', 'onKeyUp', 'onEvery', 'onAfter', 'triggerOnce', 'compareText'];
-const L3_COND = [...L2_COND, 'compareInst', 'keyHeld'];
+const L3_COND = [...L2_COND, 'compareInst', 'keyHeld', 'forEach', 'repeat', 'listHas', 'onItemClicked'];
 const L2_ACT = [...L1_ACT, 'setOn', 'setSlider', 'setSize', 'setImage'];
-const L3_ACT = [...L2_ACT, 'setInst', 'addToInst'];
+const L3_ACT = [...L2_ACT, 'setInst', 'addToInst', 'listAdd', 'listRemoveAt', 'listRemoveValue', 'listSet', 'listClear'];
 
 export const LEVELS = {
   1: { name: 'Starter',    kinds: ['button', 'text'], cond: L1_COND, act: L1_ACT, sub: false, else: false, pick: true, instVars: false, choice: false },
   2: { name: 'Conditions', kinds: BASIC_KINDS,          cond: L2_COND, act: L2_ACT, sub: true,  else: true,  pick: true, instVars: false, choice: false },
-  3: { name: 'Copies',     kinds: BASIC_KINDS,          cond: L3_COND, act: L3_ACT, sub: true,  else: true,  pick: true, instVars: true,  choice: true },
-  4: { name: 'Everything', kinds: ALL_KINDS,          cond: null,    act: null,    sub: true,  else: true,  pick: true, instVars: true,  choice: true },
+  3: { name: 'Copies & lists',     kinds: [...BASIC_KINDS, 'list'],          cond: L3_COND, act: L3_ACT, sub: true,  else: true,  pick: true, instVars: true,  choice: true, lists: true },
+  4: { name: 'Everything', kinds: ALL_KINDS,          cond: null,    act: null,    sub: true,  else: true,  pick: true, instVars: true,  choice: true, lists: true },
 };
 
 export function resolve(feat) {
@@ -35,12 +35,12 @@ export function resolve(feat) {
     level, name: lv.name, kinds: lv.kinds,
     cond: lv.cond ? new Set(lv.cond) : null,
     act: lv.act ? new Set(lv.act) : null,
-    sub: lv.sub, else: lv.else, pick: lv.pick, instVars: lv.instVars, choice: lv.choice,
+    sub: lv.sub, else: lv.else, pick: lv.pick, instVars: lv.instVars, choice: lv.choice, lists: !!lv.lists,
     custom: !!feat?.allow,
   };
   if (feat?.allow?.cond) out.cond = new Set(feat.allow.cond);
   if (feat?.allow?.act) out.act = new Set(feat.allow.act);
-  for (const k of ['sub', 'else', 'pick', 'instVars', 'choice']) if (typeof feat?.ui?.[k] === 'boolean') out[k] = feat.ui[k];
+  for (const k of ['sub', 'else', 'pick', 'instVars', 'choice', 'lists']) if (typeof feat?.ui?.[k] === 'boolean') out[k] = feat.ui[k];
   return out;
 }
 

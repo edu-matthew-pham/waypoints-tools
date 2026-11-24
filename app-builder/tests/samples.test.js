@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SAMPLES, y7MusicTracker, y7DailyChores, y7WaterTracker } from '../src/samples.js';
+import { SAMPLES, y7MusicTracker, y7DailyChores, y7WaterTracker, y7ValuesJournal } from '../src/samples.js';
 import { Runtime } from '../src/core/runtime.js';
 import { validateSheet, CONDITIONS, ACTIONS } from '../src/core/catalog.js';
 import { exprScopeFor } from '../src/core/project.js';
@@ -69,4 +69,16 @@ test('Construct habits: uppercase() works, Name.Text gets a friendly hint', () =
   const sc = exprScopeFor(p, p.screens[0]);
   assert.equal(check('uppercase(TextInput.text)', sc), null);
   assert.match(check('int(TextInput.Text)', sc), /Use TextInput.text \(small letters\)/);
+});
+
+test('Y7 values journal: choose a value, write, save to the list, see it on the journal screen', () => {
+  const rt = new Runtime(y7ValuesJournal()); rt.start();
+  rt.click('v1b');                                   // Courage
+  assert.equal(rt.screenId, 'entry');
+  assert.equal(text(rt, 'TextInstructions'), 'What did you do to demonstrate Courage?');
+  rt.userChange('j4', 'Spoke up in class'); rt.click('j5');
+  assert.equal(rt.screenId, 'journal');
+  assert.deepEqual(rt.globals.get('ArrayJournal'), ['COURAGE: Spoke up in class']);
+  assert.equal(text(rt, 'TextSubtitle'), 'Entries so far: 1');
+  assert.deepEqual(rt.errors, []);
 });

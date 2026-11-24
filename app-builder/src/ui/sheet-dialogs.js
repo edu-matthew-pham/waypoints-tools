@@ -6,7 +6,7 @@ import { check, OPERATORS, highlight, FUNCTION_HELP, OPERATOR_HELP, parse, evalu
 import { COMPONENTS } from '../core/components.js';
 import { ICONS, FALLBACK_ICON } from './component-ui.js';
 
-const CATEGORIES = ['Screen', 'Object', 'Keyboard', 'Variables', 'System'];
+const CATEGORIES = ['Screen', 'Object', 'Keyboard', 'Variables', 'Lists', 'System'];
 const plain = (label) => label.replace(/\{\w+\}/g, '\u2026');
 
 export function modal(title, body, foot) {
@@ -31,6 +31,7 @@ const GROUPS = [
   { id: 'System', label: 'System', icon: 'system' },
   { id: 'Keyboard', label: 'Keyboard', icon: 'keyboard' },
   { id: 'Variables', label: 'Variables', icon: 'variables' },
+  { id: 'Lists', label: 'Lists', icon: 'list' },
 ];
 const objParam = (e) => e.params.find((p) => p.type === 'object');
 const fitsObject = (e, o) => { const p = objParam(e); return !!p && (!p.kinds || p.kinds.includes(o.kind)); };
@@ -308,6 +309,8 @@ export function openExpressionBrowser(sheet, insert) {
   const PROP_HELP = { text: 'its text', value: 'its number', on: 'true if switched on', min: 'its smallest value', max: 'its largest value', visible: 'true if showing', x: 'distance from the left', y: 'distance from the top', w: 'its width', h: 'its height' };
   const sections = [
     ['Variables', sc.variables.map((v) => ({ code: v, desc: 'whole-app variable' }))],
+    ['Lists', (sc.lists || []).flatMap((l) => [{ code: `count(${l})`, desc: 'how many items' }, { code: `item(${l}, 1)`, desc: 'the first item' }, { code: `join(${l}, ", ")`, desc: 'all items as text' }])],
+    ['Inside loops and list clicks', [{ code: 'LoopIndex', desc: 'which time round (1, 2, 3 ...)' }, { code: 'LoopItem', desc: 'the item this time round' }, { code: 'ClickedItem', desc: 'the list item that was clicked' }, { code: 'ClickedIndex', desc: 'its number' }]],
     ...sc.objects.map((o) => [o.name + ' (' + (COMPONENTS[o.kind]?.label || o.kind) + ')', [
       ...['text', ...(COMPONENTS[o.kind]?.exposes || [])].filter((p, i, a) => a.indexOf(p) === i).map((p) => ({ code: `${o.name}.${p}`, desc: PROP_HELP[p] })),
       ...o.vars.map((v) => ({ code: `${o.name}.${v}`, desc: 'its own variable' })),

@@ -382,7 +382,7 @@ test('help: every value box has a help line; every function has help; highlighte
   const { CONDITIONS, ACTIONS } = await import('../src/core/catalog.js');
   const { FUNCTION_HELP, FUNCTION_NAMES, highlight } = await import('../src/core/expr.js');
   for (const t of [CONDITIONS, ACTIONS]) for (const [id, e] of Object.entries(t)) for (const p of e.params) if (p.type === 'expr') assert.ok(p.help, `${id}.${p.name} has no help`);
-  for (const f of FUNCTION_NAMES) assert.ok(FUNCTION_HELP[f], `function ${f} has no help`);
+  for (const f of FUNCTION_NAMES()) assert.ok(FUNCTION_HELP[f], `function ${f} has no help`);
   for (const src of ['"open', '((', 'a.', '“smart”', '', '1.5.6', 'if(x ≥ 2, "a", "b")']) {
     assert.equal(highlight(src).map(([, t]) => t).join(''), src, 'highlighting keeps every character: ' + src);
   }
@@ -407,4 +407,75 @@ test('images: built-in and uploaded pictures, Set picture action, names stay uni
   rt.click('g');
   assert.equal(rt.instancesOf('Pic')[0].props.image, 'trophy');
   assert.deepEqual(validateSheet(p.screens[0].events), []);
+});
+
+// ---- lists ----
+const listProject = (events, start = ['Milk', 'Eggs']) => ({
+  version: 1, name: 'l', features: { level: 3 },
+  variables: [{ name: 'shop', value: start }, { name: 'total', value: 0 }, { name: 'out', value: '' }],
+  screens: [{ id: 's', name: 'S', objects: [
+    { name: 'Items', kind: 'list', instanceVars: [], instances: [{ id: 'l1', x: 0, y: 0, w: 300, h: 200, text: '', visible: true, vars: {}, source: 'shop' }] },
+    { name: 'Go', kind: 'button', instanceVars: [], instances: [{ id: 'g', x: 0, y: 220, w: 100, h: 40, text: 'Go', visible: true, vars: {} }] },
+  ], events }],
+});
+const E = (id, conds, actions, children = []) => ({ id, else: false, conds, actions, children });
+
+test('lists: add, count, item (from 1), join, remove, clear; the project itself is not changed by a run', () => {
+  const p = listProject([E('e', [{ type: 'onClicked', target: 'Go' }], [
+    { type: 'listAdd', value: '"Bread"', list: 'shop' },
+    { type: 'setVar', var: 'out', value: 'count(shop) & ": " & item(shop, 1) & " / " & join(shop, "+")' },
+  ])]);
+  const rt = new Runtime(p); rt.start(); rt.click('g');
+  assert.equal(rt.getVar('out'), '3: Milk / Milk+Eggs+Bread');
+  assert.deepEqual(p.variables[0].value, ['Milk', 'Eggs']);
+  assert.deepEqual(rt.errors, []);
+});
+
+test('lists: For each gives LoopItem and LoopIndex; Repeat counts from 1; Else after a loop that never ran', () => {
+  const p = listProject([
+    E('a', [{ type: 'onClicked', target: 'Go' }, { type: 'forEach', list: 'shop' }], [{ type: 'setVar', var: 'out', value: 'out & LoopIndex & LoopItem & " "' }]),
+    E('b', [{ type: 'onClicked', target: 'Go' }, { type: 'repeat', count: '4' }], [{ type: 'addTo', value: 'LoopIndex', var: 'total' }]),
+  ]);
+  const rt = new Runtime(p); rt.start(); rt.click('g');
+  assert.equal(rt.getVar('out'), '1Milk 2Eggs ');
+  assert.equal(rt.getVar('total'), 10);
+  const q = listProject([
+    E('x', [{ type: 'everyTick' }, { type: 'forEach', list: 'shop' }], [{ type: 'addTo', value: '1', var: 'total' }]),
+    { id: 'y', else: true, conds: [], actions: [{ type: 'setVar', var: 'out', value: '"empty"' }], children: [] },
+  ], []);
+  const r2 = new Runtime(q); r2.start(); r2.tick();
+  assert.equal(r2.getVar('out'), 'empty');
+});
+
+test('lists: adding inside For each cannot loop forever; bad item numbers explain counting from 1', () => {
+  const p = listProject([
+    E('a', [{ type: 'onClicked', target: 'Go' }, { type: 'forEach', list: 'shop' }], [{ type: 'listAdd', value: 'LoopItem', list: 'shop' }]),
+    E('b', [{ type: 'onClicked', target: 'Go' }], [{ type: 'setVar', var: 'out', value: 'item(shop, 0)' }]),
+  ]);
+  const rt = new Runtime(p); rt.start(); rt.click('g');
+  assert.equal(rt.globals.get('shop').length, 4);
+  assert.match(rt.errors[0].message, /numbered from 1/);
+  const r3 = new Runtime(listProject([E('c', [{ type: 'onStart' }], [{ type: 'setVar', var: 'out', value: 'LoopIndex' }])])); r3.start();
+  assert.match(r3.errors[0].message, /only works inside/);
+});
+
+test('lists: clicking an item gives ClickedItem / ClickedIndex (e.g. tap to remove)', () => {
+  const p = listProject([E('a', [{ type: 'onItemClicked', target: 'Items' }], [
+    { type: 'setVar', var: 'out', value: 'ClickedIndex & ClickedItem' },
+    { type: 'listRemoveAt', index: 'ClickedIndex', list: 'shop' },
+  ])]);
+  const rt = new Runtime(p); rt.start();
+  rt.itemClick('l1', 2);
+  assert.equal(rt.getVar('out'), '2Eggs');
+  assert.deepEqual(rt.globals.get('shop'), ['Milk']);
+  assert.deepEqual(validateSheet(p.screens[0].events), []);
+});
+
+test('lists: rename a list updates list dropdowns and expressions', async () => {
+  const { renameVariable } = await import('../src/core/rename.js');
+  const p = listProject([E('a', [{ type: 'onClicked', target: 'Go' }], [{ type: 'listAdd', value: 'count(shop)', list: 'shop' }])]);
+  renameVariable(p, 'shop', 'groceries');
+  assert.equal(p.screens[0].events[0].actions[0].list, 'groceries');
+  assert.equal(p.screens[0].events[0].actions[0].value, 'count(groceries)');
+  assert.equal(p.screens[0].objects[0].instances[0].source, 'groceries', 'the List component follows');
 });

@@ -100,6 +100,26 @@ export const CONDITIONS = {
     help: 'Runs the event once when the conditions above become true, then waits until they are false again. Once for the whole event, not once per copy. Keep it last.',
     // the runtime handles this one itself (it needs to remember the event between ticks)
   },
+  onItemClicked: {
+    category: 'Object', label: 'An item in {target} is clicked', trigger: 'itemClicked', object: 'target',
+    params: [obj({ kinds: ['list'] })],
+    help: 'ClickedItem is the item that was clicked, and ClickedIndex is its number (from 1).',
+  },
+  forEach: {
+    category: 'Lists', label: 'For each item in list {list}', loop: 'each',
+    params: [{ name: 'list', type: 'list' }],
+    help: 'Runs the event once for every item. Inside it, LoopItem is the item and LoopIndex is its number (from 1).',
+  },
+  repeat: {
+    category: 'System', label: 'Repeat {count} times', loop: 'repeat',
+    params: [expr('count', '3')],
+    help: 'Runs the event that many times. Inside it, LoopIndex counts 1, 2, 3 ...',
+  },
+  listHas: {
+    category: 'Lists', label: 'List {list} contains {value}',
+    params: [{ name: 'list', type: 'list' }, expr()],
+    test: (rt, ctx, p) => rt.listOf(p.list).some((x) => compare(x, '=', rt.evalExpr(p.value, ctx))),
+  },
   everyTick: {
     category: 'System', label: 'Every tick', params: [],
     test: () => true,
@@ -187,6 +207,31 @@ export const ACTIONS = {
     params: [expr(), { name: 'var', type: 'variable' }],
     run: (rt, ctx, p) => rt.setVar(p.var, num(rt.getVar(p.var)) - num(rt.evalExpr(p.value, ctx))),
   },
+  listAdd: {
+    category: 'Lists', label: 'Add {value} to the end of list {list}',
+    params: [expr(), { name: 'list', type: 'list' }],
+    run: (rt, ctx, p) => rt.listChange(p.list, (l) => l.push(rt.evalExpr(p.value, ctx))),
+  },
+  listRemoveAt: {
+    category: 'Lists', label: 'Remove item {index} from list {list}',
+    params: [expr('index', '1'), { name: 'list', type: 'list' }],
+    run: (rt, ctx, p) => { const i = num(rt.evalExpr(p.index, ctx)); rt.listChange(p.list, (l) => { rt.checkIndex(l, i); l.splice(i - 1, 1); }); },
+  },
+  listRemoveValue: {
+    category: 'Lists', label: 'Remove {value} from list {list}',
+    params: [expr(), { name: 'list', type: 'list' }],
+    run: (rt, ctx, p) => { const v = rt.evalExpr(p.value, ctx); rt.listChange(p.list, (l) => { const i = l.findIndex((x) => compare(x, '=', v)); if (i >= 0) l.splice(i, 1); }); },
+  },
+  listSet: {
+    category: 'Lists', label: 'Set item {index} of list {list} to {value}',
+    params: [expr('index', '1'), { name: 'list', type: 'list' }, expr()],
+    run: (rt, ctx, p) => { const i = num(rt.evalExpr(p.index, ctx)); const v = rt.evalExpr(p.value, ctx); rt.listChange(p.list, (l) => { rt.checkIndex(l, i); l[i - 1] = v; }); },
+  },
+  listClear: {
+    category: 'Lists', label: 'Clear list {list}',
+    params: [{ name: 'list', type: 'list' }],
+    run: (rt, ctx, p) => rt.listChange(p.list, (l) => { l.length = 0; }),
+  },
   goToScreen: {
     category: 'Screen', label: 'Go to screen {screen}',
     params: [{ name: 'screen', type: 'screen' }],
@@ -216,6 +261,7 @@ export function defaultParams(entry, scope) {
         break;
       }
       case 'variable': out[prm.name] = scope.variables[0] ?? ''; break;
+      case 'list': out[prm.name] = scope.lists?.[0] ?? ''; break;
       case 'instVar': {
         const t = entry.params.find((x) => x.type === 'object');
         const o = scope.objects.find((x) => x.name === out[t?.name]);
@@ -270,6 +316,13 @@ const PARAM_HELP = {
   'compareValues.right': 'The value to compare it with.',
   'compareInst.value': 'What to compare with: a number, "text in quotes", or a variable.',
   'compareText.value': 'The text to compare with, in "quotes", e.g. "⬜".',
+  'listHas.value': 'The item to look for, e.g. "Milk" or a variable.',
+  'listAdd.value': 'The item to add: "text in quotes", a number, or something like Name.text.',
+  'listRemoveAt.index': 'Which item: 1 is the first, count(list) is the last.',
+  'listRemoveValue.value': 'The item to remove (the first one that matches).',
+  'listSet.index': 'Which item: 1 is the first.',
+  'listSet.value': 'The new value for that item.',
+  'repeat.count': 'How many times: a number or a variable.',
   'setSize.value': 'A number of pixels, or a calculation like (water / goal) * 300.',
   'setText.value': 'The text to show. Put words in "quotes" and join pieces with &, e.g. "Total: " & minutes',
   'setSlider.value': "A number between the slider's smallest and largest. " + NUM_OR_CALC,
