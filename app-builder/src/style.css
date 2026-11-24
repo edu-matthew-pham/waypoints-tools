@@ -306,3 +306,12 @@ select.ctl { padding-right: 6px; }
 .props .var .icon.danger { opacity: 0; }
 .props .var:hover .icon.danger, .props .var:focus-within .icon.danger { opacity: 1; }
 @media (hover: none) { .var .icon.danger, .props .var .icon.danger { opacity: 1; } }
+
+/* object picker */
+.op { display: flex; flex-direction: column; gap: 8px; }
+.op-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.op-tile { font: inherit; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; padding: 14px 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; transition: border-color .12s, box-shadow .12s, background .12s; }
+.op-tile:hover { border-color: var(--accent); background: var(--accent-soft); }
+.op-tile:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.op-icon { color: var(--accent); display: flex; }
+.op-tile small { color: var(--muted); font-size: 12px; line-height: 1.3; }

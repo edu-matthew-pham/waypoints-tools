@@ -3,6 +3,7 @@ import { h } from '../ui/dom.js';
 import { OBJECT_KINDS } from '../core/catalog.js';
 import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue } from '../core/project.js';
 import { openMenu } from '../ui/menu.js';
+import { openObjectPicker } from '../ui/object-picker.js';
 import { S, screen, hooks } from '../state.js';
 
 function addRow(placeholder, onAdd, withValue) {
@@ -90,11 +91,10 @@ export function renderSide(el) {
     return h('div', { class: 'tree-node open' }, row,
       folded ? null : h('div', { class: 'tree-children' },
         ...(s.objects.length ? s.objects.map(objectRow) : [h('p', { class: 'muted' }, 'Nothing on this screen yet.')]),
-        h('button', { class: 'btn add-obj', type: 'button', 'aria-haspopup': 'menu', onclick: (e) => {
-          const r = e.currentTarget.getBoundingClientRect();
-          openMenu({ x: r.left, y: r.bottom + 4, returnFocus: e.currentTarget, items: kindsAllowed().map(([k, d]) => ({
-            label: d.label, fn: () => { const { inst } = addObject(s, k); S.selId = inst.id; hooks.commit(); } })) });
-        } }, '+ Add object')));
+        h('button', { class: 'btn add-obj', type: 'button', onclick: () => openObjectPicker({
+          allowed: kindsAllowed().map(([k]) => k),
+          onPick: (k) => { const { inst } = addObject(s, k); S.selId = inst.id; hooks.commit(); },
+        }) }, '+ Add object')));
   });
 
   const vars = S.project.variables.map((v, i) => h('div', { class: 'var' },

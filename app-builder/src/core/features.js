@@ -10,7 +10,9 @@
 // No features set (older projects) means everything is available.
 import { CONDITIONS, ACTIONS } from './catalog.js';
 
-const ALL_KINDS = ['button', 'text', 'input'];
+import { COMPONENTS } from './components.js';
+const BASIC_KINDS = ['button', 'text', 'input']; // levels 2-3; new components start at level 4 unless placed here
+const ALL_KINDS = Object.keys(COMPONENTS);
 const L1_COND = ['onStart', 'onClicked'];
 const L1_ACT = ['setText', 'setVar', 'addTo', 'subtractFrom', 'goToScreen', 'setVisible'];
 const L2_COND = [...L1_COND, 'everyTick', 'compareVar', 'compareValues', 'onChanged'];
@@ -19,8 +21,8 @@ const L3_ACT = [...L1_ACT, 'setInst', 'addToInst'];
 
 export const LEVELS = {
   1: { name: 'Starter',    kinds: ['button', 'text'], cond: L1_COND, act: L1_ACT, sub: false, else: false, pick: true, instVars: false },
-  2: { name: 'Conditions', kinds: ALL_KINDS,          cond: L2_COND, act: L1_ACT, sub: true,  else: true,  pick: true, instVars: false },
-  3: { name: 'Copies',     kinds: ALL_KINDS,          cond: L3_COND, act: L3_ACT, sub: true,  else: true,  pick: true, instVars: true },
+  2: { name: 'Conditions', kinds: BASIC_KINDS,          cond: L2_COND, act: L1_ACT, sub: true,  else: true,  pick: true, instVars: false },
+  3: { name: 'Copies',     kinds: BASIC_KINDS,          cond: L3_COND, act: L3_ACT, sub: true,  else: true,  pick: true, instVars: true },
   4: { name: 'Everything', kinds: ALL_KINDS,          cond: null,    act: null,    sub: true,  else: true,  pick: true, instVars: true },
 };
 

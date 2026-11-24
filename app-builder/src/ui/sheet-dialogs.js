@@ -7,13 +7,13 @@ import { check } from '../core/expr.js';
 const CATEGORIES = ['Screen', 'Object', 'Variables', 'System'];
 const plain = (label) => label.replace(/\{\w+\}/g, '\u2026');
 
-function modal(title, body, foot) {
+export function modal(title, body, foot) {
   const dlg = h('dialog', { class: 'es-dlg' });
   const close = () => { if (dlg.open) dlg.close(); };
   dlg.append(
     h('div', { class: 'dlg-head' }, h('strong', {}, title), h('button', { class: 'icon', type: 'button', title: 'Close', onclick: close }, '\u00d7')),
-    h('div', { class: 'dlg-body' }, body),
-    foot ? h('div', { class: 'dlg-foot' }, foot) : null);
+    h('div', { class: 'dlg-body' }, body));
+  if (foot) dlg.append(h('div', { class: 'dlg-foot' }, foot));
   dlg.addEventListener('close', () => { if (!dlg._keep) dlg.remove(); });
   dlg.addEventListener('click', (e) => { if (e.target === dlg) close(); });
   document.body.append(dlg);

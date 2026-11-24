@@ -5,6 +5,7 @@
 // item = { id, kind: 'button'|'text'|'input', props: { x, y, w, h, text, visible } }
 import { h } from './dom.js';
 import { STAGE } from '../core/project.js';
+import { RENDER } from './component-ui.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -62,12 +63,10 @@ export class Stage {
   }
 
   #make(it) {
-    const inner =
-      it.kind === 'button' ? h('button', { type: 'button' })
-      : it.kind === 'input' ? h('input', { type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: this.design ? 'Text input' : '' })
-      : h('div', { class: 't' });
+    const r = RENDER[it.kind] || RENDER.text;
+    const inner = r.make(this.design);
     const wrap = h('div', { class: `w w-${it.kind}`, 'data-id': it.id }, inner);
-    return { wrap, inner, kind: it.kind, text: null };
+    return { wrap, inner, kind: it.kind };
   }
 
   sync(items) {
@@ -79,8 +78,7 @@ export class Stage {
       const p = it.props, s = n.wrap.style;
       s.left = p.x + 'px'; s.top = p.y + 'px'; s.width = p.w + 'px'; s.height = p.h + 'px';
       n.wrap.classList.toggle('hidden', p.visible === false);
-      if (it.kind === 'input') { if (n.inner.value !== p.text) n.inner.value = p.text; }
-      else if (n.text !== p.text) { n.inner.textContent = p.text; n.text = p.text; }
+      (RENDER[it.kind] || RENDER.text).write(n.inner, p);
     }
     for (const [id, n] of this.nodes) {
       if (!this.items.has(id)) { n.wrap.remove(); this.nodes.delete(id); }

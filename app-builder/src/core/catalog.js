@@ -1,3 +1,4 @@
+import { COMPONENTS } from './components.js';
 // The catalog: every condition and action the editor offers.
 // Entries are mostly data (label template, params) plus one small function each.
 // Adding a feature = adding an entry here. No editor code changes.
@@ -8,12 +9,7 @@
 
 import { ExprError, fmt } from './expr.js';
 
-export const OBJECT_KINDS = {
-  button: { label: 'Button',     base: 'Button', props: { text: 'Button', w: 150, h: 46 } },
-  text:   { label: 'Text',       base: 'Text',   props: { text: 'Text',   w: 220, h: 32 } },
-  input:  { label: 'Text input', base: 'Input',  props: { text: '',       w: 220, h: 42 } },
-};
-
+export const OBJECT_KINDS = COMPONENTS; // kept under the old name for the interpreter and project helpers
 export const OPERATORS = ['=', '≠', '<', '≤', '>', '≥'];
 
 export function compare(a, op, b) {

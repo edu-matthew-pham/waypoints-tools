@@ -14,6 +14,9 @@ Lesson links: `?level=1&allow=onClicked,addTo,setText&lock=1` (see Guided editin
 ## Layout
 
     src/core/expr.js        safe expression parser/evaluator (no eval) + static checker
+    src/core/components.js  component registry (data): Button, Text, Text input; categories, hints, defaults
+    src/ui/component-ui.js  icons and how each component is drawn
+    src/ui/object-picker.js tile picker for "Add an object"
     src/core/catalog.js     every condition and action: label template, params, one small function
     src/core/project.js     project JSON model and helpers
     src/core/runtime.js     interpreter: triggers, every tick, picking, sub-events, Else, screens
@@ -39,6 +42,8 @@ Lesson links: `?level=1&allow=onClicked,addTo,setText&lock=1` (see Guided editin
 - A condition can *pick* copies of an object; actions and sub-events then use only those.
 - Sub-events run only if the parent passed. Actions run before sub-events. Else runs if the event above didn't.
 - Go to screen happens after the current event finishes. Variables survive; objects on screens reset.
+
+See [`ROADMAP.md`](ROADMAP.md) for planned components, input events (keyboard, pointer), timers, lists and layout.
 
 ## Adding a feature
 
