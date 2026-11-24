@@ -1,0 +1,260 @@
+// The interpreter. No DOM in here: it runs headless, so it can be tested in Node,
+// used to check student projects, and drive any renderer.
+//
+// Rules (same ideas as an event sheet):
+//  - Triggers (On start, X is clicked, ...) run their event the moment it happens.
+//  - Other events are checked every tick, top to bottom.
+//  - A condition can *pick* copies; the actions and sub-events use only those.
+//  - A sub-event runs only if its parent's conditions passed (and sees the parent's picks).
+//  - Else runs if the event above it (and any Else above) didn't run.
+//  - Actions run before sub-events.
+//  - "Go to screen" happens after the current event finishes. Globals survive, copies reset.
+
+import { evaluate, parse, ExprError } from './expr.js';
+import { CONDITIONS, ACTIONS, OBJECT_KINDS } from './catalog.js';
+
+export const triggerOf = (ev) => (ev.conds || []).find((c) => CONDITIONS[c.type]?.trigger);
+
+export class Runtime {
+  constructor(project, opts = {}) {
+    this.project = project;
+    this.random = opts.random || Math.random;
+    this.hooks = opts.hooks || {};
+    this.globals = new Map();
+    this.errors = [];
+    this.queue = [];
+    this.busy = false;
+    this.pendingScreen = null;
+    this.screen = null;
+    this.screenId = null;
+    this.objects = new Map(); // name -> { def, kind, instances:[] }
+    this.byId = new Map();
+    this.version = 0;
+    this.ticks = 0;
+  }
+
+  // ---------- lifecycle ----------
+  start(screenId) {
+    this.globals = new Map(this.project.variables.map((v) => [v.name, v.value]));
+    this.errors = [];
+    this.queue = [{ name: 'start' }];
+    this.pendingScreen = null;
+    this.#load(screenId ?? this.project.screens[0].id);
+    this.#pump();
+  }
+
+  get needsTick() { return !!this.screen && (this.screen.events || []).some((ev) => !triggerOf(ev)); }
+
+  tick() {
+    if (!this.screen || this.busy) return;
+    this.ticks++;
+    this.#pump(() => this.#runChain(this.screen.events || [], this.#ctx(), true, null));
+  }
+
+  // ---------- input from a renderer ----------
+  click(instanceId) {
+    const inst = this.byId.get(instanceId);
+    if (inst) this.fire('clicked', { object: inst.object, instance: inst });
+  }
+  typeInto(instanceId, text) {
+    const inst = this.byId.get(instanceId);
+    if (!inst) return;
+    inst.props.text = String(text);
+    this.fire('changed', { object: inst.object, instance: inst });
+  }
+  fire(name, occ = {}) {
+    this.queue.push({ name, ...occ });
+    if (!this.busy) this.#pump();
+  }
+
+  // ---------- state access (used by catalog functions and renderers) ----------
+  get allInstances() { return [...this.objects.values()].flatMap((o) => o.instances); }
+  instancesOf(name) { return this.objects.get(name)?.instances ?? []; }
+
+  getVar(name) {
+    if (!this.globals.has(name)) throw new ExprError(`There's no variable called "${name}"`);
+    return this.globals.get(name);
+  }
+  setVar(name, value) {
+    if (!this.globals.has(name)) throw new ExprError(`There's no variable called "${name}"`);
+    if (this.globals.get(name) !== value) { this.globals.set(name, value); this.#changed(); }
+  }
+  instVar(inst, name) {
+    if (!(name in inst.vars)) throw new ExprError(`${inst.object} has no variable called "${name}"`);
+    return inst.vars[name];
+  }
+  setInstVar(inst, name, value) {
+    if (!(name in inst.vars)) throw new ExprError(`${inst.object} has no variable called "${name}"`);
+    if (inst.vars[name] !== value) { inst.vars[name] = value; this.#changed(); }
+  }
+  setProp(inst, name, value) {
+    if (inst.props[name] !== value) { inst.props[name] = value; this.#changed(); }
+  }
+  goTo(screenId) {
+    if (!this.project.screens.some((s) => s.id === screenId)) throw new ExprError('That screen no longer exists');
+    this.pendingScreen = screenId;
+  }
+
+  // picking: the copies an event is currently working on
+  pickList(ctx, objName) {
+    if (!this.objects.has(objName)) throw new ExprError(`There's no object called "${objName}" on this screen`);
+    return ctx.picked.get(objName) ?? this.instancesOf(objName);
+  }
+  ctxWith(ctx, objName, inst) {
+    const picked = new Map(ctx.picked);
+    picked.set(objName, [inst]);
+    return { picked };
+  }
+  // Run fn once per picked copy; expressions see just that copy.
+  each(ctx, objName, fn) {
+    for (const inst of this.pickList(ctx, objName)) fn(inst, this.ctxWith(ctx, objName, inst));
+  }
+  evalExpr(src, ctx) {
+    return evaluate(parse(String(src ?? '')), {
+      random: this.random,
+      getVar: (n) => this.getVar(n),
+      getProp: (o, p) => {
+        const list = this.pickList(ctx, o);
+        const inst = list[0];
+        if (!inst) throw new ExprError(`There's no ${o} to read "${p}" from`);
+        if (p in inst.vars) return inst.vars[p];
+        if (p in inst.props) return inst.props[p];
+        throw new ExprError(`${o} has no property "${p}"`);
+      },
+    });
+  }
+
+  watch() {
+    return { screen: this.screen?.name, vars: Object.fromEntries(this.globals) };
+  }
+
+  // ---------- internals ----------
+  #ctx() { return { picked: new Map() }; }
+
+  #changed() { this.version++; this.hooks.onChange?.(); }
+
+  #error(eventId, message) {
+    const hit = this.errors.find((e) => e.eventId === eventId && e.message === message);
+    if (hit) { hit.count++; return; }
+    const err = { eventId, message, count: 1 };
+    this.errors.push(err);
+    if (this.errors.length > 50) this.errors.shift();
+    this.hooks.onError?.(err);
+  }
+
+  #load(screenId) {
+    const scr = this.project.screens.find((s) => s.id === screenId) || this.project.screens[0];
+    this.screen = scr;
+    this.screenId = scr.id;
+    this.objects = new Map();
+    this.byId = new Map();
+    for (const od of scr.objects || []) {
+      const kind = OBJECT_KINDS[od.kind] || OBJECT_KINDS.text;
+      const instances = (od.instances || []).map((d) => {
+        const vars = {};
+        for (const iv of od.instanceVars || []) vars[iv.name] = d.vars && iv.name in d.vars ? d.vars[iv.name] : iv.value;
+        const inst = {
+          id: d.id, object: od.name, kind: od.kind, vars,
+          props: { x: d.x ?? 0, y: d.y ?? 0, w: d.w ?? kind.props.w, h: d.h ?? kind.props.h, text: d.text ?? kind.props.text, visible: d.visible !== false },
+        };
+        this.byId.set(inst.id, inst);
+        return inst;
+      });
+      this.objects.set(od.name, { def: od, kind: od.kind, instances });
+    }
+    this.hooks.onScreen?.(scr);
+    this.#changed();
+  }
+
+  #applyPending() {
+    if (this.pendingScreen === null) return;
+    const id = this.pendingScreen;
+    this.pendingScreen = null;
+    this.#load(id);
+    this.queue = [{ name: 'start' }]; // old clicks refer to copies that no longer exist
+  }
+
+  #pump(initial) {
+    this.busy = true;
+    try {
+      initial?.();
+      this.#applyPending();
+      let guard = 0;
+      while (this.queue.length) {
+        if (++guard > 500) {
+          this.#error(null, 'Too many screen changes in a row. Is one screen sending you back and forth?');
+          this.queue = [];
+          break;
+        }
+        const occ = this.queue.shift();
+        this.#runChain(this.screen.events || [], this.#ctx(), true, occ);
+        this.#applyPending();
+      }
+    } finally {
+      this.busy = false;
+    }
+  }
+
+  #matches(trig, occ, ctx) {
+    const entry = CONDITIONS[trig.type];
+    if (!entry || entry.trigger !== occ.name) return false;
+    if (entry.object) {
+      if (trig[entry.object] !== occ.object) return false;
+      ctx.picked.set(occ.object, [occ.instance]);
+    }
+    return true;
+  }
+
+  #runChain(events, parentCtx, top, occ) {
+    let chainRan = true; // an Else with nothing normal above it never runs
+    for (const ev of events) {
+      const trig = triggerOf(ev);
+      const ctx = { picked: new Map(parentCtx.picked) };
+      if (top) {
+        // trigger pass runs only matching trigger events; tick pass runs only non-trigger events
+        if (occ ? (!trig || !this.#matches(trig, occ, ctx)) : !!trig) { chainRan = true; continue; }
+      }
+      let ok;
+      if (ev.else) {
+        ok = chainRan ? false : this.#testConds(ev, ctx, trig);
+        if (ok) chainRan = true;
+      } else {
+        ok = this.#testConds(ev, ctx, trig);
+        chainRan = ok;
+      }
+      if (!ok) continue;
+      this.hooks.onEventRan?.(ev.id);
+      this.#runActions(ev, ctx);
+      this.#runChain(ev.children || [], ctx, false, null);
+    }
+  }
+
+  #testConds(ev, ctx, matchedTrigger) {
+    for (const c of ev.conds || []) {
+      if (c === matchedTrigger) continue;
+      const entry = CONDITIONS[c.type];
+      if (!entry) { this.#error(ev.id, `Unknown condition "${c.type}"`); return false; }
+      if (entry.trigger) { this.#error(ev.id, "A trigger can only be the first condition of a top-level event."); return false; }
+      try {
+        if (!entry.test(this, ctx, c)) return false;
+      } catch (e) {
+        if (e instanceof ExprError) { this.#error(ev.id, e.message); return false; }
+        throw e;
+      }
+    }
+    return true;
+  }
+
+  #runActions(ev, ctx) {
+    for (const a of ev.actions || []) {
+      const entry = ACTIONS[a.type];
+      if (!entry) { this.#error(ev.id, `Unknown action "${a.type}"`); continue; }
+      try {
+        entry.run(this, ctx, a);
+      } catch (e) {
+        if (e instanceof ExprError) this.#error(ev.id, e.message);
+        else throw e;
+      }
+    }
+  }
+}

@@ -5,6 +5,7 @@ plain HTML/JS with no build step, and no shared code between tools.
 
 | Tool | What it does |
 |---|---|
+| [`app-builder/`](app-builder/) | App Builder (prototype): build simple app screens and drive them with an event sheet (*when this happens, do that*), for about Years 7–8. |
 | [`trainer/`](trainer/) | Pattern Trainer: train an image classifier in the browser and download it for the [Python/Gradio starters](https://github.com/edu-matthew-pham/pattern-detector-starters). |
 
 Live at https://tools.learningwaypoints.com/ (GitHub Pages from `main`, root folder; the custom domain is set by the
