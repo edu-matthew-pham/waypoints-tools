@@ -246,3 +246,44 @@ export function check(src, scope) {
     throw e;
   }
 }
+
+// Help for the "Find expressions" browser: [signature, what it does, example]
+export const FUNCTION_HELP = {
+  if:     ['if(test, yes, no)', 'Use one value or another, depending on a test.', 'if(score ≥ 10, "Win!", "Keep going")'],
+  random: ['random(n)', 'A random whole number from 0 up to n - 1.', 'random(6) + 1   (a dice roll)'],
+  round:  ['round(x)', 'Rounds to the nearest whole number.', 'round(2.6)  gives 3'],
+  floor:  ['floor(x)', 'Rounds down.', 'floor(2.6)  gives 2'],
+  ceil:   ['ceil(x)', 'Rounds up.', 'ceil(2.1)  gives 3'],
+  abs:    ['abs(x)', 'Removes a minus sign.', 'abs(-5)  gives 5'],
+  min:    ['min(a, b)', 'The smaller of two numbers.', 'min(score, 100)'],
+  max:    ['max(a, b)', 'The bigger of two numbers.', 'max(lives - 1, 0)'],
+  int:    ['int(text)', 'Turns text into a whole number (for maths with typed input).', 'int(Age.text) + 1'],
+  float:  ['float(text)', 'Turns text into a number that can have decimals.', 'float(Price.text) * 2'],
+  str:    ['str(x)', 'Turns a number into text.', 'str(score)'],
+  len:    ['len(text)', 'How many characters are in some text.', 'len(Name.text)'],
+  upper:  ['upper(text)', 'Text in CAPITALS.', 'upper(Name.text)'],
+  lower:  ['lower(text)', 'Text in lower case.', 'lower(Name.text)'],
+};
+export const OPERATOR_HELP = [
+  ['&', 'Joins pieces of text', '"Hi " & Name.text'],
+  ['+  -', 'Add, subtract (numbers only)', 'score + 1'],
+  ['*  /', 'Multiply, divide', 'price * 2'],
+  ['%', 'Remainder after dividing', 'n % 2  is 0 for even numbers'],
+  ['( )', 'Work this part out first', '(goal - minutes) & " to go"'],
+];
+
+// Split text into coloured pieces for the editor. Never throws, so it works while the student is mid-typing.
+// kinds: str, num, op, fn, name, plain
+export function highlight(src) {
+  const out = [];
+  const re = /("[^"“”]*["“”]?|[“”][^"“”]*["“”]?)|(\d+(?:\.\d+)?)|([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)?)|(==|!=|<=|>=|[&+\-*/%=<>≠≤≥(),])|(\s+|.)/gu;
+  let m;
+  while ((m = re.exec(src))) {
+    if (m[1] !== undefined) out.push(['str', m[1]]);
+    else if (m[2] !== undefined) out.push(['num', m[2]]);
+    else if (m[3] !== undefined) out.push([/^\s*\(/.test(src.slice(re.lastIndex)) ? 'fn' : (m[3] === 'true' || m[3] === 'false' ? 'num' : 'name'), m[3]]);
+    else if (m[4] !== undefined) out.push(['op', m[4]]);
+    else out.push(['plain', m[5]]);
+  }
+  return out;
+}

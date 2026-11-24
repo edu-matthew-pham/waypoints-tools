@@ -377,3 +377,13 @@ test('trigger once: warnings when misplaced or in a ⚡ event', () => {
   assert.ok(w.some((x) => x.id === 'b' && /already run once/.test(x.message)));
   assert.ok(!w.some((x) => x.id === 'c'));
 });
+
+test('help: every value box has a help line; every function has help; highlighter never throws', async () => {
+  const { CONDITIONS, ACTIONS } = await import('../src/core/catalog.js');
+  const { FUNCTION_HELP, FUNCTION_NAMES, highlight } = await import('../src/core/expr.js');
+  for (const t of [CONDITIONS, ACTIONS]) for (const [id, e] of Object.entries(t)) for (const p of e.params) if (p.type === 'expr') assert.ok(p.help, `${id}.${p.name} has no help`);
+  for (const f of FUNCTION_NAMES) assert.ok(FUNCTION_HELP[f], `function ${f} has no help`);
+  for (const src of ['"open', '((', 'a.', '“smart”', '', '1.5.6', 'if(x ≥ 2, "a", "b")']) {
+    assert.equal(highlight(src).map(([, t]) => t).join(''), src, 'highlighting keeps every character: ' + src);
+  }
+});

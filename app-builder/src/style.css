@@ -346,3 +346,23 @@ select.ctl { padding-right: 6px; }
 .op-tile.small strong { font-size: 13px; overflow-wrap: anywhere; }
 .op-tile.small small { font-size: 11px; }
 .mini.back { align-self: flex-start; margin-bottom: 4px; }
+
+/* expression boxes in dialogs: wide, coloured like Construct */
+.es-sentence .hl { position: relative; display: inline-flex; flex: 1 1 280px; min-width: 200px; }
+.hl > input.ctl.expr { position: relative; width: 100%; background: transparent; color: transparent; caret-color: var(--ink); font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; padding: 7px 10px; }
+.hl > input.ctl.expr::placeholder { color: #9aa3b5; }
+.hl > input.ctl.expr::selection { background: rgba(47, 111, 221, .25); color: transparent; }
+.hl > input.ctl.expr.bad { background: transparent; }
+.hl.bad, .hl:has(input.bad) { background: var(--bad-soft); border-radius: 7px; }
+.hl-mirror { position: absolute; inset: 0; padding: 8px 11px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 15px; white-space: pre; overflow: hidden; pointer-events: none; color: var(--ink); line-height: normal; display: flex; align-items: center; }
+.hl-str { color: #b42318; } .hl-num { color: #0b7a4b; } .hl-op { color: #2f6fdd; font-weight: 600; } .hl-fn { color: #7c3aed; } .hl-name { color: #1d3a8a; }
+.es-helps { display: flex; flex-direction: column; gap: 2px; }
+.es-help { margin: 0; font-size: 13px; color: var(--muted); }
+.find-btn { font-size: 13px; padding: 4px 10px; }
+/* expression browser */
+.xb { display: flex; flex-direction: column; gap: 4px; }
+.xb-item { font: inherit; display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 2px 12px; text-align: left; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fff; cursor: pointer; }
+.xb-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+.xb-item code { font-family: ui-monospace, Menlo, Consolas, monospace; color: #1d3a8a; font-size: 13px; }
+.xb-desc { font-size: 13px; }
+.xb-item small { grid-column: 2; color: var(--muted); font-size: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; }

@@ -2,7 +2,7 @@
 // fill-in-the-blanks form for one condition or action. Native <dialog>: focus trap, Esc, backdrop.
 import { h } from './dom.js';
 import { CONDITIONS, ACTIONS } from '../core/catalog.js';
-import { check, OPERATORS } from '../core/expr.js';
+import { check, OPERATORS, highlight, FUNCTION_HELP, OPERATOR_HELP } from '../core/expr.js';
 import { COMPONENTS } from '../core/components.js';
 import { ICONS, FALLBACK_ICON } from './component-ui.js';
 
@@ -106,6 +106,7 @@ export function openChooser(sheet, kind, ev, depth, onPick) {
 export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDelete }) {
   const sentence = h('div', { class: 'es-sentence' });
   const chips = h('div', { class: 'es-chips' });
+  const helps = h('div', { class: 'es-helps' });
   const errs = h('div', { class: 'es-errs', 'aria-live': 'polite' });
   const exprs = [];
   let lastExpr = null;
@@ -150,7 +151,14 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
       const prm = entry.params.find((p) => p.name === mt[1]);
       if (prm) sentence.append(sheet._control(prm, draft, entry, ctx));
     }
+    exprs.forEach(colourBox);
+    const exprParams = entry.params.filter((p) => p.type === 'expr');
+    helps.replaceChildren(...exprParams.map((p) => h('p', { class: 'es-help' },
+      exprParams.length > 1 ? h('strong', {}, (p.name === 'left' ? 'First value' : p.name === 'right' ? 'Second value' : 'Value') + ': ') : null, p.help || '')));
     chips.replaceChildren();
+    if (exprParams.length) {
+      chips.append(h('button', { class: 'btn find-btn', type: 'button', onclick: () => openExpressionBrowser(sheet, insert) }, '\ud83d\udd0d Find expressions'));
+    }
     if (entry.params.some((p) => p.type === 'expr')) {
       const sc = sheet._scope;
       const names = [
@@ -158,7 +166,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
         ...sc.objects.flatMap((o) => [...(o.kind === 'input' ? [`${o.name}.text`] : []), ...o.vars.map((v) => `${o.name}.${v}`)]),
       ];
       if (names.length) {
-        chips.append(h('span', { class: 'muted' }, 'Click to use a name: '),
+        chips.append(h('span', { class: 'muted' }, 'Names: '),
           ...names.map((n) => h('button', { class: 'chip', type: 'button', title: `Insert ${n}`, onclick: () => insert(n) }, n)));
       }
     }
@@ -168,11 +176,12 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
     }
     validate();
   }
-  function insert(text) {
+  function insert(text, back = 0) {
     const input = lastExpr && exprs.includes(lastExpr) ? lastExpr : exprs[exprs.length - 1];
     if (!input) return;
     const s = input.selectionStart ?? input.value.length, e = input.selectionEnd ?? s;
     input.setRangeText(text, s, e, 'end');
+    if (back) input.setSelectionRange(input.selectionEnd - back, input.selectionEnd - back);
     input.dispatchEvent(new Event('input', { bubbles: true }));
     input.focus();
   }
@@ -182,7 +191,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
   done.addEventListener('click', () => { m.close(); onDone(draft); });
 
   const title = (isNew ? 'Add ' : 'Change ') + (kind === 'cond' ? (isNew ? 'a condition' : 'this condition') : (isNew ? 'an action' : 'this action'));
-  const m = modal(title, [h('p', { class: 'muted' }, kind === 'cond' ? 'This must be true for the event to run.' : 'Do this when the event runs.'), sentence, errs, chips],
+  const m = modal(title, [h('p', { class: 'muted' }, kind === 'cond' ? 'This must be true for the event to run.' : 'Do this when the event runs.'), sentence, helps, errs, chips],
     [del, h('span', { class: 'spacer' }), cancel, done]);
   const dlg = m.dlg;
   draw();
@@ -244,4 +253,60 @@ export function openChoiceBuilder(sheet, onInsert) {
   const m = modal('Choose between two values', body, [h('span', { class: 'spacer' }), cancel, add]);
   update();
   (left || m.dlg.querySelector('button')).focus();
+}
+
+// Colour an expression box as you type (like Construct): a coloured copy sits behind a see-through input.
+function colourBox(input) {
+  if (input.parentElement?.classList.contains('hl')) return;
+  const mirror = h('span', { class: 'hl-mirror', 'aria-hidden': 'true' });
+  const wrap = h('span', { class: 'hl' }, mirror);
+  input.replaceWith(wrap);
+  wrap.append(input);
+  input.removeAttribute('size');
+  const paint = () => {
+    mirror.replaceChildren(...highlight(input.value).map(([k, t]) => h('span', { class: 'hl-' + k }, t)), '​');
+    mirror.scrollLeft = input.scrollLeft;
+  };
+  input.addEventListener('input', paint);
+  input.addEventListener('scroll', () => { mirror.scrollLeft = input.scrollLeft; });
+  input.addEventListener('keyup', () => { mirror.scrollLeft = input.scrollLeft; });
+  paint();
+}
+
+// "Find expressions": everything you can use in a value, with a plain description and an example. Click to insert.
+export function openExpressionBrowser(sheet, insert) {
+  const sc = sheet._scope;
+  const PROP_HELP = { text: 'its text', value: 'its number', on: 'true if switched on', min: 'its smallest value', max: 'its largest value', visible: 'true if showing', x: 'distance from the left', y: 'distance from the top', w: 'its width', h: 'its height' };
+  const sections = [
+    ['Variables', sc.variables.map((v) => ({ code: v, desc: 'whole-app variable' }))],
+    ...sc.objects.map((o) => [o.name + ' (' + (COMPONENTS[o.kind]?.label || o.kind) + ')', [
+      ...['text', ...(COMPONENTS[o.kind]?.exposes || [])].filter((p, i, a) => a.indexOf(p) === i).map((p) => ({ code: `${o.name}.${p}`, desc: PROP_HELP[p] })),
+      ...o.vars.map((v) => ({ code: `${o.name}.${v}`, desc: 'its own variable' })),
+      ...['visible', 'x', 'y', 'w', 'h'].map((p) => ({ code: `${o.name}.${p}`, desc: PROP_HELP[p], extra: true })),
+    ]]),
+    ['Joining and maths', OPERATOR_HELP.map(([op, desc, ex]) => ({ code: op.split(/\s+/)[0], label: op, desc, ex }))],
+    ['Functions', Object.values(FUNCTION_HELP).map(([sig, desc, ex]) => ({ code: sig.replace(/\(.*\)/, '()'), label: sig, desc, ex, fn: true }))],
+  ];
+  const body = h('div', { class: 'xb' });
+  let m;
+  const draw = (q = '') => {
+    body.replaceChildren();
+    const ql = q.toLowerCase();
+    for (const [title, items] of sections) {
+      const hits = items.filter((it) => !ql ? !it.extra : (it.label || it.code).toLowerCase().includes(ql) || (it.desc || '').toLowerCase().includes(ql));
+      if (!hits.length) continue;
+      body.append(h('div', { class: 'es-cat' }, title), ...hits.map((it) => h('button', { class: 'xb-item', type: 'button', title: 'Insert ' + it.code,
+        onclick: () => {
+          m.close();
+          // functions go in with the cursor between the brackets
+          insert(it.code, it.fn ? 1 : 0);
+        } },
+        h('code', {}, it.label || it.code), h('span', { class: 'xb-desc' }, it.desc || ''), it.ex ? h('small', {}, 'e.g. ' + it.ex) : null)));
+    }
+    if (!body.children.length) body.append(h('p', { class: 'muted' }, 'Nothing matches.'));
+  };
+  const search = h('input', { class: 'ctl', type: 'search', placeholder: 'Search, e.g. round, text, join…', 'aria-label': 'Search expressions', oninput: () => draw(search.value.trim()) });
+  m = modal('Find expressions', [h('p', { class: 'muted' }, 'Click one to put it in the value box. Position and size are found by searching (e.g. "x").'), search, body]);
+  draw();
+  search.focus();
 }

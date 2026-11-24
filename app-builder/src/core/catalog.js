@@ -235,6 +235,29 @@ export function validateSheet(events, depth = 0, out = [], underTrigger = false)
   return out;
 }
 
+// One line of help under each value box (like Construct's parameter descriptions).
+const NUM_OR_CALC = 'A number, a variable, or a calculation like score + 1.';
+const PARAM_HELP = {
+  'onEvery.seconds': 'How many seconds between each time. A number like 2 or 0.5, or a variable.',
+  'onAfter.seconds': 'How many seconds to wait. A number like 3, or a variable.',
+  'compareVar.value': 'What to compare the variable with: a number, "text in quotes", or another variable.',
+  'compareValues.left': 'The first value: a variable, a number, "text in quotes", or Object.property.',
+  'compareValues.right': 'The value to compare it with.',
+  'compareInst.value': 'What to compare with: a number, "text in quotes", or a variable.',
+  'setText.value': 'The text to show. Put words in "quotes" and join pieces with &, e.g. "Total: " & minutes',
+  'setSlider.value': "A number between the slider's smallest and largest. " + NUM_OR_CALC,
+  'setInst.value': 'The new value: a number, "text in quotes", or a calculation like done + 1.',
+  'addToInst.value': 'How much to add. ' + NUM_OR_CALC,
+  'setVar.value': 'The new value: a number, "text in quotes", or a calculation like score + 1.',
+  'addTo.value': 'How much to add. ' + NUM_OR_CALC,
+  'subtractFrom.value': 'How much to take away. ' + NUM_OR_CALC,
+};
+for (const table of [CONDITIONS, ACTIONS]) {
+  for (const [id, e] of Object.entries(table)) {
+    for (const p of e.params) if (p.type === 'expr') p.help = PARAM_HELP[`${id}.${p.name}`] || 'A value: a number, "text in quotes", a variable, or a calculation.';
+  }
+}
+
 // true if any event on a screen reacts to the keyboard (the preview then asks the user to click it first)
 export function usesKeys(events = []) {
   return events.some((ev) => (ev.conds || []).some((c) => CONDITIONS[c.type]?.keyed || c.type === 'keyHeld') || usesKeys(ev.children));
