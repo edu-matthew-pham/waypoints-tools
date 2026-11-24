@@ -338,3 +338,11 @@ select.ctl { padding-right: 6px; }
 .stage.kb-focus ~ .kb-hint { display: none; }
 .kb-hint[hidden] { display: none; }
 .es-entry small.help { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+/* event chooser: grid first */
+.op-grid.small { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); gap: 8px; }
+.op-tile.small { padding: 10px 6px 8px; gap: 2px; }
+.op-tile.small .op-icon svg { width: 32px; height: 32px; }
+.op-tile.small strong { font-size: 13px; overflow-wrap: anywhere; }
+.op-tile.small small { font-size: 11px; }
+.mini.back { align-self: flex-start; margin-bottom: 4px; }

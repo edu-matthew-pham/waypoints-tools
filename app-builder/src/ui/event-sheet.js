@@ -200,9 +200,14 @@ export class EventSheet extends HTMLElement {
   }
 
   _add(kind, ev, depth) {
-    openChooser(this, kind, ev, depth, (type) => {
+    openChooser(this, kind, ev, depth, (type, preset = {}) => {
       const entry = entryFor(kind, type);
-      const draft = { type, ...defaultParams(entry, this._scope) };
+      const draft = { type, ...defaultParams(entry, this._scope), ...preset };
+      // the object was chosen first: point any "its variable" blank at one of that object's variables
+      for (const prm of entry.params.filter((p) => p.type === 'instVar')) {
+        const o = this._scope.objects.find((x) => x.name === draft[entry.params.find((p) => p.type === 'object')?.name]);
+        if (o && !o.vars.includes(draft[prm.name])) draft[prm.name] = o.vars[0] ?? '';
+      }
       const insert = (item) => {
         const target = kind === 'cond' ? ev.conds : ev.actions;
         const onceAt = target.findIndex((c) => c.type === 'triggerOnce');

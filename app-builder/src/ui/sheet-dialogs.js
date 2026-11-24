@@ -3,6 +3,8 @@
 import { h } from './dom.js';
 import { CONDITIONS, ACTIONS } from '../core/catalog.js';
 import { check, OPERATORS } from '../core/expr.js';
+import { COMPONENTS } from '../core/components.js';
+import { ICONS, FALLBACK_ICON } from './component-ui.js';
 
 const CATEGORIES = ['Screen', 'Object', 'Keyboard', 'Variables', 'System'];
 const plain = (label) => label.replace(/\{\w+\}/g, '\u2026');
@@ -21,32 +23,82 @@ export function modal(title, body, foot) {
   return { dlg, close };
 }
 
-// onPick(type) is called with the chosen catalog id.
+// Two steps, like Construct: a grid of "what is it about?" (System, Keyboard, Variables, and each object on
+// this screen), then a short list of just that thing's conditions or actions. Typing in search skips to one
+// flat list. onPick(type, preset) gets the catalog id and any values already chosen (e.g. the object).
+const GROUPS = [
+  { id: 'Screen', label: 'Screen', icon: 'screen' },
+  { id: 'System', label: 'System', icon: 'system' },
+  { id: 'Keyboard', label: 'Keyboard', icon: 'keyboard' },
+  { id: 'Variables', label: 'Variables', icon: 'variables' },
+];
+const objParam = (e) => e.params.find((p) => p.type === 'object');
+const fitsObject = (e, o) => { const p = objParam(e); return !!p && (!p.kinds || p.kinds.includes(o.kind)); };
+
 export function openChooser(sheet, kind, ev, depth, onPick) {
   const table = kind === 'cond' ? CONDITIONS : ACTIONS;
-  const list = h('div', { class: 'es-list' });
+  const usable = Object.entries(table).filter(([type]) => sheet._can(kind, type));
+  const body = h('div', { class: 'es-list' });
   let m;
-  const draw = (q = '') => {
-    list.replaceChildren();
-    for (const cat of CATEGORIES) {
-      const entries = Object.entries(table).filter(([type, e]) =>
-        e.category === cat && sheet._can(kind, type) && plain(e.label).toLowerCase().includes(q.toLowerCase()));
-      if (!entries.length) continue;
-      list.append(h('div', { class: 'es-cat' }, cat));
-      for (const [type, entry] of entries) {
-        const why = sheet._blocked(kind, entry, ev, depth);
-        list.append(h('button', {
-          class: 'es-entry' + (entry.trigger ? ' trig' : ''), type: 'button', disabled: !!why, title: why,
-          onclick: () => { m.close(); onPick(type); },
-        }, entry.trigger ? '\u26a1 ' : '', plain(entry.label), why ? h('small', {}, why) : entry.help ? h('small', { class: 'help' }, entry.help) : null));
-      }
-    }
-    if (!list.children.length) list.append(h('p', { class: 'muted' }, 'Nothing matches.'));
+
+  const entryBtn = ([type, entry], why, label, preset) => h('button', {
+    class: 'es-entry' + (entry.trigger ? ' trig' : ''), type: 'button', disabled: !!why, title: why,
+    onclick: () => { m.close(); onPick(type, preset); },
+  }, entry.trigger ? '⚡ ' : '', label, why ? h('small', {}, why) : entry.help ? h('small', { class: 'help' }, entry.help) : null);
+
+  // why an entry can't be used for this particular object (or '' if it can)
+  const whyFor = (entry, o) => {
+    const b = sheet._blocked(kind, { ...entry, params: entry.params.filter((p) => p.type !== 'object' && p.type !== 'instVar') }, ev, depth);
+    if (b) return b;
+    if (entry.params.some((p) => p.type === 'instVar') && !o.vars.length) return `Give ${o.name} a variable of its own first`;
+    return '';
   };
-  const search = h('input', { class: 'ctl', type: 'search', placeholder: kind === 'cond' ? 'Search conditions\u2026' : 'Search actions\u2026', 'aria-label': 'Search', oninput: () => draw(search.value) });
-  m = modal(kind === 'cond' ? 'Add a condition' : 'Add an action', [search, list]);
-  draw();
-  search.focus();
+
+  function grid() {
+    title.textContent = kind === 'cond' ? 'Add a condition' : 'Add an action';
+    const tile = (label, iconSvg, sub, onclick) => {
+      const ic = h('span', { class: 'op-icon' }); ic.innerHTML = iconSvg;
+      return h('button', { class: 'op-tile small', type: 'button', onclick }, ic, h('strong', {}, label), sub ? h('small', {}, sub) : null);
+    };
+    const general = GROUPS.map((g) => [g, usable.filter(([, e]) => e.category === g.id && !objParam(e))])
+      .filter(([, list]) => list.length)
+      .map(([g, list]) => tile(g.label, ICONS[g.icon] || FALLBACK_ICON, null, () => listFor(g.label, list.map((x) => entryBtn(x, sheet._blocked(kind, x[1], ev, depth), plain(x[1].label))))));
+    const objs = sheet._scope.objects
+      .map((o) => [o, usable.filter(([, e]) => fitsObject(e, o))])
+      .filter(([, list]) => list.length)
+      .map(([o, list]) => tile(o.name, ICONS[o.kind] || FALLBACK_ICON, COMPONENTS[o.kind]?.label, () => listFor(o.name, list.map((x) => {
+        const p = objParam(x[1]);
+        return entryBtn(x, whyFor(x[1], o), plain(x[1].label.replace(`{${p.name}}`, o.name)), { [p.name]: o.name });
+      }))));
+    body.replaceChildren(
+      h('div', { class: 'op-grid small' }, general),
+      objs.length ? h('div', { class: 'es-cat' }, 'On this screen') : null,
+      objs.length ? h('div', { class: 'op-grid small' }, objs) : h('p', { class: 'muted' }, 'Add objects on the Design tab to see what they can do here.'));
+    body.querySelector('.op-tile')?.focus();
+  }
+
+  function listFor(name, buttons) {
+    title.textContent = name;
+    body.replaceChildren(h('button', { class: 'mini back', type: 'button', onclick: () => { search.value = ''; grid(); } }, '← Back'), ...buttons);
+    body.querySelector('.es-entry:not(:disabled)')?.focus();
+  }
+
+  function flat(q) {
+    title.textContent = kind === 'cond' ? 'Add a condition' : 'Add an action';
+    body.replaceChildren();
+    for (const cat of CATEGORIES) {
+      const hits = usable.filter(([, e]) => e.category === cat && plain(e.label).toLowerCase().includes(q.toLowerCase()));
+      if (!hits.length) continue;
+      body.append(h('div', { class: 'es-cat' }, cat), ...hits.map((x) => entryBtn(x, sheet._blocked(kind, x[1], ev, depth), plain(x[1].label))));
+    }
+    if (!body.children.length) body.append(h('p', { class: 'muted' }, 'Nothing matches.'));
+  }
+
+  const search = h('input', { class: 'ctl', type: 'search', placeholder: kind === 'cond' ? 'Search conditions…' : 'Search actions…', 'aria-label': 'Search',
+    oninput: () => (search.value.trim() ? flat(search.value.trim()) : grid()) });
+  m = modal(kind === 'cond' ? 'Add a condition' : 'Add an action', [search, body]);
+  const title = m.dlg.querySelector('.dlg-head strong');
+  grid();
 }
 
 // Edit one condition/action as a sentence with blanks. `draft` is a copy; nothing changes
