@@ -315,3 +315,10 @@ select.ctl { padding-right: 6px; }
 .op-tile:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .op-icon { color: var(--accent); display: flex; }
 .op-tile small { color: var(--muted); font-size: 12px; line-height: 1.3; }
+
+/* choose-between-two-values builder */
+.cb-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cb-row .lbl { min-width: 92px; color: var(--muted); }
+.cb-preview { padding: 8px 10px; background: #f7f8fc; border-radius: 8px; font-size: 13px; overflow-wrap: anywhere; }
+.cb-code { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.choice-btn { font-size: 13px; padding: 4px 10px; margin-left: auto; }

@@ -1,12 +1,33 @@
 // A tiny, safe expression language for the event editor.
 //   numbers, "text", true/false, variables, Object.property, functions,
 //   + - * / %  (numbers only)   & (joins text)
+//   if(test, value if true, value if false)   test = two values and  = ≠ < ≤ > ≥  (also != <= >= ==)
 // No eval, no JS: the parser builds a small tree and we walk it.
 
 export class ExprError extends Error {
   constructor(message) { super(message); this.name = 'ExprError'; }
 }
 
+export const OPERATORS = ['=', '≠', '<', '≤', '>', '≥'];
+
+export function compare(a, op, b) {
+  if (op === '=' || op === '≠') {
+    const eq = typeof a === typeof b ? a === b : String(a) === String(b);
+    return op === '=' ? eq : !eq;
+  }
+  if (typeof a !== typeof b) {
+    throw new ExprError(`Can't compare ${typeof a === 'number' ? 'a number' : 'text'} with ${typeof b === 'number' ? 'a number' : 'text'} using ${op}. Use int(...) on text first.`);
+  }
+  switch (op) {
+    case '<': return a < b;
+    case '≤': return a <= b;
+    case '>': return a > b;
+    case '≥': return a >= b;
+  }
+  throw new ExprError(`Unknown comparison "${op}"`);
+}
+
+const CMP = { '=': '=', '==': '=', '!=': '≠', '≠': '≠', '<': '<', '<=': '≤', '≤': '≤', '>': '>', '>=': '≥', '≥': '≥' };
 const QUOTES = new Set(['"', '“', '”']); // straight and tablet "smart" quotes
 
 function tokenize(src) {
@@ -35,6 +56,9 @@ function tokenize(src) {
       toks.push({ t: 'id', v: src.slice(i, j) });
       i = j; continue;
     }
+    const two = src.slice(i, i + 2);
+    if (['==', '!=', '<=', '>='].includes(two)) { toks.push({ t: 'cmp', v: two }); i += 2; continue; }
+    if ('=<>≠≤≥'.includes(c)) { toks.push({ t: 'cmp', v: c }); i++; continue; }
     if ('+-*/%&(),.'.includes(c)) { toks.push({ t: 'op', v: c }); i++; continue; }
     throw new ExprError(`Unexpected "${c}"`);
   }
@@ -52,6 +76,12 @@ export function parse(src) {
   const isOp = (v) => peek() && peek().t === 'op' && peek().v === v;
   const expect = (v) => { if (!isOp(v)) throw new ExprError(`Expected "${v}"`); p++; };
 
+  function test() {
+    const l = concat();
+    if (peek()?.t !== 'cmp') throw new ExprError('if() needs a test first, like  if(score ≥ 10, "Win", "Keep going")');
+    const op = CMP[toks[p++].v];
+    return { k: 'cmp', op, l, r: concat() };
+  }
   function concat() {
     let l = add();
     while (isOp('&')) { p++; l = { k: 'bin', op: '&', l, r: add() }; }
@@ -78,6 +108,18 @@ export function parse(src) {
     if (t.t === 'str') return { k: 'str', v: t.v };
     if (t.t === 'id') {
       if (t.v === 'true' || t.v === 'false') return { k: 'bool', v: t.v === 'true' };
+      if (t.v === 'if' && isOp('(')) {
+        p++;
+        const cond = test();
+        if (!isOp(',')) throw new ExprError('if() needs a value for when the test is true, then one for when it is not');
+        p++;
+        const yes = concat();
+        if (!isOp(',')) throw new ExprError('if() also needs a value for when the test is not true (three parts in all)');
+        p++;
+        const no = concat();
+        expect(')');
+        return { k: 'if', cond, yes, no };
+      }
       if (isOp('(')) {
         p++;
         const args = [];
@@ -98,7 +140,7 @@ export function parse(src) {
   }
 
   const ast = concat();
-  if (p < toks.length) throw new ExprError(`Unexpected "${toks[p].v}"`);
+  if (p < toks.length) throw new ExprError(toks[p].t === 'cmp' ? 'Comparisons like ' + toks[p].v + ' only work inside if(...)' : `Unexpected "${toks[p].v}"`);
   cache.set(src, ast);
   return ast;
 }
@@ -129,7 +171,7 @@ const FUNCS = {
   lower:  { n: 1, f: (v) => String(v).toLowerCase() },
   str:    { n: 1, f: (v) => fmt(v) },
 };
-export const FUNCTION_NAMES = [...Object.keys(FUNCS), 'random'];
+export const FUNCTION_NAMES = [...Object.keys(FUNCS), 'random', 'if'];
 
 // env = { getVar(name), getProp(obj, prop), random() }
 export function evaluate(n, env) {
@@ -139,6 +181,7 @@ export function evaluate(n, env) {
     case 'var': return env.getVar(n.name);
     case 'prop': return env.getProp(n.obj, n.prop);
     case 'neg': return -needNum(ev(n.e));
+    case 'if': return compare(ev(n.cond.l), n.cond.op, ev(n.cond.r)) ? ev(n.yes) : ev(n.no); // only the chosen side is worked out
     case 'bin': {
       const a = ev(n.l), b = ev(n.r);
       if (n.op === '&') return fmt(a) + fmt(b);
@@ -183,6 +226,13 @@ export function check(src, scope) {
           break;
         }
         case 'neg': walk(n.e); break;
+        case 'if': {
+          walk(n.cond.l); walk(n.cond.r); walk(n.yes); walk(n.no);
+          if (n.yes.k !== n.no.k && ['num', 'str'].includes(n.yes.k) && ['num', 'str'].includes(n.no.k)) {
+            throw new ExprError('Both choices in if() should be the same kind: both text or both numbers');
+          }
+          break;
+        }
         case 'bin': walk(n.l); walk(n.r); break;
         case 'call':
           if (!FUNCTION_NAMES.includes(n.name)) throw new ExprError(`There's no function called "${n.name}"`);

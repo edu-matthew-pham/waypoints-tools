@@ -46,6 +46,7 @@ calls directly, just like clicks today.
 | **After N seconds** (once) | trigger | 2 |
 | **Wait N seconds, then...** | action | 3 |
 | Random number / pick from list | expression function (`random` exists) | 2 |
+| `if(test, yes, no)` and the **Choose between two values** builder *(done)* | expression function + dialog | 3 |
 | Current time / date | expression functions | 3 |
 
 Time runs from the interpreter's tick counter, not the wall clock, so tests are deterministic (`rt.advance(ms)`).
@@ -77,5 +78,5 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
 
 ## Suggested order
 
-1. Toggle, Slider (small, prove the registry).  2. Key pressed + Enter-submits + pressed/released.  3. Timers.
+1. Toggle, Slider (small, prove the registry). *(`if()` + builder done.)*  2. Key pressed + Enter-submits + pressed/released.  3. Timers.
 4. Image + asset panel.  5. Lists + for-each + Repeater.  6. Rename.  7. Layout/Tabs.  8. Custom HTML widget and JS view.

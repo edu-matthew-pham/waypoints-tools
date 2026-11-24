@@ -167,3 +167,25 @@ test('screen change loops are stopped', () => {
   rt.start();
   assert.ok(rt.errors.some((e) => /Too many screen changes/.test(e.message)));
 });
+
+test('if(test, yes, no): picks a value; only the chosen side is worked out', () => {
+  const env = { getVar: (n) => ({ minutes: 40, goal: 30, name: 'Sam' })[n], getProp: () => 0, random: () => 0 };
+  const run = (src) => evaluate(parse(src), env);
+  assert.equal(run('if(minutes ≥ goal, "Goal reached!", "Keep going")'), 'Goal reached!');
+  assert.equal(run('if(minutes < goal, "Goal reached!", "Keep going")'), 'Keep going');
+  assert.equal(run('if(minutes >= 30, 1, 0)'), 1);            // typed symbols work too
+  assert.equal(run('if(name = "Sam", "Hi " & name, "Hello")'), 'Hi Sam');
+  assert.equal(run('"Result: " & if(minutes != goal, "different", "same")'), 'Result: different');
+  assert.equal(run('if(minutes > 0, 5, 1 / 0)'), 5);          // the unused side is never run
+});
+
+test('if(): friendly errors', () => {
+  const scope = { vars: new Set(['minutes', 'goal']), objects: new Map() };
+  assert.match(check('if(minutes, 1, 2)', scope), /needs a test/);
+  assert.match(check('if(minutes ≥ goal, 1)', scope), /three parts/);
+  assert.match(check('if(minutes ≥ goal)', scope), /true/);
+  assert.match(check('if(minutes ≥ goal, "a", 2)', scope), /same kind/);
+  assert.match(check('if(nope ≥ goal, 1, 2)', scope), /no variable called "nope"/);
+  assert.match(check('minutes ≥ goal', scope), /only work inside if/);
+  assert.equal(check('if(minutes ≥ goal, "a", "b")', scope), null);
+});

@@ -45,6 +45,10 @@ Lesson links: `?level=1&allow=onClicked,addTo,setText&lock=1` (see Guided editin
 
 See [`ROADMAP.md`](ROADMAP.md) for planned components, input events (keyboard, pointer), timers, lists and layout.
 
+Expressions: `&` joins text, `+ - * /` for numbers, `Name.property`, helpers like `round()` and `random()`, and
+`if(test, value if true, value if false)` with `= ≠ < ≤ > ≥`. At Level 3+ a **Choose between two values** button in the
+guided dialog writes the `if()` from fill-in blanks.
+
 ## Adding a feature
 
 Add an entry to `CONDITIONS` or `ACTIONS` in `catalog.js` (label with `{param}` placeholders, params, run/test).

@@ -7,27 +7,10 @@ import { COMPONENTS } from './components.js';
 // Param types: object, variable, instVar (belongs to the event's `target`),
 //              expr, operator, screen, showhide
 
-import { ExprError, fmt } from './expr.js';
+import { ExprError, fmt, OPERATORS, compare } from './expr.js';
 
 export const OBJECT_KINDS = COMPONENTS; // kept under the old name for the interpreter and project helpers
-export const OPERATORS = ['=', '≠', '<', '≤', '>', '≥'];
-
-export function compare(a, op, b) {
-  if (op === '=' || op === '≠') {
-    const eq = typeof a === typeof b ? a === b : String(a) === String(b);
-    return op === '=' ? eq : !eq;
-  }
-  if (typeof a !== typeof b) {
-    throw new ExprError(`Can't compare ${typeof a === 'number' ? 'a number' : 'text'} with ${typeof b === 'number' ? 'a number' : 'text'} using ${op}. Use int(...) on text first.`);
-  }
-  switch (op) {
-    case '<': return a < b;
-    case '≤': return a <= b;
-    case '>': return a > b;
-    case '≥': return a >= b;
-  }
-  throw new ExprError(`Unknown comparison "${op}"`);
-}
+export { OPERATORS, compare };
 
 const obj = (extra = {}) => ({ name: 'target', type: 'object', ...extra });
 const expr = (name = 'value') => ({ name, type: 'expr' });

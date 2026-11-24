@@ -2,7 +2,7 @@
 // fill-in-the-blanks form for one condition or action. Native <dialog>: focus trap, Esc, backdrop.
 import { h } from './dom.js';
 import { CONDITIONS, ACTIONS } from '../core/catalog.js';
-import { check } from '../core/expr.js';
+import { check, OPERATORS } from '../core/expr.js';
 
 const CATEGORIES = ['Screen', 'Object', 'Variables', 'System'];
 const plain = (label) => label.replace(/\{\w+\}/g, '\u2026');
@@ -110,6 +110,10 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
           ...names.map((n) => h('button', { class: 'chip', type: 'button', title: `Insert ${n}`, onclick: () => insert(n) }, n)));
       }
     }
+    if (entry.params.some((p) => p.type === 'expr') && sheet._ui('choice')) {
+      chips.append(h('button', { class: 'btn choice-btn', type: 'button', title: 'Use one value or another depending on a test',
+        onclick: () => openChoiceBuilder(sheet, (code) => { insert(code); }) }, '\u21c4 Choose between two values'));
+    }
     validate();
   }
   function insert(text) {
@@ -131,4 +135,61 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
   const dlg = m.dlg;
   draw();
   sentence.querySelector('select, input')?.focus();
+}
+
+// "Choose between two values": fill-in-the-blanks that writes if(test, yes, no) for the student.
+// onInsert(code) is called with the finished text. Opens on top of the item dialog.
+export function openChoiceBuilder(sheet, onInsert) {
+  const sc = sheet._scope;
+  const names = [
+    ...sc.variables,
+    ...sc.objects.flatMap((o) => [...(o.kind === 'input' ? [`${o.name}.text`] : []), ...o.vars.map((v) => `${o.name}.${v}`)]),
+  ];
+  const errs = h('div', { class: 'es-errs', 'aria-live': 'polite' });
+  const code = h('code', { class: 'cb-code' });
+  const add = h('button', { class: 'btn primary', type: 'button' }, 'Use this');
+  const exprs = [];
+  const box = (ph, label) => {
+    const input = h('input', { class: 'ctl expr', type: 'text', placeholder: ph, 'aria-label': label, spellcheck: 'false', autocomplete: 'off', size: 14 });
+    exprs.push(input);
+    input.addEventListener('input', update);
+    return input;
+  };
+  const left = names.length
+    ? h('select', { class: 'ctl', 'aria-label': 'Compare this', onchange: () => update() }, names.map((n) => h('option', { value: n }, n)))
+    : null;
+  const op = h('select', { class: 'ctl', 'aria-label': 'Comparison', onchange: () => update() }, OPERATORS.map((o) => h('option', { value: o }, o)));
+  op.value = '≥';
+  const right = box('a value, e.g. 10', 'Compare with');
+  const yes = box('e.g. "Goal reached!"', 'Use this value');
+  const no = box('e.g. "Keep going"', 'Otherwise use');
+
+  function update() {
+    const text = left ? `if(${left.value} ${op.value} ${right.value.trim()}, ${yes.value.trim()}, ${no.value.trim()})` : '';
+    code.textContent = text;
+    const filled = exprs.every((i) => i.value.trim());
+    const msgs = [];
+    for (const i of exprs) {
+      const msg = i.value.trim() ? check(i.value, sheet._exprScope) : null;
+      i.classList.toggle('bad', !!msg);
+      if (msg) msgs.push(msg);
+    }
+    if (left && filled && !msgs.length) { const whole = check(text, sheet._exprScope); if (whole) msgs.push(whole); }
+    errs.replaceChildren(...msgs.map((t) => h('p', {}, '\u26a0 ' + t)));
+    add.disabled = !left || !filled || msgs.length > 0;
+  }
+
+  const row = (...kids) => h('div', { class: 'cb-row' }, ...kids);
+  const body = left
+    ? [h('p', { class: 'muted' }, 'The value will depend on a test. Pick what to test, then what to use each way.'),
+       row(h('span', { class: 'lbl' }, 'If'), left, op, right),
+       row(h('span', { class: 'lbl' }, 'use'), yes),
+       row(h('span', { class: 'lbl' }, 'otherwise use'), no),
+       errs, h('div', { class: 'cb-preview' }, h('span', { class: 'muted' }, 'This writes: '), code)]
+    : [h('p', { class: 'muted' }, 'Add a variable first (left side of the app), then you can choose between two values based on it.')];
+  const cancel = h('button', { class: 'btn', type: 'button', onclick: () => m.close() }, 'Cancel');
+  add.addEventListener('click', () => { m.close(); onInsert(code.textContent); });
+  const m = modal('Choose between two values', body, [h('span', { class: 'spacer' }), cancel, add]);
+  update();
+  (left || m.dlg.querySelector('button')).focus();
 }

@@ -68,3 +68,10 @@ test('samples and new projects carry sensible levels', () => {
   assert.equal(dailyChores().features.level, 3);
   assert.equal(newProject().features.level, 2);
 });
+
+test('the choose-between-values builder is a level 3 feature (typed if() always works)', () => {
+  assert.equal(resolve({ level: 2 }).choice, false);
+  assert.equal(resolve({ level: 3 }).choice, true);
+  assert.equal(resolve({ level: 1, ui: { choice: true } }).choice, true);
+  assert.equal(resolve(undefined).choice, true);
+});
