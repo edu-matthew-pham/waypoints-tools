@@ -229,3 +229,64 @@ button.item.guided .val.bad { color: #b3261e; }
 .chip { font: inherit; font-size: 12px; padding: 2px 9px; border: 1px solid var(--line); border-radius: 99px; background: #fff; cursor: pointer; }
 .chip:hover { border-color: var(--accent); color: var(--accent); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+/* ---- polish pass ---- */
+:root { --line: #dfe3ec; --line-strong: #cdd3e0; --shadow-sm: 0 1px 2px rgba(20, 30, 60, .06); --ok: #eaf8ef; }
+body { -webkit-font-smoothing: antialiased; }
+.top { box-shadow: var(--shadow-sm); position: relative; z-index: 2; }
+.brand { letter-spacing: -.01em; }
+.tab { transition: color .15s, border-color .15s; border-radius: 6px 6px 0 0; }
+.tab:hover:not(.on) { color: var(--ink); background: #f4f6fb; }
+.btn { box-shadow: var(--shadow-sm); transition: background .15s, border-color .15s, box-shadow .15s; border-color: var(--line-strong); }
+.btn:hover:not(:disabled) { border-color: #b9c1d3; }
+.btn.primary { border-color: var(--accent); box-shadow: 0 1px 2px rgba(53, 99, 233, .35); }
+.btn.danger:hover:not(:disabled) { background: var(--bad-soft); border-color: #e7b4ae; }
+
+/* text boxes: light, subtle border; clear focus ring */
+.ctl { border-color: var(--line-strong); background: #fff; box-shadow: inset 0 1px 2px rgba(20, 30, 60, .04); transition: border-color .15s, box-shadow .15s; }
+.ctl:hover { border-color: #b4bccd; }
+.ctl:focus, .ctl:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ctl.bad { border-color: var(--bad); background: var(--bad-soft); }
+.ctl.bad:focus { box-shadow: 0 0 0 3px #f6d5d1; }
+select.ctl { padding-right: 6px; }
+.btn:focus-visible, .icon:focus-visible, .chip:focus-visible, .link:focus-visible, .tab:focus-visible, .obj-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* the app on the stage */
+.stage { border-color: var(--line-strong); }
+.w-input > input { border: 1px solid #d3d9e6; background: #fff; box-shadow: inset 0 1px 2px rgba(20, 30, 60, .06); border-radius: 10px; color: var(--ink); transition: border-color .15s, box-shadow .15s; }
+.w-input > input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.w-button > button { box-shadow: 0 1px 2px rgba(20, 30, 60, .18); transition: filter .12s, transform .06s; }
+.w-button > button:hover { filter: brightness(1.06); }
+.w-button > button:active { transform: translateY(1px); filter: brightness(.92); }
+.w-text > .t { padding: 0 2px; line-height: 1.25; }
+.design .w-text { outline: 1px dashed #d5dbe8; outline-offset: 1px; border-radius: 6px; }
+.design .w.sel { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+/* side tree: compact rows */
+.tree-row.obj { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0; border-bottom: 0; border-radius: 8px; margin: 1px 0; }
+.tree-row.obj.on { background: var(--accent-soft); }
+.obj-btn { flex: 1; min-width: 0; display: flex; align-items: baseline; justify-content: space-between; gap: 8px; border: 0; background: none; text-align: left; padding: 6px 8px; border-radius: 8px; }
+.obj-btn:hover { background: #f0f2f8; }
+.tree-row.obj.on .obj-btn:hover { background: transparent; }
+.obj-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-row.obj .kind { width: auto; font-size: 11px; color: var(--muted); flex: none; }
+.tree-row.obj .chips { margin: 0 4px 0 0; flex: none; }
+.tree-children { margin: 2px 0 10px 7px; padding-left: 8px; }
+.add-kinds .btn { font-size: 13px; padding: 5px 10px; }
+.side h3 { margin-top: 20px; }
+
+/* cards */
+.props, .ev, .watch { box-shadow: var(--shadow-sm); }
+.ev { border-color: var(--line); }
+.ev.ran { background: var(--ok); border-color: #8fd1a8; }
+.es.guided .ev { border: 1px solid var(--line); }
+.es.guided .ev:hover { border-color: #c3cbe0; }
+.es.guided .ev.sel { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.run-bar { flex-wrap: wrap; }
+.props h3 small { color: var(--muted); }
+.design .w.sel { z-index: 5; }
+
+/* match the Waypoints tools site palette */
+:root { --bg: #f6f7f9; --line: #dde2e8; --line-strong: #cbd2dc; --ink: #1c2430; --muted: #5b6676; --accent: #2f6fdd; --accent-soft: #e6eefb; }
+.btn.primary:hover { background: #2760c4; }
+.btn.primary { box-shadow: 0 1px 2px rgba(47, 111, 221, .35); }

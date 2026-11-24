@@ -14,15 +14,18 @@ function addRow(placeholder, onAdd, withValue) {
 
 function objectRow(o) {
   const many = o.instances.length > 1;
-  return h('div', { class: 'tree-row obj' },
-    h('span', { class: 'kind' }, OBJECT_KINDS[o.kind]?.label ?? o.kind),
-    h('div', { class: 'obj-main' },
-      h('strong', {}, o.name),
-      h('div', { class: 'chips' }, o.instances.map((i, n) => h('button', {
-        class: 'chip' + (i.id === S.selId ? ' on' : ''),
-        title: `Select ${o.name}${many ? ' copy ' + (n + 1) : ''}`,
-        onclick: () => hooks.select(i.id),
-      }, many ? String(n + 1) : '●')))));
+  const first = o.instances[0];
+  const on = o.instances.some((i) => i.id === S.selId);
+  return h('div', { class: 'tree-row obj' + (on ? ' on' : '') },
+    h('button', { class: 'obj-btn', title: `Select ${o.name}`, 'aria-current': on ? 'true' : null,
+      onclick: () => hooks.select(on && many ? S.selId : first.id) },
+      h('span', { class: 'obj-name' }, o.name),
+      h('span', { class: 'kind' }, OBJECT_KINDS[o.kind]?.label ?? o.kind)),
+    many ? h('div', { class: 'chips' }, o.instances.map((i, n) => h('button', {
+      class: 'chip' + (i.id === S.selId ? ' on' : ''),
+      title: `Select ${o.name} copy ${n + 1}`,
+      onclick: () => hooks.select(i.id),
+    }, String(n + 1)))) : null);
 }
 
 export function renderSide(el) {

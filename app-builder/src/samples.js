@@ -16,11 +16,11 @@ export function musicTracker() {
       {
         id: 'home', name: 'Home',
         objects: [
-          obj('Title', 'text', [inst('i_title', 85, 40, 220, 36, 'Practice tracker')]),
-          obj('Total', 'text', [inst('i_total', 85, 120, 220, 36, 'Total: 0 min')]),
-          obj('Msg', 'text', [inst('i_msg', 85, 170, 220, 36, '')]),
-          obj('AddBtn', 'button', [inst('i_add', 120, 240, 150, 48, '+10 minutes')]),
-          obj('SummaryBtn', 'button', [inst('i_sum', 120, 310, 150, 48, 'Summary')]),
+          obj('Title', 'text', [inst('i_title', 24, 48, 342, 36, 'Practice tracker')]),
+          obj('Total', 'text', [inst('i_total', 24, 112, 342, 32, 'Total: 0 min')]),
+          obj('Msg', 'text', [inst('i_msg', 24, 152, 342, 32, '')]),
+          obj('AddBtn', 'button', [inst('i_add', 24, 216, 342, 48, '+10 minutes')]),
+          obj('SummaryBtn', 'button', [inst('i_sum', 24, 276, 342, 48, 'Summary')]),
         ],
         events: [
           ev('e_start', [{ type: 'onStart' }], [
@@ -45,9 +45,9 @@ export function musicTracker() {
       {
         id: 'summary', name: 'Summary',
         objects: [
-          obj('Heading', 'text', [inst('i_head', 85, 60, 220, 36, 'Summary')]),
-          obj('Result', 'text', [inst('i_res', 55, 140, 280, 36, '')]),
-          obj('BackBtn', 'button', [inst('i_back', 120, 220, 150, 48, 'Back')]),
+          obj('Heading', 'text', [inst('i_head', 24, 48, 342, 36, 'Summary')]),
+          obj('Result', 'text', [inst('i_res', 24, 112, 342, 32, '')]),
+          obj('BackBtn', 'button', [inst('i_back', 24, 168, 342, 48, 'Back')]),
         ],
         events: [
           ev('e_s_start', [{ type: 'onStart' }], [
