@@ -13,7 +13,7 @@ export function modal(title, body, foot) {
   const dlg = h('dialog', { class: 'es-dlg' });
   const close = () => { if (dlg.open) dlg.close(); };
   dlg.append(
-    h('div', { class: 'dlg-head' }, h('strong', {}, title), h('button', { class: 'icon', type: 'button', title: 'Close', onclick: close }, '\u00d7')),
+    h('div', { class: 'dlg-head' }, h('strong', {}, title), h('button', { class: 'icon', type: 'button', title: 'Close', 'data-ab': 'close', onclick: close }, '\u00d7')),
     h('div', { class: 'dlg-body' }, body));
   if (foot) dlg.append(h('div', { class: 'dlg-foot' }, foot));
   dlg.addEventListener('close', () => { if (!dlg._keep) dlg.remove(); });
@@ -43,7 +43,7 @@ export function openChooser(sheet, kind, ev, depth, onPick) {
   let m;
 
   const entryBtn = ([type, entry], why, label, preset) => h('button', {
-    class: 'es-entry' + (entry.trigger ? ' trig' : ''), type: 'button', disabled: !!why, title: why,
+    'data-ab': 'entry:' + type, class: 'es-entry' + (entry.trigger ? ' trig' : ''), type: 'button', disabled: !!why, title: why,
     onclick: () => { m.close(); onPick(type, preset); },
   }, entry.trigger ? '⚡ ' : '', label, why ? h('small', {}, why) : entry.help ? h('small', { class: 'help' }, entry.help) : null);
 
@@ -57,20 +57,20 @@ export function openChooser(sheet, kind, ev, depth, onPick) {
 
   function grid() {
     title.textContent = kind === 'cond' ? 'Add a condition' : 'Add an action';
-    const tile = (label, iconSvg, sub, onclick) => {
+    const tile = (label, iconSvg, sub, onclick, abKey) => {
       const ic = h('span', { class: 'op-icon' }); ic.innerHTML = iconSvg;
-      return h('button', { class: 'op-tile small', type: 'button', onclick }, ic, h('strong', {}, label), sub ? h('small', {}, sub) : null);
+      return h('button', { class: 'op-tile small', type: 'button', 'data-ab': abKey, onclick }, ic, h('strong', {}, label), sub ? h('small', {}, sub) : null);
     };
     const general = GROUPS.map((g) => [g, usable.filter(([, e]) => e.category === g.id && !objParam(e))])
       .filter(([, list]) => list.length)
-      .map(([g, list]) => tile(g.label, ICONS[g.icon] || FALLBACK_ICON, null, () => listFor(g.label, list.map((x) => entryBtn(x, sheet._blocked(kind, x[1], ev, depth), plain(x[1].label))))));
+      .map(([g, list]) => tile(g.label, ICONS[g.icon] || FALLBACK_ICON, null, () => listFor(g.label, list.map((x) => entryBtn(x, sheet._blocked(kind, x[1], ev, depth), plain(x[1].label)))), 'group:' + g.id));
     const objs = sheet._scope.objects
       .map((o) => [o, usable.filter(([, e]) => fitsObject(e, o))])
       .filter(([, list]) => list.length)
       .map(([o, list]) => tile(o.name, ICONS[o.kind] || FALLBACK_ICON, COMPONENTS[o.kind]?.label, () => listFor(o.name, list.map((x) => {
         const p = objParam(x[1]);
         return entryBtn(x, whyFor(x[1], o), plain(x[1].label.replace(`{${p.name}}`, o.name)), { [p.name]: o.name });
-      }))));
+      })), 'group:object:' + o.name));
     body.replaceChildren(
       h('div', { class: 'op-grid small' }, general),
       objs.length ? h('div', { class: 'es-cat' }, 'On this screen') : null,
@@ -80,7 +80,7 @@ export function openChooser(sheet, kind, ev, depth, onPick) {
 
   function listFor(name, buttons) {
     title.textContent = name;
-    body.replaceChildren(h('button', { class: 'mini back', type: 'button', onclick: () => { search.value = ''; grid(); } }, '← Back'), ...buttons);
+    body.replaceChildren(h('button', { class: 'mini back', type: 'button', 'data-ab': 'back', onclick: () => { search.value = ''; grid(); } }, '← Back'), ...buttons);
     body.querySelector('.es-entry:not(:disabled)')?.focus();
   }
 
@@ -95,7 +95,7 @@ export function openChooser(sheet, kind, ev, depth, onPick) {
     if (!body.children.length) body.append(h('p', { class: 'muted' }, 'Nothing matches.'));
   }
 
-  const search = h('input', { class: 'ctl', type: 'search', placeholder: kind === 'cond' ? 'Search conditions…' : 'Search actions…', 'aria-label': 'Search',
+  const search = h('input', { class: 'ctl', type: 'search', 'data-ab': 'search', placeholder: kind === 'cond' ? 'Search conditions…' : 'Search actions…', 'aria-label': 'Search',
     oninput: () => (search.value.trim() ? flat(search.value.trim()) : grid()) });
   m = modal(kind === 'cond' ? 'Add a condition' : 'Add an action', [search, body]);
   const title = m.dlg.querySelector('.dlg-head strong');
@@ -113,7 +113,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
   let lastExpr = null;
   let dlgBody = null;
 
-  const done = h('button', { class: 'btn primary', type: 'button' }, isNew ? 'Add' : 'Done');
+  const done = h('button', { class: 'btn primary', type: 'button', 'data-ab': 'done' }, isNew ? 'Add' : 'Done');
   const validate = () => {
     const msgs = [];
     for (const input of exprs) {
@@ -186,7 +186,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
       exprParams.length > 1 ? h('strong', {}, (p.name === 'left' ? 'First value' : p.name === 'right' ? 'Second value' : 'Value') + ': ') : null, p.help || '')));
     chips.replaceChildren();
     if (exprParams.length) {
-      chips.append(h('button', { class: 'btn find-btn', type: 'button', onclick: () => openExpressionBrowser(sheet, insert) }, '\ud83d\udd0d Find expressions'));
+      chips.append(h('button', { class: 'btn find-btn', type: 'button', 'data-ab': 'find-expressions', onclick: () => openExpressionBrowser(sheet, insert) }, '\ud83d\udd0d Find expressions'));
     }
     if (entry.params.some((p) => p.type === 'expr')) {
       const sc = sheet._scope;
@@ -196,12 +196,12 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
       ];
       if (names.length) {
         chips.append(h('span', { class: 'muted' }, 'Names: '),
-          ...names.map((n) => h('button', { class: 'chip', type: 'button', title: `Insert ${n}`, onclick: () => insert(n) }, n)));
+          ...names.map((n) => h('button', { class: 'chip', type: 'button', 'data-ab': 'name:' + n, title: `Insert ${n}`, onclick: () => insert(n) }, n)));
       }
     }
     if (entry.params.some((p) => p.type === 'expr') && sheet._ui('choice')) {
       chips.append(h('button', { class: 'btn choice-btn', type: 'button', title: 'Use one value or another depending on a test',
-        onclick: () => openChoiceBuilder(sheet, (code) => { insert(code); }) }, '\u21c4 Choose between two values'));
+        'data-ab': 'choose-two', onclick: () => openChoiceBuilder(sheet, (code) => { insert(code); }) }, '\u21c4 Choose between two values'));
     }
     validate();
   }
@@ -215,8 +215,8 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
     input.focus();
   }
 
-  const cancel = h('button', { class: 'btn', type: 'button', onclick: () => m.close() }, 'Cancel');
-  const del = !isNew && onDelete ? h('button', { class: 'btn danger', type: 'button', onclick: () => { m.close(); onDelete(); } }, 'Delete') : null;
+  const cancel = h('button', { class: 'btn', type: 'button', 'data-ab': 'cancel', onclick: () => m.close() }, 'Cancel');
+  const del = !isNew && onDelete ? h('button', { class: 'btn danger', type: 'button', 'data-ab': 'delete', onclick: () => { m.close(); onDelete(); } }, 'Delete') : null;
   done.addEventListener('click', () => { m.close(); onDone(draft); });
 
   const title = (isNew ? 'Add ' : 'Change ') + (kind === 'cond' ? (isNew ? 'a condition' : 'this condition') : (isNew ? 'an action' : 'this action'));
@@ -238,7 +238,7 @@ export function openChoiceBuilder(sheet, onInsert) {
   ];
   const errs = h('div', { class: 'es-errs', 'aria-live': 'polite' });
   const code = h('code', { class: 'cb-code' });
-  const add = h('button', { class: 'btn primary', type: 'button' }, 'Use this');
+  const add = h('button', { class: 'btn primary', type: 'button', 'data-ab': 'done' }, 'Use this');
   const exprs = [];
   const box = (ph, label) => {
     const input = h('input', { class: 'ctl expr', type: 'text', placeholder: ph, 'aria-label': label, spellcheck: 'false', autocomplete: 'off', size: 14 });
@@ -278,7 +278,7 @@ export function openChoiceBuilder(sheet, onInsert) {
        row(h('span', { class: 'lbl' }, 'otherwise use'), no),
        errs, h('div', { class: 'cb-preview' }, h('span', { class: 'muted' }, 'This writes: '), code)]
     : [h('p', { class: 'muted' }, 'Add a variable first (left side of the app), then you can choose between two values based on it.')];
-  const cancel = h('button', { class: 'btn', type: 'button', onclick: () => m.close() }, 'Cancel');
+  const cancel = h('button', { class: 'btn', type: 'button', 'data-ab': 'cancel', onclick: () => m.close() }, 'Cancel');
   add.addEventListener('click', () => { m.close(); onInsert(code.textContent); });
   const m = modal('Choose between two values', body, [h('span', { class: 'spacer' }), cancel, add]);
   update();
@@ -327,7 +327,7 @@ export function openExpressionBrowser(sheet, insert) {
     for (const [title, items] of sections) {
       const hits = items.filter((it) => !ql ? !it.extra : (it.label || it.code).toLowerCase().includes(ql) || (it.desc || '').toLowerCase().includes(ql));
       if (!hits.length) continue;
-      body.append(h('div', { class: 'es-cat' }, title), ...hits.map((it) => h('button', { class: 'xb-item', type: 'button', title: 'Insert ' + it.code,
+      body.append(h('div', { class: 'es-cat' }, title), ...hits.map((it) => h('button', { 'data-ab': 'expr:' + it.code, class: 'xb-item', type: 'button', title: 'Insert ' + it.code,
         onclick: () => {
           m.close();
           // functions go in with the cursor between the brackets
@@ -337,7 +337,7 @@ export function openExpressionBrowser(sheet, insert) {
     }
     if (!body.children.length) body.append(h('p', { class: 'muted' }, 'Nothing matches.'));
   };
-  const search = h('input', { class: 'ctl', type: 'search', placeholder: 'Search, e.g. round, text, join…', 'aria-label': 'Search expressions', oninput: () => draw(search.value.trim()) });
+  const search = h('input', { class: 'ctl', type: 'search', 'data-ab': 'search', placeholder: 'Search, e.g. round, text, join…', 'aria-label': 'Search expressions', oninput: () => draw(search.value.trim()) });
   m = modal('Find expressions', [h('p', { class: 'muted' }, 'Click one to put it in the value box. Position and size are found by searching (e.g. "x").'), search, body]);
   draw();
   search.focus();

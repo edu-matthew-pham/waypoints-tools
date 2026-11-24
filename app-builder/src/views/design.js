@@ -35,7 +35,7 @@ export function initDesign(root) {
   function sync() { stage.sync(items()); stage.setSelected(S.selId); }
 
   function numField(label, key, inst, min = 0) {
-    const input = h('input', { class: 'ctl small', type: 'number', value: inst[key], min, 'aria-label': label, 'data-k': key,
+    const input = h('input', { class: 'ctl small', type: 'number', value: inst[key], min, 'aria-label': label, 'data-k': key, 'data-ab': 'prop:' + key,
       oninput: () => { inst[key] = Math.max(min, Math.round(Number(input.value) || 0)); sync(); },
       onchange: () => hooks.commit() });
     return h('label', { class: 'f' }, h('span', {}, label), input);
@@ -53,7 +53,7 @@ export function initDesign(root) {
     }
     const { obj, inst } = hit;
     const n = obj.instances.indexOf(inst) + 1;
-    const text = h('input', { class: 'ctl', value: inst.text, 'aria-label': 'Text', oninput: (e) => { inst.text = e.target.value; sync(); }, onchange: () => hooks.commit() });
+    const text = h('input', { class: 'ctl', 'data-ab': 'prop:text', value: inst.text, 'aria-label': 'Text', oninput: (e) => { inst.text = e.target.value; sync(); }, onchange: () => hooks.commit() });
     const showCopies = !S.rf || S.rf.instVars;
     const ivars = obj.instanceVars.map((v) => {
       const cur = v.name in inst.vars ? inst.vars[v.name] : v.value;
@@ -94,9 +94,9 @@ export function initDesign(root) {
       const choose = (name) => { inst.image = name; hooks.commit(); };
       extra.push(h('div', { class: 'f wide' }, h('span', {}, 'Picture'),
         h('div', { class: 'pic-grid' },
-          ...imageNames(S.project).map((n) => h('button', { class: 'pic' + (inst.image === n ? ' on' : ''), type: 'button', title: n, 'aria-label': 'Use picture ' + n, 'aria-pressed': String(inst.image === n), onclick: () => choose(n) },
+          ...imageNames(S.project).map((n) => h('button', { class: 'pic' + (inst.image === n ? ' on' : ''), 'data-ab': 'picture:' + n, type: 'button', title: n, 'aria-label': 'Use picture ' + n, 'aria-pressed': String(inst.image === n), onclick: () => choose(n) },
             h('img', { src: imageData(S.project, n), alt: '' }))),
-          h('button', { class: 'pic add', type: 'button', title: 'Upload a picture', onclick: () => pickPicture(({ fileName, data }) => {
+          h('button', { class: 'pic add', 'data-ab': 'upload-picture', type: 'button', title: 'Upload a picture', onclick: () => pickPicture(({ fileName, data }) => {
             const name = assetName(S.project, fileName);
             S.project.assets.push({ name, data });
             choose(name);
@@ -134,8 +134,8 @@ export function initDesign(root) {
         ...(ivars.length ? ivars : [h('p', { class: 'muted' }, 'No variables of its own. Add one so each copy can have its own value (like done, or hearts).')]),
         showCopies ? addVar : null] : []),
       h('div', { class: 'btn-row' },
-        showCopies || obj.instances.length > 1 ? h('button', { class: 'btn', onclick: () => { const c = duplicateInstance(obj, inst, sizeOf(S.project)); S.selId = c.id; hooks.commit(); } }, 'Duplicate (new copy)') : null,
-        h('button', { class: 'btn danger', onclick: () => { deleteInstance(screen(), inst.id); S.selId = null; hooks.commit(); } }, 'Delete')),
+        showCopies || obj.instances.length > 1 ? h('button', { class: 'btn', 'data-ab': 'duplicate', onclick: () => { const c = duplicateInstance(obj, inst, sizeOf(S.project)); S.selId = c.id; hooks.commit(); } }, 'Duplicate (new copy)') : null,
+        h('button', { class: 'btn danger', 'data-ab': 'delete', onclick: () => { deleteInstance(screen(), inst.id); S.selId = null; hooks.commit(); } }, 'Delete')),
     );
   }
 
@@ -145,6 +145,9 @@ export function initDesign(root) {
     if (!hit) return false;
     const step = e.shiftKey ? 10 : 1;
     const move = { ArrowLeft: ['x', -step], ArrowRight: ['x', step], ArrowUp: ['y', -step], ArrowDown: ['y', step] }[e.key];
+    // Alt + arrows resize: the keyboard way to do what dragging the corner handle does
+    const grow = e.altKey && { ArrowLeft: ['w', -step], ArrowRight: ['w', step], ArrowUp: ['h', -step], ArrowDown: ['h', step] }[e.key];
+    if (grow) { hit.inst[grow[0]] = Math.max(grow[0] === 'w' ? 24 : 20, hit.inst[grow[0]] + grow[1]); sync(); renderProps(true); hooks.commit(); return true; }
     if (move) { hit.inst[move[0]] = Math.max(0, hit.inst[move[0]] + move[1]); sync(); renderProps(true); hooks.commit(); return true; }
     if (e.key === 'Delete' || e.key === 'Backspace') { deleteInstance(screen(), S.selId); S.selId = null; hooks.commit(); return true; }
     return false;

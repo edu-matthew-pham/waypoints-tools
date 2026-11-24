@@ -9,7 +9,7 @@ export function initRun(root) {
   const watch = h('div', { class: 'watch' });
   const problems = h('div', { class: 'problems' });
   const sheet = document.createElement('event-sheet');
-  const restartBtn = h('button', { class: 'btn' }, '↻ Restart');
+  const restartBtn = h('button', { class: 'btn', 'data-ab': 'restart' }, '↻ Restart');
   root.append(
     h('div', { class: 'stage-col' },
       h('div', { class: 'run-bar' }, restartBtn, h('span', { class: 'muted' }, 'Starts on the screen you were editing. Click things like a user would.')),

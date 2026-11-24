@@ -479,3 +479,15 @@ test('lists: rename a list updates list dropdowns and expressions', async () => 
   assert.equal(p.screens[0].events[0].actions[0].value, 'count(groceries)');
   assert.equal(p.screens[0].objects[0].instances[0].source, 'groceries', 'the List component follows');
 });
+
+test('sheetText: one readable line per event, sub-events repeat their parents', async () => {
+  const { sheetText } = await import('../src/core/sheet-text.js');
+  const { choresChecklist, musicTracker } = await import('../src/samples.js');
+  const t = sheetText(choresChecklist());
+  assert.match(t, /event: when BedBox is clicked > when BedBox text = "⬜" \| do: Set BedBox text to "✅"/);
+  assert.match(t, /event: when BedBox is clicked > else \| do: Set BedBox text to "⬜"/);
+  const m = sheetText(musicTracker());
+  assert.match(m, /^variable minutes = 0$/m);
+  assert.match(m, /object AddBtn \(button\) text "\+10 minutes"/);
+  assert.match(m, /Go to screen Summary/);
+});

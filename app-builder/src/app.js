@@ -11,14 +11,18 @@ import { initRun } from './views/run.js';
 import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './core/features.js';
 import { pictures } from './ui/component-ui.js';
+import { embed } from './embed.js';
 import { imageData } from './core/assets.js';
 pictures.lookup = (name) => imageData(S.project, name);
 import { SAMPLES, sampleById } from './samples.js';
 
 // ?sample=water opens that lesson project. Each lesson link keeps its own saved work, so a student who
 // comes back (or refreshes) carries on where they were; "Start again" reloads the original.
-const lessonId = new URLSearchParams(location.search).get('sample');
-const STORE_KEY = lessonId ? 'appbuilder.lesson.' + lessonId : 'appbuilder.prototype.v1';
+const QS = new URLSearchParams(location.search);
+const lessonId = QS.get('sample');
+// ?store=<key>: a page that embeds App Builder (one per lesson step) keeps each copy's work apart.
+const storeId = QS.get('store') || QS.get('id'); // ?id= is a Waypoints lesson step
+const STORE_KEY = storeId ? 'appbuilder.store.' + storeId : lessonId ? 'appbuilder.lesson.' + lessonId : 'appbuilder.prototype.v1';
 const store = (fn) => { try { return fn(localStorage); } catch { return null; } };
 let history;
 
@@ -56,6 +60,7 @@ function setProject(p, { resetHistory = true } = {}) {
 function commit(source) {
   if (history.push(JSON.stringify(S.project))) store((ls) => ls.setItem(STORE_KEY, history.current));
   refresh(source);
+  embed.report(S.project);
 }
 function undo(d) {
   const json = history.step(d);
@@ -63,6 +68,7 @@ function undo(d) {
   setProject(JSON.parse(json), { resetHistory: false });
   store((ls) => ls.setItem(STORE_KEY, json));
   refresh();
+  embed.report(S.project);
 }
 function select(id) { S.selId = id; design.select(); renderSide(els.side); }
 
@@ -85,14 +91,14 @@ Object.assign(hooks, { commit, refresh, select, notify, setTab });
 
 // ---------------- top bar & tabs ----------------
 function renderTop() {
-  const sel = h('select', { class: 'ctl', 'aria-label': 'Load a sample' },
+  const sel = h('select', { class: 'ctl', 'data-ab': 'samples', 'aria-label': 'Load a sample' },
     h('option', { value: '' }, 'Samples…'),
     Object.keys(SAMPLES).map((n) => h('option', { value: n }, n)));
   sel.addEventListener('change', () => { if (sel.value) loadProject(SAMPLES[sel.value]()); });
   const f = S.project.features;
   const level = S.locked ? h('span', { class: 'tag lvl', title: 'Set by your teacher' }, S.rf.custom ? 'Lesson' : S.rf.name)
     : (() => {
-      const l = h('select', { class: 'ctl', 'aria-label': 'Level', title: 'How many blocks to show. Nothing you built is ever removed.' },
+      const l = h('select', { class: 'ctl', 'data-ab': 'level', 'aria-label': 'Level', title: 'How many blocks to show. Nothing you built is ever removed.' },
         S.rf.custom ? h('option', { value: 'custom', selected: true }, 'Level: Custom') : null,
         Object.entries(LEVELS).map(([n, d]) => h('option', { value: n, selected: !S.rf.custom && f.level === Number(n) }, `L${n}: ${d.name}`)));
       l.addEventListener('change', () => { if (l.value === 'custom') return; S.project.features = { level: Number(l.value) }; S.rf = resolve(S.project.features); commit(); });
@@ -100,25 +106,25 @@ function renderTop() {
     })();
   els.top.replaceChildren(
     h('strong', { class: 'brand' }, 'App Builder', h('span', { class: 'tag' }, 'prototype')),
-    h('input', { class: 'ctl name', value: S.project.name, 'aria-label': 'Project name', oninput: (e) => { S.project.name = e.target.value; }, onchange: () => commit() }),
+    h('input', { class: 'ctl name', 'data-ab': 'project-name', value: S.project.name, 'aria-label': 'Project name', oninput: (e) => { S.project.name = e.target.value; }, onchange: () => commit() }),
     h('span', { class: 'spacer' }),
     (() => {
-      const d = h('select', { class: 'ctl', 'aria-label': 'Screen size', title: 'The size of the app you are building' },
+      const d = h('select', { class: 'ctl', 'data-ab': 'screen-size', 'aria-label': 'Screen size', title: 'The size of the app you are building' },
         Object.entries(DEVICES).map(([k, v]) => h('option', { value: k, selected: S.project.device === k, title: `${v.w} \u00d7 ${v.h}` }, v.label)));
       d.addEventListener('change', () => { S.project.device = d.value; commit(); });
       return d;
     })(),
     level,
-    h('button', { class: 'btn', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, 'Undo'),
-    h('button', { class: 'btn', disabled: !history.canRedo, title: 'Redo (Ctrl+Shift+Z)', onclick: () => undo(1) }, 'Redo'),
+    h('button', { class: 'btn', 'data-ab': 'undo', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, 'Undo'),
+    h('button', { class: 'btn', 'data-ab': 'redo', disabled: !history.canRedo, title: 'Redo (Ctrl+Shift+Z)', onclick: () => undo(1) }, 'Redo'),
     h('span', { class: 'sep' }),
     S.locked ? '' : sel, // a locked lesson link keeps students in the lesson project
-    lessonStart ? h('button', { class: 'btn', title: 'Throw away your changes and reload the lesson project', onclick: () => {
+    lessonStart ? h('button', { class: 'btn', 'data-ab': 'start-again', title: 'Throw away your changes and reload the lesson project', onclick: () => {
       if (confirmTwice('Start again? Your changes to this lesson will be lost.')) loadProject(lessonStart());
     } }, 'Start again')
-      : h('button', { class: 'btn', onclick: () => loadProject(newProject()) }, 'New'),
-    h('button', { class: 'btn', onclick: openFile }, 'Open…'),
-    h('button', { class: 'btn primary', onclick: saveFile }, 'Save'),
+      : h('button', { class: 'btn', 'data-ab': 'new', onclick: () => loadProject(newProject()) }, 'New'),
+    h('button', { class: 'btn', 'data-ab': 'open', onclick: openFile }, 'Open…'),
+    h('button', { class: 'btn primary', 'data-ab': 'save', onclick: saveFile }, 'Save'),
   );
 }
 // no confirm() in some hosts: ask by pressing twice within 4 seconds
@@ -136,6 +142,7 @@ function loadProject(p) {
   setProject(p);
   store((ls) => ls.setItem(STORE_KEY, JSON.stringify(S.project)));
   refresh();
+  embed.report(S.project);
 }
 async function saveFile() {
   const json = JSON.stringify(S.project, null, 2);
@@ -163,7 +170,7 @@ function openFile() {
 
 function renderTabs() {
   els.tabs.replaceChildren(...[['design', 'Design'], ['events', 'Events'], ['run', 'Run ▶']].map(([id, label]) =>
-    h('button', { class: 'tab' + (S.tab === id ? ' on' : ''), role: 'tab', 'aria-selected': S.tab === id, onclick: () => setTab(id) }, label)));
+    h('button', { class: 'tab' + (S.tab === id ? ' on' : ''), 'data-ab': 'tab:' + id, role: 'tab', 'aria-selected': S.tab === id, onclick: () => setTab(id) }, label)));
   els.design.hidden = S.tab !== 'design';
   els.events.hidden = S.tab !== 'events';
   els.run.hidden = S.tab !== 'run';
@@ -194,12 +201,23 @@ document.addEventListener('keydown', (e) => {
 // ---------------- boot ----------------
 let initial = null;
 try { const saved = store((ls) => ls.getItem(STORE_KEY)); if (saved) initial = JSON.parse(saved); } catch { /* ignore */ }
-const lessonStart = lessonId && sampleById(lessonId) ? () => sampleById(lessonId) : null;
+// ?code=<project JSON>: a lesson step's starter (Waypoints playgrounds pass their starter this way)
+let codeStart = null;
+try { if (QS.get('code')) { const p = JSON.parse(QS.get('code')); codeStart = () => structuredClone(p); } } catch { queueMicrotask(() => notify('The starter project for this step could not be read.')); }
+const lessonStart = codeStart || (lessonId && sampleById(lessonId) ? () => sampleById(lessonId) : null);
 if (lessonId && !lessonStart) queueMicrotask(() => notify(`There is no lesson called "${lessonId}". Opening your last project instead.`));
-initial = checkProject(initial || (lessonStart ? lessonStart() : SAMPLES['Practice tracker']()));
+initial = checkProject(initial || (lessonStart ? lessonStart() : SAMPLES['Minutes and goal (two screens)']()));
 applyParams(initial);
 setProject(initial);
 refresh();
 const tab = new URLSearchParams(location.search).get('tab');
 if (tab && tabViews[tab] !== undefined) setTab(tab);
 window.__app = { S, setTab, loadProject }; // handy for debugging and tests
+
+// An embedding page (a lesson) can start, reset and read the project. See src/embed.js.
+const hadSaved = !!store((ls) => ls.getItem(STORE_KEY));
+embed.start({
+  start: (p) => { if (!hadSaved) loadProject(p); else embed.report(S.project); }, // a student's own work wins over the starter
+  reset: (p) => loadProject(p),
+  get: () => S.project,
+});

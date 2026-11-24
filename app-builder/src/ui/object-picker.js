@@ -12,7 +12,7 @@ export function openObjectPicker({ allowed, onPick }) {
   const tile = (c) => {
     const icon = h('span', { class: 'op-icon' });
     icon.innerHTML = ICONS[c.id] || FALLBACK_ICON;
-    return h('button', { class: 'op-tile', type: 'button', onclick: () => { m.close(); onPick(c.id); } },
+    return h('button', { class: 'op-tile', type: 'button', 'data-ab': 'kind:' + c.id, onclick: () => { m.close(); onPick(c.id); } },
       icon, h('strong', {}, c.label), h('small', {}, c.hint));
   };
   const draw = (q = '') => {
@@ -29,7 +29,7 @@ export function openObjectPicker({ allowed, onPick }) {
   };
   const parts = [];
   if (list.length > 8) {
-    const search = h('input', { class: 'ctl', type: 'search', placeholder: 'Search objects…', 'aria-label': 'Search objects', oninput: () => draw(search.value) });
+    const search = h('input', { class: 'ctl', type: 'search', 'data-ab': 'search', placeholder: 'Search objects…', 'aria-label': 'Search objects', oninput: () => draw(search.value) });
     parts.push(search);
   }
   parts.push(body);

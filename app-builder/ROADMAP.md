@@ -11,10 +11,10 @@ The picker groups tiles by category and only shows what the current level / less
 
 | Category | Components | Level | Notes |
 |---|---|---|---|
-| Basics | Button, Text, Text input, Box (coloured rectangle) *(done)* | 1-2 | Box + "Set width / height / x / y" make progress bars |
-| Choices | Toggle *(done)*, Slider *(done)*, Dropdown, Checkbox | 2 | Toggle has `Name.on` and an "is on / off" condition (pair with Else); Slider has `Name.value`, `min`, `max`. Both have a "changes" trigger. |
-| Media | Image *(done)* with Pictures panel and 8 built-in pictures | 2 | Uploads stored as data URLs in the project file; photos shrunk to 800 px, GIFs kept (they animate); in-use pictures can't be deleted. |
-| Data | List *(done)*, Repeater (one row per list item), Gallery | 3-4 | List shows a list variable; tapping an item gives ClickedItem / ClickedIndex. |
+| Basics | Button, Text, Text input *(done)* | 1-2 | |
+| Choices | Toggle (on/off), Slider, Dropdown, Checkbox | 2 | Each has a value you can compare and an "on changed" trigger. Reuse `onChanged`. |
+| Media | Image (+ asset panel, built-in icons), Emoji/icon | 2 | Assets stored as data URLs in the project file (size cap and warning). |
+| Data | List (shows items), Repeater (one row per list item), Gallery | 3-4 | Needs the list value type and "for each" first (section 4). |
 | Layout | Stack (row/column), Container, Tabs, Scroll area | 3-4 | Needs children inside containers (section 5). |
 | Advanced | Custom HTML widget (sandboxed iframe) | 4 | Escape hatch; talks to events through postMessage. |
 
@@ -25,41 +25,38 @@ Pointer Events cover mouse, pen and touch with one code path, so nothing depends
 
 | Event | Kind | Level | How |
 |---|---|---|---|
-| Object **pressed** / **released** *(done)* | trigger | 2 | `pointerdown` / `pointerup` on the object; release goes to the pressed object even if the pointer slid off |
+| Object **pressed** / **released** | trigger | 2 | `pointerdown` / `pointerup` on the object |
 | Object **double-clicked**, **long-pressed** | trigger | 3 | Timer on pointerdown (long press 500 ms) |
 | Pointer **enters / leaves** object (hover) | trigger | 3 | Desktop only; hidden on touch devices |
-| **Key pressed** `{key}` / **key released** *(done)* | trigger | 2 | Keys offered in a picker: Enter, Escape, Space, arrows, letters, digits. `Enter` in a text input is the beginner case ("submit"). |
-| **Key is held down** `{key}` *(done)* | condition, every tick | 3 | Held keys; same mechanism as every-tick events |
-| Text input **changed** / **submitted** *(done)* | trigger | 2 | Enter in a text box fires "Enter is pressed in ..." |
+| **Key pressed** `{key}` / **key released** | trigger | 2-3 | Keys offered in a picker: Enter, Escape, Space, arrows, letters, digits. `Enter` in a text input is the beginner case ("submit"). |
+| **Key is down** `{key}` | condition, every tick | 3 | Held keys; same mechanism as every-tick events |
+| Text input **changed** / **submitted** | trigger | 2 | `onChanged` exists; add `onSubmitted` (Enter) |
 | Object **is visible / is hovered / has focus** | condition | 3 | |
 | **Swipe** left/right/up/down on screen or object | trigger | 4 | Pointer delta threshold |
 
-Runtime *(done except hover)*: `rt.key(name, down)`, `rt.press/release(id)`, `rt.submit(id)`, `rt.userChange(id, value)` next to `rt.click`. Keys only reach the
-app when it has focus: the Run tab focuses it automatically, and the Events preview shows "click it first" when the screen uses keys. Keys typed into a text box are ignored by key events (the box has its own). Headless tests feed these
+Runtime: add `rt.key(name, down)`, `rt.hover(id, over)`, `rt.pointer(id, 'down'|'up')` next to `rt.click`. Keys only reach the
+app when the preview has focus, so the preview shows "Click the app, then press keys" until it does. Headless tests feed these
 calls directly, just like clicks today.
 
 ## 3. Time and chance
 
 | Item | Kind | Level |
 |---|---|---|
-| **Every N seconds** *(done)* | trigger | 2 |
-| **After N seconds** (once) *(done)* | trigger | 2 |
-| **Trigger once while true** *(done)* | condition | 2 | Construct behaviour: once per event (not per copy), re-arms when false; kept last; warns in ⚡ events |
+| **Every N seconds** | trigger | 2 |
+| **After N seconds** (once) | trigger | 2 |
 | **Wait N seconds, then...** | action | 3 |
 | Random number / pick from list | expression function (`random` exists) | 2 |
-| `if(test, yes, no)` and the **Choose between two values** builder *(done)* | expression function + dialog | 3 |
 | Current time / date | expression functions | 3 |
 
-Time is app time fed by the renderer (`rt.advance(ms)`), not the wall clock, so tests are exact. Seconds can be a variable
-(re-read after each firing), must be at least 0.1, timers reset on a screen change, and a hidden tab never causes a burst.
+Time runs from the interpreter's tick counter, not the wall clock, so tests are deterministic (`rt.advance(ms)`).
 
 ## 4. Data
 
-- **Lists** *(done)*: list variables with starting items; Add / Remove item N / Remove value / Set item / Clear; `count()`, `item(list, n)`,
-  `join()`; "For each item" and "Repeat N times" conditions with `LoopItem` / `LoopIndex` (numbered from 1); loops over 1000 rounds stop.
+- **Lists** as a value type: `add / remove / clear / count / item N / for each`. "For each" works like picking: it narrows to one
+  item, runs the actions, and sub-events inherit it. The expression language gets `list.count` and `list[1]` (no loops, no eval).
 - **Remember between visits** (localStorage-backed variables; fails safe when storage is blocked).
 - **Screen stack**: "Go back" action alongside "Go to screen".
-- **Rename** objects, variables, object variables and screens *(done)*: events and expressions are updated; text in quotes is never touched; built-in words are refused.
+- **Rename** objects, variables and screens with references updated in events and expressions (rewrite identifiers via the tokenizer).
 
 ## 5. Layout
 
@@ -76,12 +73,31 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
 - Lesson mode tasks: *trace a tick*, *put the events in order* (Parsons), *find the bug*.
 - Headless project checks for lesson pages: "click 3 times, then `minutes` should be 30".
 - Events -> JavaScript read-only view, then a *Run script* action (Level 4), so students can graduate to code.
-- **Year 7 tutorial samples** *(done)*: Music tracker, Daily chores (Option B: sub-event + Else), Water tracker, using the same object and
-  variable names as the Construct 3 tutorials. Values journal *(done)* uses lists, pictures and three screens. `uppercase()`/`lowercase()` work, and
-  `Name.Text` gets a "use small letters" hint, so Construct habits transfer.
 - Teacher view: share a project link with `?level=` / `?allow=` / `?lock=1` (done); later, a starter-project link.
 
 ## Suggested order
 
-1. Toggle, Slider. *(done, with `if()` + builder)*  2. Key pressed + Enter-submits + pressed/released. *(done)*  3. Timers. *(done, except Wait)*
+1. Toggle, Slider (small, prove the registry).  2. Key pressed + Enter-submits + pressed/released.  3. Timers.
 4. Image + asset panel.  5. Lists + for-each + Repeater.  6. Rename.  7. Layout/Tabs.  8. Custom HTML widget and JS view.
+
+## Automation hooks *(done, 24 Nov 2026)*
+
+For lessons, tests and (later) guided tutorials:
+- **Stable labels:** every button, menu item, tile, dialog button and field carries `data-ab="..."` (for example `add-event`,
+  `add-condition`, `group:System`, `group:object:SaveButton`, `entry:onClicked`, `param:value`, `done`, `tab:events`,
+  `object:SaveButton`, `prop:x`, `menu:delete`). Change a label only with the lessons and tests that use it.
+- **Open a project from the page:** `?sample=<id>` (and `-start`), `?code=<project JSON>` with `?id=` or `?store=` (each keeps its
+  own saved work), or `postMessage({ type: 'appbuilder', cmd: 'start' | 'reset' | 'get', project })` (src/embed.js).
+- **Report back:** `{ type: 'appbuilder', event: 'project', project, sheet }` after every change, and for Waypoints lesson steps
+  `{ wp: 'run', kind: 'appbuilder', id, quiet, code: sheet }`. `sheet` is one plain line per event (core/sheet-text.js).
+- **No drag needed:** arrow keys move the selected object (Shift: 10 px), Alt + arrows resize it, the Properties panel has X, Y,
+  Width and Height boxes, and events are reordered from their ⋯ menu.
+- Tests: `tools/embed-test.mjs` (also in `npm run test:ui`).
+
+## Later ideas
+
+- **Guided tutorials as Markdown** (like MakeCode tutorials): `## Step` sections with text and hints, `@highlight <data-ab label>`
+  to point at a control, and a `wait for:` line matched against the sheet text so the step ticks itself. A generator could draft one
+  from any finished project (one step per object, then per event), for a teacher to edit.
+- **From Thunkable:** open the app being built on a phone (QR code beside the link, never instead of it), share a finished app as a
+  play-only link, and screen templates for prototype lessons. Not native device APIs, app stores or a block editor.

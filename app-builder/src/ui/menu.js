@@ -3,6 +3,8 @@
 //   openMenu({ x, y, items, returnFocus })    items: [{ label, fn, danger, disabled } | null]
 import { h } from './dom.js';
 
+export const abSlug = (x) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+
 export function openMenu({ x, y, items, returnFocus }) {
   document.querySelector('.popmenu')?.remove();
   const list = items.filter(Boolean);
@@ -24,7 +26,7 @@ export function openMenu({ x, y, items, returnFocus }) {
     }
   };
   const menu = h('div', { class: 'popmenu', role: 'menu' },
-    list.map((it) => h('button', { class: 'pm-item' + (it.danger ? ' danger' : ''), type: 'button', role: 'menuitem', disabled: !!it.disabled,
+    list.map((it) => h('button', { class: 'pm-item' + (it.danger ? ' danger' : ''), type: 'button', role: 'menuitem', 'data-ab': 'menu:' + abSlug(it.label), disabled: !!it.disabled,
       onclick: () => { close(false); it.fn(); } }, it.label)));
   document.body.append(menu);
   const r = menu.getBoundingClientRect();

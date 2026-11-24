@@ -84,13 +84,13 @@ export class EventSheet extends HTMLElement {
         this._events.push(ev);
         this._sel = ev.id;
         this._changed();
-      } }, '+ Add event'));
+      }, 'data-ab': 'add-event' }, '+ Add event'));
     }
     return root;
   }
 
   _addBtn(kind, ev, depth) {
-    return h('button', { class: 'mini', type: 'button', onclick: () => this._add(kind, ev, depth) }, kind === 'cond' ? '+ Condition' : '+ Action');
+    return h('button', { class: 'mini', type: 'button', 'data-ab': kind === 'cond' ? 'add-condition' : 'add-action', onclick: () => this._add(kind, ev, depth) }, kind === 'cond' ? '+ Condition' : '+ Action');
   }
 
   _rows(list, depth, issues) {
@@ -99,7 +99,7 @@ export class EventSheet extends HTMLElement {
       const sel = this.guided && this._sel === ev.id;
       const row = h('div', {
         class: 'ev' + (ev.else ? ' else' : '') + (msgs ? ' bad' : '') + (sel ? ' sel' : ''),
-        'data-id': ev.id, tabindex: this.guided ? '0' : null,
+        'data-id': ev.id, 'data-ab': 'event', tabindex: this.guided ? '0' : null,
       });
       if (this.guided) {
         row.addEventListener('click', (e) => { if (!e.target.closest('button')) this._select(ev.id); });
@@ -121,7 +121,7 @@ export class EventSheet extends HTMLElement {
       const main = h('div', { class: 'ev-main' }, conds, acts);
       if (this.edit) main.append(this._tools(list, i, ev));
       else if (sel) main.append(h('div', { class: 'ev-tools' },
-        h('button', { class: 'icon', type: 'button', title: 'More', 'aria-label': 'More actions for this event', 'aria-haspopup': 'menu',
+        h('button', { class: 'icon', type: 'button', title: 'More', 'data-ab': 'event-menu', 'aria-label': 'More actions for this event', 'aria-haspopup': 'menu',
           onclick: (e) => this._eventMenu(e.currentTarget, list, i, ev) }, '⋯')));
       row.append(main);
       if (msgs) row.append(h('div', { class: 'ev-warn' }, '⚠ ' + msgs.join(' ')));
@@ -169,7 +169,7 @@ export class EventSheet extends HTMLElement {
   _item(kind, ev, list, item, idx) {
     const entry = entryFor(kind, item.type);
     const guided = this.guided;
-    const el = h(guided ? 'button' : 'div', { class: 'item ' + kind + (entry?.trigger ? ' trig' : '') + (guided ? ' guided' : ''), type: guided ? 'button' : null });
+    const el = h(guided ? 'button' : 'div', { 'data-ab': 'item:' + item.type, class: 'item ' + kind + (entry?.trigger ? ' trig' : '') + (guided ? ' guided' : ''), type: guided ? 'button' : null });
     if (!entry) {
       el.classList.add('bad');
       el.append(h('span', {}, `Unknown ${kind === 'cond' ? 'condition' : 'action'}: ${item.type}`));
@@ -269,13 +269,13 @@ export class EventSheet extends HTMLElement {
       }
       changed();
     };
-    const sel = h('select', { class: 'ctl' + (known ? '' : ' bad'), title: known ? '' : `"${cur}" doesn't exist on this screen` },
+    const sel = h('select', { 'data-ab': 'param:' + prm.name, class: 'ctl' + (known ? '' : ' bad'), title: known ? '' : `"${cur}" doesn't exist on this screen` },
       !known ? h('option', { value: cur, selected: true }, cur ? `${cur} ⚠` : '— choose —') : null,
       options.map(([v, label]) => h('option', { value: v, selected: v === cur }, label)));
     sel.addEventListener('change', () => apply(sel.value));
     const pickable = ctx.pickable ?? (this.edit && this._canPick && this._ui('pick'));
     if (prm.type === 'object' && pickable) {
-      const pick = h('button', { class: 'icon pick', type: 'button', title: 'Pick it on the screen', 'aria-label': 'Pick on screen',
+      const pick = h('button', { 'data-ab': 'pick-on-screen', class: 'icon pick', type: 'button', title: 'Pick it on the screen', 'aria-label': 'Pick on screen',
         onclick: () => (ctx.pick
           ? ctx.pick(prm, apply)
           : this.dispatchEvent(new CustomEvent('pickobject', { bubbles: true, detail: { kinds: prm.kinds, apply } }))) }, '◎');
@@ -287,7 +287,7 @@ export class EventSheet extends HTMLElement {
   _exprControl(prm, item, interactive, ctx) {
     const val = String(item[prm.name] ?? '');
     if (!interactive) return h('span', { class: 'val expr' }, val || '…');
-    const input = h('input', { class: 'ctl expr', type: 'text', value: val, placeholder: 'value', spellcheck: 'false', autocomplete: 'off', size: Math.max(5, val.length + 1) });
+    const input = h('input', { 'data-ab': 'param:' + prm.name, class: 'ctl expr', type: 'text', value: val, placeholder: 'value', spellcheck: 'false', autocomplete: 'off', size: Math.max(5, val.length + 1) });
     const validate = () => {
       const msg = check(input.value, this._exprScope);
       input.classList.toggle('bad', !!msg);

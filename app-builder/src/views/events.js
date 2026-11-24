@@ -35,7 +35,7 @@ export function initEvents(root) {
     h('div', { class: 'sheet-col' }, h('div', { class: 'sheet-bar' }, hint, modeBtn), sheet),
     h('div', { class: 'preview-col' },
       h('div', { class: 'run-bar' },
-        h('button', { class: 'btn', onclick: restart }, '↻ Restart'),
+        h('button', { class: 'btn', 'data-ab': 'restart', onclick: restart }, '↻ Restart'),
         h('label', { class: 'check-inline' }, autoBox, 'Restart when I edit')),
       banner, stageHost,
       h('details', { class: 'dbg' }, h('summary', {}, 'Watch values and problems'), watch, problems)));

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SAMPLES, SAMPLE_IDS, sampleById, y7MusicTracker, y7DailyChores, y7WaterTracker, y7ValuesJournal } from '../src/samples.js';
+import { SAMPLES, SAMPLE_IDS, sampleById, practiceTracker, choresChecklist, waterTracker, valuesJournal, creatureStats } from '../src/samples.js';
 import { Runtime } from '../src/core/runtime.js';
 import { validateSheet, CONDITIONS, ACTIONS } from '../src/core/catalog.js';
 import { exprScopeFor } from '../src/core/project.js';
@@ -32,54 +32,59 @@ test('every sample: no warnings, every value valid, everything allowed at its le
 
 const text = (rt, n) => rt.instancesOf(n)[0].props.text;
 
-test('Y7 music tracker: adds typed hours, shows Great work at 10', () => {
-  const rt = new Runtime(y7MusicTracker()); rt.start();
-  rt.userChange('m2', '4'); rt.click('m3'); rt.tick();
-  assert.equal(text(rt, 'TextDisplayHours'), 'You have practiced for 4 hours');
-  assert.equal(rt.instancesOf('GreatWork')[0].props.visible, false);
-  rt.userChange('m2', '6'); rt.click('m3'); rt.tick();
-  assert.equal(rt.instancesOf('GreatWork')[0].props.visible, true);
+test('practice tracker: adds what was typed and shows the total', () => {
+  const rt = new Runtime(practiceTracker()); rt.start();
+  rt.userChange('t2', '15'); rt.click('t3'); rt.click('t3');
+  assert.equal(text(rt, 'TotalText'), "You've practised 30 minutes");
   assert.deepEqual(rt.errors, []);
 });
 
-test('Y7 daily chores: each checkbox toggles on its own', () => {
-  const rt = new Runtime(y7DailyChores()); rt.start();
-  rt.click('d0b');
-  assert.equal(text(rt, 'Checkbox_Bed'), '✅');
-  assert.equal(text(rt, 'Checkbox_Dog'), '⬜');
-  rt.click('d0b');
-  assert.equal(text(rt, 'Checkbox_Bed'), '⬜');
+test('chores checklist: each box ticks and unticks on its own', () => {
+  const rt = new Runtime(choresChecklist()); rt.start();
+  rt.click('c0b');
+  assert.equal(text(rt, 'BedBox'), '✅');
+  assert.equal(text(rt, 'FeedBox'), '⬜');
+  rt.click('c0b');
+  assert.equal(text(rt, 'BedBox'), '⬜');
 });
 
-test('Y7 water tracker: caps at the goal, bar grows, message changes, reset works', () => {
-  const rt = new Runtime(y7WaterTracker()); rt.start(); rt.tick();
-  assert.equal(text(rt, 'MotivationalMessage'), 'Keep drinking water to reach your goal');
+test('water tracker: stops at the goal, Every tick keeps the text right, Reset works', () => {
+  const rt = new Runtime(waterTracker()); rt.start(); rt.tick();
   for (let i = 0; i < 12; i++) { rt.click('w2'); rt.tick(); }
-  assert.equal(rt.getVar('waterCount'), 10);
-  assert.equal(rt.instancesOf('ProgressBar')[0].props.w, 300);
-  assert.match(text(rt, 'MotivationalMessage'), /goal achieved/);
-  rt.click('w6'); rt.tick();
-  assert.equal(rt.getVar('waterCount'), 0);
-  assert.equal(rt.instancesOf('ProgressBar')[0].props.w, 0);
+  assert.equal(rt.getVar('Glasses'), 8);
+  assert.equal(text(rt, 'GlassText'), 'Glasses: 8 of 8');
+  rt.click('w3'); rt.tick();
+  assert.equal(text(rt, 'GlassText'), 'Glasses: 0 of 8');
   assert.deepEqual(rt.errors, []);
 });
 
 test('Construct habits: uppercase() works, Name.Text gets a friendly hint', () => {
-  const p = y7MusicTracker();
+  const p = practiceTracker();
   const sc = exprScopeFor(p, p.screens[0]);
   assert.equal(check('uppercase(TextInput.text)', sc), null);
   assert.match(check('int(TextInput.Text)', sc), /Use TextInput.text \(small letters\)/);
 });
 
-test('Y7 values journal: choose a value, write, save to the list, see it on the journal screen', () => {
-  const rt = new Runtime(y7ValuesJournal()); rt.start();
+test('values journal: choose a value, describe it, see it in the list', () => {
+  const rt = new Runtime(valuesJournal()); rt.start();
   rt.click('v1b');                                   // Courage
-  assert.equal(rt.screenId, 'entry');
-  assert.equal(text(rt, 'TextInstructions'), 'What did you do to demonstrate Courage?');
+  assert.equal(rt.screenId, 'describe');
+  assert.equal(text(rt, 'Question'), 'What did you do to show Courage?');
   rt.userChange('j4', 'Spoke up in class'); rt.click('j5');
   assert.equal(rt.screenId, 'journal');
-  assert.deepEqual(rt.globals.get('ArrayJournal'), ['COURAGE: Spoke up in class']);
-  assert.equal(text(rt, 'TextSubtitle'), 'Entries so far: 1');
+  assert.deepEqual(rt.globals.get('Journal'), ['COURAGE: Spoke up in class']);
+  assert.equal(text(rt, 'Count'), 'Entries: 1');
+  assert.deepEqual(rt.errors, []);
+});
+
+test('creature stats: clicking a copy shows that copy’s own stats', () => {
+  const rt = new Runtime(creatureStats()); rt.start();
+  rt.click('k1');
+  assert.equal(text(rt, 'NameText'), 'Tide');
+  assert.equal(text(rt, 'DefenceText'), 'Defence: 90');
+  assert.equal(rt.instancesOf('DefenceBar')[0].props.w, 180);
+  rt.click('k2');
+  assert.equal(text(rt, 'NameText'), 'Zip');
   assert.deepEqual(rt.errors, []);
 });
 

@@ -11,11 +11,12 @@ import { assetName } from '../core/assets.js';
 import { S, screen, hooks } from '../state.js';
 
 function addRow(placeholder, onAdd, withValue) {
-  const name = h('input', { class: 'ctl', placeholder, 'aria-label': placeholder });
-  const val = withValue ? h('input', { class: 'ctl small', placeholder: 'start', value: '0', 'aria-label': 'Starting value' }) : null;
+  const key = placeholder.toLowerCase().replace(/[^a-z]+/g, '-');
+  const name = h('input', { class: 'ctl', placeholder, 'aria-label': placeholder, 'data-ab': key + '-name' });
+  const val = withValue ? h('input', { class: 'ctl small', placeholder: 'start', value: '0', 'aria-label': 'Starting value', 'data-ab': key + '-value' }) : null;
   const go = () => { if (name.value.trim() && onAdd(name.value.trim(), val ? parseValue(val.value) : null) !== false) name.value = ''; };
   name.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-  return h('div', { class: 'add-row' }, name, val, h('button', { class: 'btn', onclick: go, title: 'Add' }, '+'));
+  return h('div', { class: 'add-row' }, name, val, h('button', { class: 'btn', onclick: go, title: 'Add', 'data-ab': key + '-add' }, '+'));
 }
 
 const kindsAllowed = () => Object.entries(OBJECT_KINDS).filter(([k]) => !S.rf || S.rf.kinds.includes(k));
@@ -43,7 +44,7 @@ function objectRow(o) {
     }));
   }
   const row = h('div', { class: 'tree-row obj' + (on ? ' on' : '') },
-    h('button', { class: 'obj-btn', title: `Select ${o.name} (double-click to rename)`, 'aria-current': on ? 'true' : null,
+    h('button', { class: 'obj-btn', 'data-ab': 'object:' + o.name, title: `Select ${o.name} (double-click to rename)`, 'aria-current': on ? 'true' : null,
       ondblclick: () => { renamingObj = o.name; hooks.refresh(); },
       onclick: () => hooks.select(on && many ? S.selId : first.id) },
       h('span', { class: 'obj-name' }, o.name),
@@ -53,7 +54,7 @@ function objectRow(o) {
       title: `Select ${o.name} copy ${n + 1}`,
       onclick: () => hooks.select(i.id),
     }, String(n + 1)))) : null,
-    on ? h('button', { class: 'icon more', type: 'button', title: 'More', 'aria-label': `More for ${o.name}`, 'aria-haspopup': 'menu',
+    on ? h('button', { class: 'icon more', type: 'button', title: 'More', 'aria-label': `More for ${o.name}`, 'data-ab': 'object-menu', 'aria-haspopup': 'menu',
       onclick: (e) => { const r = e.currentTarget.getBoundingClientRect(); objectMenu({ x: r.left, y: r.bottom + 4 }, o, sel, e.currentTarget); } }, '\u22ef') : null);
   return row;
 }
@@ -80,7 +81,7 @@ export function renderSide(el) {
     if (s.id !== sc.id) {
       return h('div', { class: 'tree-node' },
         h('div', { class: 'tree-row screen' },
-          h('button', { class: 'link', onclick: () => { S.screenId = s.id; S.selId = null; collapsed.delete(s.id); hooks.refresh(); } }, '▸ ' + s.name)));
+          h('button', { class: 'link', 'data-ab': 'screen:' + s.name, onclick: () => { S.screenId = s.id; S.selId = null; collapsed.delete(s.id); hooks.refresh(); } }, '▸ ' + s.name)));
     }
     const folded = collapsed.has(s.id);
     let nameEl;
@@ -102,12 +103,12 @@ export function renderSide(el) {
       h('button', { class: 'caret', type: 'button', 'aria-expanded': String(!folded), title: folded ? 'Show objects' : 'Hide objects',
         onclick: () => { if (folded) collapsed.delete(s.id); else collapsed.add(s.id); hooks.refresh(); } }, folded ? '▸' : '▾'),
       nameEl,
-      h('button', { class: 'icon more', type: 'button', title: 'More', 'aria-label': 'More for this screen', 'aria-haspopup': 'menu',
+      h('button', { class: 'icon more', type: 'button', title: 'More', 'aria-label': 'More for this screen', 'data-ab': 'screen-menu', 'aria-haspopup': 'menu',
         onclick: (e) => { const r = e.currentTarget.getBoundingClientRect(); screenMenu({ x: r.left, y: r.bottom + 4 }, s, e.currentTarget); } }, '\u22ef'));
     return h('div', { class: 'tree-node open' }, row,
       folded ? null : h('div', { class: 'tree-children' },
         ...(s.objects.length ? s.objects.map(objectRow) : [h('p', { class: 'muted' }, 'Nothing on this screen yet.')]),
-        h('button', { class: 'btn add-obj', type: 'button', onclick: () => openObjectPicker({
+        h('button', { class: 'btn add-obj', type: 'button', 'data-ab': 'add-object', onclick: () => openObjectPicker({
           allowed: kindsAllowed().map(([k]) => k),
           onPick: (k) => { const { inst } = addObject(s, k, sizeOf(S.project)); S.selId = inst.id; hooks.commit(); },
         }) }, '+ Add object')));
@@ -125,7 +126,7 @@ export function renderSide(el) {
   el.replaceChildren(
     h('h3', {}, 'Project'),
     h('div', { class: 'tree' }, ...tree),
-    h('button', { class: 'btn add-screen', type: 'button', onclick: () => {
+    h('button', { class: 'btn add-screen', type: 'button', 'data-ab': 'add-screen', onclick: () => {
       const names = new Set(S.project.screens.map((x) => x.name));
       let n = S.project.screens.length + 1; while (names.has('Screen ' + n)) n++;
       const sc2 = newScreen('Screen ' + n); S.project.screens.push(sc2); S.screenId = sc2.id; S.selId = null; renaming = sc2.id; hooks.commit();
@@ -149,7 +150,7 @@ export function renderSide(el) {
         } }, '\u00d7'))))] : [h('p', { class: 'muted' }, 'Built-in pictures are ready to use. Upload your own here or on an Image.')]),
       h('button', { class: 'btn add-screen', type: 'button', onclick: () => pickPicture(({ fileName, data }) => {
         S.project.assets.push({ name: assetName(S.project, fileName), data }); hooks.commit();
-      }, hooks.notify) }, '+ Upload picture')] : []),
+      }, hooks.notify), 'data-ab': 'upload-picture' }, '+ Upload picture')] : []),
     h('p', { class: 'muted legal' }, 'Free for education. Commercial use by permission only.'),
   );
 }

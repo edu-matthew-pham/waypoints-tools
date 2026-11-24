@@ -104,145 +104,159 @@ export function dailyChores() {
   };
 }
 
-// ---- Year 7 tutorial versions (cggs-digital-tutorials): same names and steps as the Construct 3 tutorials ----
+// ---- The App Builder apps course (tutorials.learningwaypoints.com): same object and variable names as its lessons ----
 
-// Music tracker: global variable, text input with int(), Set text, show a message at 10 hours
-export function y7MusicTracker() {
+// Practice tracker: a global variable, a button event that changes it, and Set text to show it
+export function practiceTracker() {
   return {
-    version: 1, name: 'Music tracker', features: { level: 2 },
-    variables: [{ name: 'HoursPracticed', value: 0 }],
+    version: 1, name: 'Practice tracker', features: { level: 2 },
+    variables: [{ name: 'Minutes', value: 0 }],
     screens: [{
       id: 'main', name: 'Tracker',
       objects: [
-        obj('TextTitle', 'text', [inst('m1', 24, 40, 342, 36, '🎻 Music practice tracker')]),
-        obj('TextInput', 'input', [inst('m2', 24, 110, 200, 42, '')]),
-        obj('Button', 'button', [inst('m3', 236, 108, 130, 46, 'Add hours')]),
-        obj('TextDisplayHours', 'text', [inst('m4', 24, 180, 342, 32, 'You have practiced for 0 hours')]),
-        obj('GreatWork', 'image', [{ ...inst('m5', 135, 240, 120, 120, 'Great work trophy'), visible: false, image: 'trophy' }]),
+        obj('Title', 'text', [inst('t1', 24, 40, 342, 36, 'Practice tracker')]),
+        obj('TextInput', 'input', [inst('t2', 24, 100, 200, 42, '')]),
+        obj('SaveButton', 'button', [inst('t3', 236, 98, 130, 46, 'Save')]),
+        obj('TotalText', 'text', [inst('t4', 24, 170, 342, 32, "You've practised 0 minutes")]),
       ],
       events: [
-        ev('t1', [{ type: 'onClicked', target: 'Button' }], [
-          { type: 'addTo', value: 'int(TextInput.text)', var: 'HoursPracticed' },
-          { type: 'setText', target: 'TextDisplayHours', value: '"You have practiced for " & HoursPracticed & " hours"' },
-        ]),
-        ev('t2', [{ type: 'compareVar', var: 'HoursPracticed', op: '≥', value: '10' }], [
-          { type: 'setVisible', visible: 'show', target: 'GreatWork' },
+        ev('p1', [{ type: 'onClicked', target: 'SaveButton' }], [
+          { type: 'addTo', value: 'int(TextInput.text)', var: 'Minutes' },
+          { type: 'setText', target: 'TotalText', value: `"You've practised " & Minutes & " minutes"` },
         ]),
       ],
     }],
   };
 }
 
-// Daily chores, Option B: one trigger, a sub-event that checks the text, and Else
-export function y7DailyChores() {
-  const chores = [['Bed', 'Make my bed'], ['Dog', 'Feed the dog'], ['Homework', 'Do my homework']];
-  const objects = [obj('TextTitle', 'text', [inst('d0', 24, 40, 342, 36, 'My daily chores')])];
+// Chores checklist: one click event per box, a sub-event that checks the text, and Else
+export function choresChecklist() {
+  const jobs = [['BedBox', 'Make my bed'], ['FeedBox', 'Feed the dog'], ['HomeworkBox', 'Do my homework']];
+  const objects = [obj('Title', 'text', [inst('c0', 24, 40, 342, 36, 'My jobs today')])];
   const events = [];
-  chores.forEach(([key, label], i) => {
+  jobs.forEach(([box, label], i) => {
     const y = 110 + i * 70;
-    objects.push(obj('Checkbox_' + key, 'button', [inst('d' + i + 'b', 24, y, 56, 52, '⬜')]));
-    objects.push(obj('Text_' + key, 'text', [inst('d' + i + 't', 96, y + 10, 270, 32, label)]));
-    events.push(ev('c' + i, [{ type: 'onClicked', target: 'Checkbox_' + key }], [], [
-      ev('c' + i + 'a', [{ type: 'compareText', target: 'Checkbox_' + key, op: '=', value: '"⬜"' }], [
-        { type: 'setText', target: 'Checkbox_' + key, value: '"✅"' },
-      ]),
-      elseEv('c' + i + 'b', [{ type: 'setText', target: 'Checkbox_' + key, value: '"⬜"' }]),
+    objects.push(obj(box, 'button', [inst('c' + i + 'b', 24, y, 56, 52, '⬜')]));
+    objects.push(obj(box.replace('Box', 'Text'), 'text', [inst('c' + i + 't', 96, y + 10, 270, 32, label)]));
+    events.push(ev('c' + i, [{ type: 'onClicked', target: box }], [], [
+      ev('c' + i + 'a', [{ type: 'compareText', target: box, op: '=', value: '"⬜"' }], [{ type: 'setText', target: box, value: '"✅"' }]),
+      elseEv('c' + i + 'e', [{ type: 'setText', target: box, value: '"⬜"' }]),
     ]));
   });
-  return { version: 1, name: 'Daily chores', features: { level: 2 }, variables: [], screens: [{ id: 'main', name: 'Chores', objects, events }] };
+  return { version: 1, name: 'Chores checklist', features: { level: 2 }, variables: [], screens: [{ id: 'main', name: 'Chores', objects, events }] };
 }
 
-// Water tracker: two variables, a cap with a sub-event, reset, Every tick display, Else message, progress bar
-export function y7WaterTracker() {
+// Water tracker: two variables, Every tick keeps the display right, a cap in a sub-event, Reset
+export function waterTracker() {
   return {
-    version: 1, name: 'Daily water intake tracker', features: { level: 2 },
-    variables: [{ name: 'waterCount', value: 0 }, { name: 'dailyGoal', value: 10 }],
+    version: 1, name: 'Water tracker', features: { level: 2 },
+    variables: [{ name: 'Glasses', value: 0 }, { name: 'Goal', value: 8 }],
     screens: [{
       id: 'main', name: 'Water',
       objects: [
-        obj('WaterText', 'text', [inst('w1', 24, 40, 342, 36, 'Glasses of water today: 0 / 10')]),
-        obj('AddWaterButton', 'button', [inst('w2', 24, 100, 342, 52, 'Add Glass')]),
-        obj('ProgressBG', 'shape', [{ ...inst('w3', 45, 180, 300, 24, ''), color: '#d5dae3' }]),
-        obj('ProgressBar', 'shape', [{ ...inst('w4', 45, 180, 30, 24, ''), color: '#2f8fdd' }]),
-        obj('MotivationalMessage', 'text', [inst('w5', 24, 220, 342, 48, '')]),
-        obj('ResetButton', 'button', [inst('w6', 24, 600, 342, 48, 'Reset Day')]),
+        obj('GlassText', 'text', [inst('w1', 24, 40, 342, 36, 'Glasses: 0 of 8')]),
+        obj('AddButton', 'button', [inst('w2', 24, 100, 342, 52, 'Add a glass')]),
+        obj('ResetButton', 'button', [inst('w3', 24, 170, 342, 46, 'Reset')]),
       ],
       events: [
-        ev('w_add', [{ type: 'onClicked', target: 'AddWaterButton' }], [], [
-          ev('w_cap', [{ type: 'compareVar', var: 'waterCount', op: '<', value: 'dailyGoal' }], [
-            { type: 'addTo', value: '1', var: 'waterCount' },
-          ]),
+        ev('w1', [{ type: 'everyTick' }], [{ type: 'setText', target: 'GlassText', value: '"Glasses: " & Glasses & " of " & Goal' }]),
+        ev('w2', [{ type: 'onClicked', target: 'AddButton' }], [], [
+          ev('w2a', [{ type: 'compareVar', var: 'Glasses', op: '<', value: 'Goal' }], [{ type: 'addTo', value: '1', var: 'Glasses' }]),
         ]),
-        ev('w_reset', [{ type: 'onClicked', target: 'ResetButton' }], [
-          { type: 'setVar', var: 'waterCount', value: '0' },
-        ]),
-        ev('w_tick', [{ type: 'everyTick' }], [
-          { type: 'setText', target: 'WaterText', value: '"Glasses: " & waterCount & " / " & dailyGoal' },
-          { type: 'setSize', target: 'ProgressBar', prop: 'w', value: '(waterCount / dailyGoal) * 300' },
-        ]),
-        ev('w_goal', [{ type: 'compareVar', var: 'waterCount', op: '=', value: 'dailyGoal' }], [
-          { type: 'setText', target: 'MotivationalMessage', value: '"🎉 Daily water goal achieved! Great job!"' },
-        ]),
-        elseEv('w_keep', [
-          { type: 'setText', target: 'MotivationalMessage', value: '"Keep drinking water to reach your goal"' },
-        ]),
+        ev('w3', [{ type: 'onClicked', target: 'ResetButton' }], [{ type: 'setVar', var: 'Glasses', value: '0' }]),
       ],
     }],
   };
 }
 
-// Values journal: buttons set a variable and change screen, Save pushes to a list, a List shows the journal
-export function y7ValuesJournal() {
-  const values = [['Integrity', 'tick'], ['Courage', 'star'], ['Respect', 'heart'], ['Inclusion', 'smile']];
-  const pick = values.map(([v, pic], i) => {
-    const x = 24 + (i % 2) * 177, y = 150 + Math.floor(i / 2) * 210;
+// Values journal: buttons set a variable and change screen, Add saves to a list, a List shows it
+export function valuesJournal() {
+  const values = [['Kindness', 'heart'], ['Courage', 'star'], ['Honesty', 'tick'], ['Respect', 'smile']];
+  const pick = values.flatMap(([v, pic], i) => {
+    const x = 24 + (i % 2) * 177, y = 140 + Math.floor(i / 2) * 200;
     return [
-      obj('Sprite' + v, 'image', [{ ...inst('v' + i + 'p', x + 34, y, 100, 100, v), image: pic }]),
-      obj('Button' + v, 'button', [inst('v' + i + 'b', x, y + 112, 165, 46, v)]),
+      obj(v + 'Picture', 'image', [{ ...inst('v' + i + 'p', x + 34, y, 100, 100, v), image: pic }]),
+      obj(v + 'Button', 'button', [inst('v' + i + 'b', x, y + 110, 165, 46, v)]),
     ];
-  }).flat();
+  });
   return {
     version: 1, name: 'Values journal', features: { level: 3 },
-    variables: [{ name: 'CurrentValue', value: '' }, { name: 'ArrayJournal', value: [] }],
+    variables: [{ name: 'Chosen', value: '' }, { name: 'Journal', value: [] }],
     screens: [
-      { id: 'pick', name: 'Choose a value',
+      { id: 'choose', name: 'Choose',
         objects: [
-          obj('TextTitle', 'text', [inst('j1', 24, 40, 342, 36, 'My values journal')]),
-          obj('TextInstructions', 'text', [inst('j2', 24, 84, 342, 48, 'Choose a value you showed today')]),
+          obj('Title', 'text', [inst('j1', 24, 30, 342, 36, 'Values journal')]),
+          obj('Prompt', 'text', [inst('j2', 24, 74, 342, 40, 'Which value did you show today?')]),
           ...pick,
         ],
-        events: values.map(([v], i) => ev('jv' + i, [{ type: 'onClicked', target: 'Button' + v }], [
-          { type: 'setVar', var: 'CurrentValue', value: `"${v}"` },
-          { type: 'goToScreen', screen: 'entry' },
+        events: values.map(([v], i) => ev('jv' + i, [{ type: 'onClicked', target: v + 'Button' }], [
+          { type: 'setVar', var: 'Chosen', value: `"${v}"` },
+          { type: 'goToScreen', screen: 'describe' },
         ])),
       },
-      { id: 'entry', name: 'Write an entry',
+      { id: 'describe', name: 'Describe',
         objects: [
-          obj('TextInstructions', 'text', [inst('j3', 24, 40, 342, 64, '')]),
+          obj('Question', 'text', [inst('j3', 24, 40, 342, 64, '')]),
           obj('TextInput', 'input', [inst('j4', 24, 120, 342, 46, '')]),
-          obj('ButtonSave', 'button', [inst('j5', 24, 184, 342, 48, 'Save')]),
+          obj('AddButton', 'button', [inst('j5', 24, 184, 342, 48, 'Add to my journal')]),
         ],
         events: [
-          ev('je1', [{ type: 'onStart' }], [{ type: 'setText', target: 'TextInstructions', value: '"What did you do to demonstrate " & CurrentValue & "?"' }]),
-          ev('je2', [{ type: 'onClicked', target: 'ButtonSave' }], [
-            { type: 'listAdd', value: 'uppercase(CurrentValue) & ": " & TextInput.text', list: 'ArrayJournal' },
+          ev('jd1', [{ type: 'onStart' }], [{ type: 'setText', target: 'Question', value: '"What did you do to show " & Chosen & "?"' }]),
+          ev('jd2', [{ type: 'onClicked', target: 'AddButton' }], [
+            { type: 'listAdd', value: 'uppercase(Chosen) & ": " & TextInput.text', list: 'Journal' },
             { type: 'goToScreen', screen: 'journal' },
           ]),
         ],
       },
-      { id: 'journal', name: 'My journal',
+      { id: 'journal', name: 'Journal',
         objects: [
-          obj('TextTitle', 'text', [inst('j6', 24, 40, 342, 36, 'My journal')]),
-          obj('TextSubtitle', 'text', [inst('j7', 24, 80, 342, 32, '')]),
-          obj('List', 'list', [{ ...inst('j8', 24, 124, 342, 380, ''), source: 'ArrayJournal' }]),
-          obj('ButtonCelebrate', 'button', [inst('j9', 24, 524, 342, 48, '🎉 Add another')]),
+          obj('Heading', 'text', [inst('j6', 24, 30, 342, 36, 'My values in action')]),
+          obj('Count', 'text', [inst('j7', 24, 72, 342, 30, '')]),
+          obj('List', 'list', [{ ...inst('j8', 24, 110, 342, 360, ''), source: 'Journal' }]),
+          obj('AnotherButton', 'button', [inst('j9', 24, 490, 342, 48, 'Add another')]),
         ],
         events: [
-          ev('jj1', [{ type: 'onStart' }], [{ type: 'setText', target: 'TextSubtitle', value: '"Entries so far: " & count(ArrayJournal)' }]),
-          ev('jj2', [{ type: 'onClicked', target: 'ButtonCelebrate' }], [{ type: 'goToScreen', screen: 'pick' }]),
+          ev('jj1', [{ type: 'onStart' }], [{ type: 'setText', target: 'Count', value: '"Entries: " & count(Journal)' }]),
+          ev('jj2', [{ type: 'onClicked', target: 'AnotherButton' }], [{ type: 'goToScreen', screen: 'choose' }]),
         ],
       },
     ],
+  };
+}
+
+// Creature stats: one object with three copies, each with its own variables; clicking one picks just that copy
+export function creatureStats() {
+  const stats = [['Blaze', 80, 60, 30, 'Fire breath', 'star'], ['Tide', 50, 40, 90, 'Water shield', 'water'], ['Zip', 30, 95, 40, 'Super dash', 'music']];
+  const bar = (name, y, color) => obj(name, 'shape', [{ ...inst(name, 150, y, 0, 18, ''), color }]);
+  return {
+    version: 1, name: 'Creature stats', features: { level: 3 },
+    variables: [],
+    screens: [{
+      id: 'main', name: 'Creatures',
+      objects: [
+        obj('Title', 'text', [inst('k0', 24, 20, 342, 34, 'Click a creature')]),
+        obj('Creature', 'image', stats.map(([n, p, s, d, a, pic], i) => ({ ...inst('k' + i, 30 + i * 115, 70, 100, 100, n, { name: n, power: p, speed: s, defence: d, ability: a }), image: pic })),
+          [{ name: 'name', value: '' }, { name: 'power', value: 0 }, { name: 'speed', value: 0 }, { name: 'defence', value: 0 }, { name: 'ability', value: '' }]),
+        obj('NameText', 'text', [inst('k10', 24, 200, 342, 34, '')]),
+        obj('PowerText', 'text', [inst('k11', 24, 246, 120, 26, '')]),
+        obj('SpeedText', 'text', [inst('k12', 24, 282, 120, 26, '')]),
+        obj('DefenceText', 'text', [inst('k13', 24, 318, 120, 26, '')]),
+        bar('PowerBar', 250, '#e5484d'), bar('SpeedBar', 286, '#2f8fdd'), bar('DefenceBar', 322, '#2fa36b'),
+        obj('AbilityText', 'text', [inst('k14', 24, 362, 342, 30, '')]),
+      ],
+      events: [
+        ev('k', [{ type: 'onClicked', target: 'Creature' }], [
+          { type: 'setText', target: 'NameText', value: 'Creature.name' },
+          { type: 'setText', target: 'PowerText', value: '"Power: " & Creature.power' },
+          { type: 'setText', target: 'SpeedText', value: '"Speed: " & Creature.speed' },
+          { type: 'setText', target: 'DefenceText', value: '"Defence: " & Creature.defence' },
+          { type: 'setText', target: 'AbilityText', value: '"Special: " & Creature.ability' },
+          { type: 'setSize', target: 'PowerBar', prop: 'w', value: 'Creature.power / 100 * 200' },
+          { type: 'setSize', target: 'SpeedBar', prop: 'w', value: 'Creature.speed / 100 * 200' },
+          { type: 'setSize', target: 'DefenceBar', prop: 'w', value: 'Creature.defence / 100 * 200' },
+        ]),
+      ],
+    }],
   };
 }
 
@@ -261,11 +275,12 @@ function onWebPage(make) {
 }
 
 export const SAMPLES = {
-  'Y7: Music tracker': onWebPage(y7MusicTracker),
-  'Y7: Daily chores': onWebPage(y7DailyChores),
-  'Y7: Water tracker': onWebPage(y7WaterTracker),
-  'Y7: Values journal': onWebPage(y7ValuesJournal),
-  'Practice tracker': onWebPage(musicTracker),
+  'Practice tracker': onWebPage(practiceTracker),
+  'Chores checklist': onWebPage(choresChecklist),
+  'Water tracker': onWebPage(waterTracker),
+  'Values journal': onWebPage(valuesJournal),
+  'Creature stats': onWebPage(creatureStats),
+  'Minutes and goal (two screens)': onWebPage(musicTracker),
   'Daily chores (copies)': onWebPage(dailyChores),
 };
 
@@ -280,15 +295,18 @@ export function starterOf(project) {
   return p;
 }
 const LESSONS = {
-  music: SAMPLES['Y7: Music tracker'],
-  chores: SAMPLES['Y7: Daily chores'],
-  water: SAMPLES['Y7: Water tracker'],
-  journal: SAMPLES['Y7: Values journal'],
-  practice: SAMPLES['Practice tracker'],
+  tracker: SAMPLES['Practice tracker'],
+  chores: SAMPLES['Chores checklist'],
+  water: SAMPLES['Water tracker'],
+  journal: SAMPLES['Values journal'],
+  creatures: SAMPLES['Creature stats'],
+  goal: SAMPLES['Minutes and goal (two screens)'],
   copies: SAMPLES['Daily chores (copies)'],
 };
-export const SAMPLE_IDS = [...Object.keys(LESSONS), ...['music', 'chores', 'water', 'journal'].map((k) => k + '-start')];
+const ALIASES = { music: 'tracker', practice: 'goal' }; // lesson links published on 24 Nov 2026
+export const SAMPLE_IDS = [...Object.keys(LESSONS), ...['tracker', 'chores', 'water', 'journal', 'creatures'].map((k) => k + '-start')];
 export function sampleById(id) {
+  if (id) id = id.replace(/^[a-z]+/, (k) => ALIASES[k] || k);
   if (LESSONS[id]) return LESSONS[id]();
   const base = id?.endsWith('-start') && LESSONS[id.slice(0, -6)];
   return base ? starterOf(base()) : null;
