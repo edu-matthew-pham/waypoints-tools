@@ -268,3 +268,28 @@ export const SAMPLES = {
   'Practice tracker': onWebPage(musicTracker),
   'Daily chores (copies)': onWebPage(dailyChores),
 };
+
+// ---- lesson links: ?sample=<id> ----
+// "-start" versions keep the finished design (screens, objects, text, pictures) but no events or variables,
+// so a tutorial can begin with "the screen is built; now make it work".
+export function starterOf(project) {
+  const p = structuredClone(project);
+  p.name += ' (start)';
+  p.variables = [];
+  for (const s of p.screens) s.events = [];
+  return p;
+}
+const LESSONS = {
+  music: SAMPLES['Y7: Music tracker'],
+  chores: SAMPLES['Y7: Daily chores'],
+  water: SAMPLES['Y7: Water tracker'],
+  journal: SAMPLES['Y7: Values journal'],
+  practice: SAMPLES['Practice tracker'],
+  copies: SAMPLES['Daily chores (copies)'],
+};
+export const SAMPLE_IDS = [...Object.keys(LESSONS), ...['music', 'chores', 'water', 'journal'].map((k) => k + '-start')];
+export function sampleById(id) {
+  if (LESSONS[id]) return LESSONS[id]();
+  const base = id?.endsWith('-start') && LESSONS[id.slice(0, -6)];
+  return base ? starterOf(base()) : null;
+}

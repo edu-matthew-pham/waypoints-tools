@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SAMPLES, y7MusicTracker, y7DailyChores, y7WaterTracker, y7ValuesJournal } from '../src/samples.js';
+import { SAMPLES, SAMPLE_IDS, sampleById, y7MusicTracker, y7DailyChores, y7WaterTracker, y7ValuesJournal } from '../src/samples.js';
 import { Runtime } from '../src/core/runtime.js';
 import { validateSheet, CONDITIONS, ACTIONS } from '../src/core/catalog.js';
 import { exprScopeFor } from '../src/core/project.js';
@@ -97,4 +97,15 @@ test('web page is the default; older projects stay phone-sized; samples fit the 
   const p = newProject();
   const { inst } = addObject(p.screens[0], 'button', sizeOf(p));
   assert.ok(inst.x > 250, 'new objects are centred on the web page');
+});
+
+test('lesson links: every id opens a project; starters keep the design but no events or variables', () => {
+  for (const id of SAMPLE_IDS) assert.ok(sampleById(id), id);
+  assert.equal(sampleById('nope'), null);
+  const full = sampleById('water'), start = sampleById('water-start');
+  assert.equal(start.screens[0].objects.length, full.screens[0].objects.length);
+  assert.deepEqual(start.screens[0].events, []);
+  assert.deepEqual(start.variables, []);
+  assert.equal(start.device, 'web');
+  assert.ok(full.screens[0].events.length > 0, 'starter did not change the full sample');
 });

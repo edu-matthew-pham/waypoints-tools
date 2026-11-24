@@ -10,7 +10,23 @@ inputs, driven by an event sheet: *when this happens, do that*. Runs in the brow
     cd app-builder && npm test      # headless tests of the interpreter (node:test, no dependencies)
     python3 -m http.server 8080     # run locally from the repo root, then open /app-builder/
 
-Lesson links: `?level=1&allow=onClicked,addTo,setText&lock=1` (see Guided editing and levels).
+## Lesson links
+
+Add these to `https://tools.learningwaypoints.com/app-builder/`:
+
+| Link | Opens |
+|---|---|
+| `?sample=music` / `?sample=music-start` | Y7 Music tracker: finished / design only (no events or variables) |
+| `?sample=chores` / `?sample=chores-start` | Y7 Daily chores |
+| `?sample=water` / `?sample=water-start` | Y7 Water tracker |
+| `?sample=journal` / `?sample=journal-start` | Y7 Values journal |
+| `?sample=practice`, `?sample=copies` | Other samples |
+
+Combine with `&level=2` (blocks offered), `&allow=onClicked,addTo,setText` (a lesson's own block list) and `&lock=1`
+(hides the level switch and Samples menu). Example: `?sample=water-start&level=2&lock=1`.
+
+Each lesson link keeps its own saved work in the browser, so students carry on where they were; **Start again**
+(press twice) reloads the original. Save/Open still work for handing in a file.
 
 ## Layout
 

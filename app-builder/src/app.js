@@ -13,9 +13,12 @@ import { LEVELS, resolve, fromParams } from './core/features.js';
 import { pictures } from './ui/component-ui.js';
 import { imageData } from './core/assets.js';
 pictures.lookup = (name) => imageData(S.project, name);
-import { SAMPLES } from './samples.js';
+import { SAMPLES, sampleById } from './samples.js';
 
-const STORE_KEY = 'appbuilder.prototype.v1';
+// ?sample=water opens that lesson project. Each lesson link keeps its own saved work, so a student who
+// comes back (or refreshes) carries on where they were; "Start again" reloads the original.
+const lessonId = new URLSearchParams(location.search).get('sample');
+const STORE_KEY = lessonId ? 'appbuilder.lesson.' + lessonId : 'appbuilder.prototype.v1';
 const store = (fn) => { try { return fn(localStorage); } catch { return null; } };
 let history;
 
@@ -109,11 +112,22 @@ function renderTop() {
     h('button', { class: 'btn', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, 'Undo'),
     h('button', { class: 'btn', disabled: !history.canRedo, title: 'Redo (Ctrl+Shift+Z)', onclick: () => undo(1) }, 'Redo'),
     h('span', { class: 'sep' }),
-    sel,
-    h('button', { class: 'btn', onclick: () => loadProject(newProject()) }, 'New'),
+    S.locked ? '' : sel, // a locked lesson link keeps students in the lesson project
+    lessonStart ? h('button', { class: 'btn', title: 'Throw away your changes and reload the lesson project', onclick: () => {
+      if (confirmTwice('Start again? Your changes to this lesson will be lost.')) loadProject(lessonStart());
+    } }, 'Start again')
+      : h('button', { class: 'btn', onclick: () => loadProject(newProject()) }, 'New'),
     h('button', { class: 'btn', onclick: openFile }, 'Open…'),
     h('button', { class: 'btn primary', onclick: saveFile }, 'Save'),
   );
+}
+// no confirm() in some hosts: ask by pressing twice within 4 seconds
+let armed = 0;
+function confirmTwice(msg) {
+  if (Date.now() - armed < 4000) { armed = 0; document.querySelector('.toast')?.remove(); return true; }
+  armed = Date.now();
+  notify(msg + ' Press again to confirm.');
+  return false;
 }
 function loadProject(p) {
   p = checkProject(p); applyParams(p);
@@ -180,7 +194,9 @@ document.addEventListener('keydown', (e) => {
 // ---------------- boot ----------------
 let initial = null;
 try { const saved = store((ls) => ls.getItem(STORE_KEY)); if (saved) initial = JSON.parse(saved); } catch { /* ignore */ }
-initial = checkProject(initial || SAMPLES['Practice tracker']());
+const lessonStart = lessonId && sampleById(lessonId) ? () => sampleById(lessonId) : null;
+if (lessonId && !lessonStart) queueMicrotask(() => notify(`There is no lesson called "${lessonId}". Opening your last project instead.`));
+initial = checkProject(initial || (lessonStart ? lessonStart() : SAMPLES['Practice tracker']()));
 applyParams(initial);
 setProject(initial);
 refresh();
