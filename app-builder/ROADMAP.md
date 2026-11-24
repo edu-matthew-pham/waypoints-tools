@@ -55,6 +55,14 @@ Time runs from the interpreter's tick counter, not the wall clock, so tests are 
 - **Lists** as a value type: `add / remove / clear / count / item N / for each`. "For each" works like picking: it narrows to one
   item, runs the actions, and sub-events inherit it. The expression language gets `list.count` and `list[1]` (no loops, no eval).
 - **Remember between visits** (localStorage-backed variables; fails safe when storage is blocked).
+- **Tables (records you can see)** *(proposed 24 Nov 2026)*: a list of records, each row with the same named fields. Construct's
+  Array, Dictionary and JSON are invisible until the debugger; here the data shape is always on screen.
+  - Sidebar: edited like a small spreadsheet (columns are fields, rows are records).
+  - Watch box: a live table while running, the row in use highlighted, so For each is seen stepping through rows.
+  - A **Table** object shows one on screen; clicking a row works like a list item (ClickedIndex).
+  - Expressions `item(Songs, 2).artist`, `LoopItem.artist`; actions add row, set field, remove row, sort by field, filter.
+  - One record alone (a dictionary) shows as a two-column field/value table: no separate concept.
+  - Saves as JSON with "Remember between visits". Sheet text gets `table Songs = [title, artist, length] 3 rows` for lesson checks.
 - **Screen stack**: "Go back" action alongside "Go to screen".
 - **Rename** objects, variables and screens with references updated in events and expressions (rewrite identifiers via the tokenizer).
 
