@@ -374,3 +374,5 @@ select.ctl { padding-right: 6px; }
 .link-name { border: 0; background: none; padding: 3px 4px; margin-left: -4px; text-align: left; border-radius: 5px; cursor: text; color: inherit; }
 .link-name:hover { background: #eef1f7; }
 .ctl.rename { flex: 1; min-width: 0; font-weight: 600; }
+.w-shape > .box { border-radius: 6px; }
+.design .w-shape:not(.sel) { outline: none; }

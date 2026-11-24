@@ -11,7 +11,7 @@ The picker groups tiles by category and only shows what the current level / less
 
 | Category | Components | Level | Notes |
 |---|---|---|---|
-| Basics | Button, Text, Text input *(done)* | 1-2 | |
+| Basics | Button, Text, Text input, Box (coloured rectangle) *(done)* | 1-2 | Box + "Set width / height / x / y" make progress bars |
 | Choices | Toggle *(done)*, Slider *(done)*, Dropdown, Checkbox | 2 | Toggle has `Name.on` and an "is on / off" condition (pair with Else); Slider has `Name.value`, `min`, `max`. Both have a "changes" trigger. |
 | Media | Image (+ asset panel, built-in icons), Emoji/icon | 2 | Assets stored as data URLs in the project file (size cap and warning). |
 | Data | List (shows items), Repeater (one row per list item), Gallery | 3-4 | Needs the list value type and "for each" first (section 4). |
@@ -76,6 +76,9 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
 - Lesson mode tasks: *trace a tick*, *put the events in order* (Parsons), *find the bug*.
 - Headless project checks for lesson pages: "click 3 times, then `minutes` should be 30".
 - Events -> JavaScript read-only view, then a *Run script* action (Level 4), so students can graduate to code.
+- **Year 7 tutorial samples** *(done)*: Music tracker, Daily chores (Option B: sub-event + Else), Water tracker, using the same object and
+  variable names as the Construct 3 tutorials. Values journal waits for lists and images. `uppercase()`/`lowercase()` work, and
+  `Name.Text` gets a "use small letters" hint, so Construct habits transfer.
 - Teacher view: share a project link with `?level=` / `?allow=` / `?lock=1` (done); later, a starter-project link.
 
 ## Suggested order

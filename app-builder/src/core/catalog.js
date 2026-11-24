@@ -66,6 +66,16 @@ export const CONDITIONS = {
     params: [{ name: 'key', type: 'key' }],
     test: (rt, ctx, p) => (p.key === 'any' ? rt.keysDown.size > 0 : rt.keysDown.has(p.key)),
   },
+  compareText: {
+    category: 'Object', label: '{target} text {op} {value}',
+    params: [obj(), { name: 'op', type: 'operator' }, expr()],
+    // Picking: keeps only the copies whose text matches.
+    test: (rt, ctx, p) => {
+      const keep = rt.pickList(ctx, p.target).filter((inst) => compare(inst.props.text, p.op, rt.evalExpr(p.value, rt.ctxWith(ctx, p.target, inst))));
+      ctx.picked.set(p.target, keep);
+      return keep.length > 0;
+    },
+  },
   isOn: {
     category: 'Object', label: '{target} is {state}',
     params: [obj({ kinds: ['toggle'] }), { name: 'state', type: 'onoff' }],
@@ -122,6 +132,14 @@ export const ACTIONS = {
     category: 'Object', label: 'Set {target} text to {value}',
     params: [obj(), expr()],
     run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => rt.setProp(inst, 'text', fmt(rt.evalExpr(p.value, c)))),
+  },
+  setSize: {
+    category: 'Object', label: 'Set {target} {prop} to {value}',
+    params: [obj(), { name: 'prop', type: 'posSize' }, expr()],
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => {
+      const v = num(rt.evalExpr(p.value, c));
+      rt.setProp(inst, p.prop, p.prop === 'w' || p.prop === 'h' ? Math.max(0, v) : v);
+    }),
   },
   setOn: {
     category: 'Object', label: 'Turn {target} {state}',
@@ -204,6 +222,7 @@ export function defaultParams(entry, scope) {
       case 'showhide': out[prm.name] = 'show'; break;
       case 'onoff': out[prm.name] = 'on'; break;
       case 'key': out[prm.name] = 'Enter'; break;
+      case 'posSize': out[prm.name] = 'w'; break;
       default: out[prm.name] = prm.default ?? '';
     }
   }
@@ -244,6 +263,8 @@ const PARAM_HELP = {
   'compareValues.left': 'The first value: a variable, a number, "text in quotes", or Object.property.',
   'compareValues.right': 'The value to compare it with.',
   'compareInst.value': 'What to compare with: a number, "text in quotes", or a variable.',
+  'compareText.value': 'The text to compare with, in "quotes", e.g. "⬜".',
+  'setSize.value': 'A number of pixels, or a calculation like (water / goal) * 300.',
   'setText.value': 'The text to show. Put words in "quotes" and join pieces with &, e.g. "Total: " & minutes',
   'setSlider.value': "A number between the slider's smallest and largest. " + NUM_OR_CALC,
   'setInst.value': 'The new value: a number, "text in quotes", or a calculation like done + 1.',

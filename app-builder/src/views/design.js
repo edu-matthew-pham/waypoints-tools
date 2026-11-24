@@ -83,6 +83,9 @@ export function initDesign(root) {
     if (obj.kind === 'toggle') {
       extra.push(h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: !!inst.on, onchange: (e) => { inst.on = e.target.checked; hooks.commit(); } }), h('span', {}, 'Starts on')));
     }
+    if (obj.kind === 'shape') {
+      extra.push(h('label', { class: 'f' }, h('span', {}, 'Colour'), h('input', { type: 'color', value: inst.color || '#2f6fdd', 'aria-label': 'Colour', oninput: (e) => { inst.color = e.target.value; sync(); }, onchange: () => hooks.commit() })));
+    }
     if (obj.kind === 'slider') {
       const num = (label, key) => h('label', { class: 'f' }, h('span', {}, label),
         h('input', { class: 'ctl small', type: 'number', value: inst[key], 'aria-label': label, onchange: (e) => {
@@ -96,7 +99,7 @@ export function initDesign(root) {
 
     props.replaceChildren(
       h('h3', {}, obj.name, h('small', {}, ` ${OBJECT_KINDS[obj.kind]?.label ?? obj.kind}${obj.instances.length > 1 ? ` · copy ${n} of ${obj.instances.length}` : ''}`)),
-      ...(obj.kind === 'slider' ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : 'Text'), text)]),
+      ...(obj.kind === 'slider' || obj.kind === 'shape' ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : 'Text'), text)]),
       h('div', { class: 'grid4' }, numField('X', 'x', inst), numField('Y', 'y', inst), numField('Width', 'w', inst, 24), numField('Height', 'h', inst, 20)),
       ...extra,
       h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: inst.visible !== false, onchange: (e) => { inst.visible = e.target.checked; hooks.commit(); } }), h('span', {}, 'Visible at start')),

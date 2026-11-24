@@ -104,7 +104,97 @@ export function dailyChores() {
   };
 }
 
+// ---- Year 7 tutorial versions (cggs-digital-tutorials): same names and steps as the Construct 3 tutorials ----
+
+// Music tracker: global variable, text input with int(), Set text, show a message at 10 hours
+export function y7MusicTracker() {
+  return {
+    version: 1, name: 'Music tracker', features: { level: 2 },
+    variables: [{ name: 'HoursPracticed', value: 0 }],
+    screens: [{
+      id: 'main', name: 'Tracker',
+      objects: [
+        obj('TextTitle', 'text', [inst('m1', 24, 40, 342, 36, '🎻 Music practice tracker')]),
+        obj('TextInput', 'input', [inst('m2', 24, 110, 200, 42, '')]),
+        obj('Button', 'button', [inst('m3', 236, 108, 130, 46, 'Add hours')]),
+        obj('TextDisplayHours', 'text', [inst('m4', 24, 180, 342, 32, 'You have practiced for 0 hours')]),
+        obj('GreatWork', 'text', [{ ...inst('m5', 24, 240, 342, 48, '🎉 Great work! 10 hours!'), visible: false }]),
+      ],
+      events: [
+        ev('t1', [{ type: 'onClicked', target: 'Button' }], [
+          { type: 'addTo', value: 'int(TextInput.text)', var: 'HoursPracticed' },
+          { type: 'setText', target: 'TextDisplayHours', value: '"You have practiced for " & HoursPracticed & " hours"' },
+        ]),
+        ev('t2', [{ type: 'compareVar', var: 'HoursPracticed', op: '≥', value: '10' }], [
+          { type: 'setVisible', visible: 'show', target: 'GreatWork' },
+        ]),
+      ],
+    }],
+  };
+}
+
+// Daily chores, Option B: one trigger, a sub-event that checks the text, and Else
+export function y7DailyChores() {
+  const chores = [['Bed', 'Make my bed'], ['Dog', 'Feed the dog'], ['Homework', 'Do my homework']];
+  const objects = [obj('TextTitle', 'text', [inst('d0', 24, 40, 342, 36, 'My daily chores')])];
+  const events = [];
+  chores.forEach(([key, label], i) => {
+    const y = 110 + i * 70;
+    objects.push(obj('Checkbox_' + key, 'button', [inst('d' + i + 'b', 24, y, 56, 52, '⬜')]));
+    objects.push(obj('Text_' + key, 'text', [inst('d' + i + 't', 96, y + 10, 270, 32, label)]));
+    events.push(ev('c' + i, [{ type: 'onClicked', target: 'Checkbox_' + key }], [], [
+      ev('c' + i + 'a', [{ type: 'compareText', target: 'Checkbox_' + key, op: '=', value: '"⬜"' }], [
+        { type: 'setText', target: 'Checkbox_' + key, value: '"✅"' },
+      ]),
+      elseEv('c' + i + 'b', [{ type: 'setText', target: 'Checkbox_' + key, value: '"⬜"' }]),
+    ]));
+  });
+  return { version: 1, name: 'Daily chores', features: { level: 2 }, variables: [], screens: [{ id: 'main', name: 'Chores', objects, events }] };
+}
+
+// Water tracker: two variables, a cap with a sub-event, reset, Every tick display, Else message, progress bar
+export function y7WaterTracker() {
+  return {
+    version: 1, name: 'Daily water intake tracker', features: { level: 2 },
+    variables: [{ name: 'waterCount', value: 0 }, { name: 'dailyGoal', value: 10 }],
+    screens: [{
+      id: 'main', name: 'Water',
+      objects: [
+        obj('WaterText', 'text', [inst('w1', 24, 40, 342, 36, 'Glasses of water today: 0 / 10')]),
+        obj('AddWaterButton', 'button', [inst('w2', 24, 100, 342, 52, 'Add Glass')]),
+        obj('ProgressBG', 'shape', [{ ...inst('w3', 45, 180, 300, 24, ''), color: '#d5dae3' }]),
+        obj('ProgressBar', 'shape', [{ ...inst('w4', 45, 180, 30, 24, ''), color: '#2f8fdd' }]),
+        obj('MotivationalMessage', 'text', [inst('w5', 24, 220, 342, 48, '')]),
+        obj('ResetButton', 'button', [inst('w6', 24, 600, 342, 48, 'Reset Day')]),
+      ],
+      events: [
+        ev('w_add', [{ type: 'onClicked', target: 'AddWaterButton' }], [], [
+          ev('w_cap', [{ type: 'compareVar', var: 'waterCount', op: '<', value: 'dailyGoal' }], [
+            { type: 'addTo', value: '1', var: 'waterCount' },
+          ]),
+        ]),
+        ev('w_reset', [{ type: 'onClicked', target: 'ResetButton' }], [
+          { type: 'setVar', var: 'waterCount', value: '0' },
+        ]),
+        ev('w_tick', [{ type: 'everyTick' }], [
+          { type: 'setText', target: 'WaterText', value: '"Glasses: " & waterCount & " / " & dailyGoal' },
+          { type: 'setSize', target: 'ProgressBar', prop: 'w', value: '(waterCount / dailyGoal) * 300' },
+        ]),
+        ev('w_goal', [{ type: 'compareVar', var: 'waterCount', op: '=', value: 'dailyGoal' }], [
+          { type: 'setText', target: 'MotivationalMessage', value: '"🎉 Daily water goal achieved! Great job!"' },
+        ]),
+        elseEv('w_keep', [
+          { type: 'setText', target: 'MotivationalMessage', value: '"Keep drinking water to reach your goal"' },
+        ]),
+      ],
+    }],
+  };
+}
+
 export const SAMPLES = {
+  'Y7: Music tracker': y7MusicTracker,
+  'Y7: Daily chores': y7DailyChores,
+  'Y7: Water tracker': y7WaterTracker,
   'Practice tracker': musicTracker,
-  'Daily chores': dailyChores,
+  'Daily chores (copies)': dailyChores,
 };

@@ -8,6 +8,7 @@ export const ICONS = {
   button: svg('<rect x="6" y="14" width="36" height="20" rx="6"/><path d="M17 24h14"/>'),
   text:   svg('<path d="M10 14h28M24 14v22M18 36h12"/>'),
   input:  svg('<rect x="6" y="14" width="36" height="20" rx="4"/><path d="M14 20v8"/>'),
+  shape:  svg('<rect x="8" y="14" width="32" height="20" rx="3" fill="currentColor" fill-opacity=".25"/>'),
   toggle: svg('<rect x="6" y="15" width="36" height="18" rx="9"/><circle cx="33" cy="24" r="5"/>'),
   slider: svg('<path d="M8 24h32"/><circle cx="20" cy="24" r="5" fill="currentColor"/>'),
 };
@@ -29,6 +30,10 @@ export const RENDER = {
   input: {
     make: (design) => h('input', { type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: design ? 'Text input' : '' }),
     write: (inner, p) => { if (inner.value !== p.text) inner.value = p.text; },
+  },
+  shape: {
+    make: () => h('div', { class: 'box' }),
+    write: (inner, p) => { if (inner.style.background !== p.color) inner.style.background = p.color; },
   },
   toggle: {
     make: () => h('label', { class: 'tg' }, h('input', { type: 'checkbox', role: 'switch' }), h('span', { class: 'tg-track' }), h('span', { class: 'tg-label' })),

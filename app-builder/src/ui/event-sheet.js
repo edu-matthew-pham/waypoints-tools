@@ -116,7 +116,7 @@ export class EventSheet extends HTMLElement {
       const acts = h('div', { class: 'ev-acts' });
       ev.actions.forEach((a, ai) => acts.append(this._item('act', ev, ev.actions, a, ai)));
       if (showAdd) acts.append(this._addBtn('act', ev, depth));
-      else if (!ev.actions.length && this.guided) acts.append(h('span', { class: 'muted' }, '(no actions yet)'));
+      else if (!ev.actions.length && this.guided && !ev.children.length) acts.append(h('span', { class: 'muted' }, '(no actions yet)'));
 
       const main = h('div', { class: 'ev-main' }, conds, acts);
       if (this.edit) main.append(this._tools(list, i, ev));
@@ -238,6 +238,7 @@ export class EventSheet extends HTMLElement {
       case 'showhide': return [['show', 'Show'], ['hide', 'Hide']];
       case 'onoff': return [['on', 'on'], ['off', 'off']];
       case 'key': return KEYS;
+      case 'posSize': return [['w', 'width'], ['h', 'height'], ['x', 'x position'], ['y', 'y position']];
     }
     return [];
   }

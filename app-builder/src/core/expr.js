@@ -171,6 +171,9 @@ const FUNCS = {
   lower:  { n: 1, f: (v) => String(v).toLowerCase() },
   str:    { n: 1, f: (v) => fmt(v) },
 };
+// Construct names, so code copied from a Construct tutorial still works
+FUNCS.uppercase = FUNCS.upper;
+FUNCS.lowercase = FUNCS.lower;
 export const FUNCTION_NAMES = [...Object.keys(FUNCS), 'random', 'if'];
 
 // env = { getVar(name), getProp(obj, prop), random() }
@@ -222,7 +225,10 @@ export function check(src, scope) {
         case 'prop': {
           const props = scope.objects.get(n.obj);
           if (!props) throw new ExprError(`There's no object called "${n.obj}" on this screen`);
-          if (!props.has(n.prop)) throw new ExprError(`${n.obj} has no property "${n.prop}"`);
+          if (!props.has(n.prop)) {
+            const lower = [...props].find((p) => p.toLowerCase() === n.prop.toLowerCase());
+            throw new ExprError(lower ? `Use ${n.obj}.${lower} (small letters), not ${n.obj}.${n.prop}` : `${n.obj} has no property "${n.prop}"`);
+          }
           break;
         }
         case 'neg': walk(n.e); break;
@@ -261,8 +267,10 @@ export const FUNCTION_HELP = {
   float:  ['float(text)', 'Turns text into a number that can have decimals.', 'float(Price.text) * 2'],
   str:    ['str(x)', 'Turns a number into text.', 'str(score)'],
   len:    ['len(text)', 'How many characters are in some text.', 'len(Name.text)'],
-  upper:  ['upper(text)', 'Text in CAPITALS.', 'upper(Name.text)'],
-  lower:  ['lower(text)', 'Text in lower case.', 'lower(Name.text)'],
+  upper:  ['upper(text)', 'Text in CAPITALS. (uppercase() also works.)', 'upper(Name.text)'],
+  lower:  ['lower(text)', 'Text in lower case. (lowercase() also works.)', 'lower(Name.text)'],
+  uppercase: ['uppercase(text)', 'Same as upper().', 'uppercase(Name.text)'],
+  lowercase: ['lowercase(text)', 'Same as lower().', 'lowercase(Name.text)'],
 };
 export const OPERATOR_HELP = [
   ['&', 'Joins pieces of text', '"Hi " & Name.text'],

@@ -18,6 +18,7 @@ export const COMPONENTS = {
   button: { id: 'button', label: 'Button',     category: 'Basics', hint: 'Something to tap or click.',            base: 'Button', props: { text: 'Button', w: 150, h: 46 } },
   text:   { id: 'text',   label: 'Text',       category: 'Basics', hint: 'Words on the screen. Events can change them.', base: 'Text',   props: { text: 'Text',   w: 220, h: 32 } },
   input:  { id: 'input',  label: 'Text input', category: 'Basics', hint: 'A box where the user types.',           base: 'Input',  props: { text: '',       w: 220, h: 42 } },
+  shape:  { id: 'shape',  label: 'Box',        category: 'Basics', hint: 'A coloured rectangle: bars, backgrounds, dividers.', base: 'Box', props: { text: '', w: 200, h: 24 }, extra: { color: '#2f6fdd' } },
   toggle: { id: 'toggle', label: 'Toggle',     category: 'Choices', hint: 'An on/off switch with a label.',        base: 'Toggle', props: { text: 'Switch', w: 180, h: 32 }, extra: { on: false }, exposes: ['on'] },
   slider: { id: 'slider', label: 'Slider',     category: 'Choices', hint: 'Drag to pick a number.',                base: 'Slider', props: { text: '',       w: 240, h: 32 }, extra: { min: 0, max: 100, value: 50 }, exposes: ['value', 'min', 'max'] },
 };
