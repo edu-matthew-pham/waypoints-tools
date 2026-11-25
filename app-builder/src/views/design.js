@@ -161,7 +161,10 @@ export function initDesign(root) {
         h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: !!S.project.allowCamera, 'data-ab': 'allow-camera',
           onchange: (e) => { S.project.allowCamera = e.target.checked; hooks.commit(); } }),
           h('span', {}, 'Allow camera in this app (off by default; the browser also asks the user, and some school devices block cameras)')),
-        h('p', { class: 'muted small' }, 'The camera starts only when the user taps the Photo. Add a button that takes the photo; Photo.picture is the photo, ready for an Image or a table. Photos stay in this browser.'));
+        h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: inst.shutter !== false, 'data-ab': 'prop:shutter',
+          onchange: (e) => { inst.shutter = e.target.checked; hooks.commit(); } }),
+          h('span', {}, 'Show a take-photo button (or hide it and take photos with your own button: Take a photo with)')),
+        h('p', { class: 'muted small' }, 'The camera starts when the user taps the Photo. "A photo is taken with" runs when they tap its take-photo button; Photo.picture is the photo, ready for an Image or a table. Photos stay in this browser.'));
     }
     if (obj.kind === 'list') {
       const lists = S.project.variables.filter(isList).map((v) => v.name);

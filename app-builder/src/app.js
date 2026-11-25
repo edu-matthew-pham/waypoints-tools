@@ -241,14 +241,20 @@ function openFile() {
 }
 
 function renderTabs() {
-  els.tabs.replaceChildren(...[['design', 'Design'], ['events', 'Events'], ['map', 'Map'], ['run', 'Run ▶']].map(([id, label]) =>
-    h('button', { class: 'tab' + (S.tab === id ? ' on' : ''), 'data-ab': 'tab:' + id, role: 'tab', 'aria-selected': S.tab === id, onclick: () => setTab(id) }, label)));
+  // while the app runs, the Run tab reads Stop and goes back to the tab you came from (Restart is on the Run tab)
+  const running = S.tab === 'run';
+  els.tabs.replaceChildren(...[['design', 'Design'], ['events', 'Events'], ['map', 'Map'], ['run', running ? '■ Stop' : 'Run ▶']].map(([id, label]) =>
+    h('button', { class: 'tab' + (S.tab === id ? ' on' : '') + (id === 'run' && running ? ' stop' : ''), 'data-ab': 'tab:' + id, role: 'tab', 'aria-selected': S.tab === id,
+      title: id === 'run' ? (running ? 'Stop the app and go back' : 'Run the app') : null,
+      onclick: () => setTab(id === 'run' && running ? (lastTab !== 'run' ? lastTab : 'design') : id) }, label)));
   els.design.hidden = S.tab !== 'design';
   els.events.hidden = S.tab !== 'events';
   els.run.hidden = S.tab !== 'run';
   els.map.hidden = S.tab !== 'map';
 }
+let lastTab = 'design';
 function setTab(t) {
+  if (S.tab !== 'run') lastTab = S.tab;
   tabViews[S.tab]?.deactivate();
   S.tab = t;
   renderTabs();

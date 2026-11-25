@@ -112,3 +112,19 @@ test('picture is a field type; the new blocks are offered from level 3; the shee
   assert.match(text, /object Pad \(drawing\)/);
   assert.match(text, /Take a photo with Cam/);
 });
+
+test('the Photo\'s own take-photo button takes the photo and runs "a photo is taken"; the action does not run it', () => {
+  const p = app();
+  p.screens[0].events.push(newEvent({ conds: [{ type: 'onPhotoTaken', target: 'Cam' }], actions: [{ type: 'setText', target: 'Msg', value: '"taken " & Cam.picture' }] }));
+  const { rt } = runtime(p);
+  const cam = one(rt, 'Cam');
+  rt.userChange(cam.id, { shoot: true });
+  assert.ok(rt.errors.some((e) => /camera isn't on yet/.test(e.message)), 'no camera yet: a plain problem, nothing runs');
+  assert.equal(one(rt, 'Msg').props.text, 'Text');
+  rt.userChange(cam.id, true);
+  rt.userChange(cam.id, { shoot: true });
+  assert.equal(one(rt, 'Msg').props.text, 'taken media:00000001');
+  rt.click(one(rt, 'Snap').id); // Take a photo with Cam, from a button's event
+  assert.equal(one(rt, 'Msg').props.text, 'taken media:00000001', 'the action does not run "a photo is taken"');
+  assert.equal(cam.props.picture, 'media:00000002');
+});

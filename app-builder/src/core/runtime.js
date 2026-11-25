@@ -163,9 +163,13 @@ export class Runtime {
       inst.props.length = Math.round((Number(value.length) || 0) * 10) / 10;
       inst.props.start = 0; inst.props.end = inst.props.length;
     } else if (inst.kind === 'photo') {
-      inst.props.ready = !!value; // the camera started (or stopped); not an event of its own
-      this.#changed();
-      return;
+      if (value?.shoot) { // the Photo's own take-photo button: take it, then "a photo is taken" runs
+        try { this.takePhoto(inst); } catch (e) { this.#error(null, e.message); return; }
+      } else {
+        inst.props.ready = !!value; // the camera started (or stopped); not an event of its own
+        this.#changed();
+        return;
+      }
     } else return;
     this.fire('changed', { object: inst.object, instance: inst });
   }

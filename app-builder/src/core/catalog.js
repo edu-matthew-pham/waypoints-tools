@@ -59,6 +59,11 @@ export const CONDITIONS = {
     params: [obj({ kinds: ['drawing'] })],
     help: 'Runs each time the user finishes a line. Drawing.lines is how many lines there are.',
   },
+  onPhotoTaken: {
+    category: 'Object', label: 'A photo is taken with {target}', trigger: 'changed', object: 'target',
+    params: [obj({ kinds: ['photo'] })],
+    help: 'Runs when the user taps the Photo\'s own take-photo button. Photo.picture is the photo. (A photo taken by the "Take a photo with" action doesn\'t run this: put what comes next in that same event.)',
+  },
   onRecorded: {
     category: 'Object', label: '{target} finishes a recording', trigger: 'changed', object: 'target',
     params: [obj({ kinds: ['recorder'] })],

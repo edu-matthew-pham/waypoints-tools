@@ -203,15 +203,17 @@ export const RENDER = {
       // the <video> is added only when the camera starts: browser extensions that put buttons on every video then have
       // nothing to latch onto before that (and never in Design)
       const el = h('div', { class: 'pho' }), msg = h('div', { class: 'pho-msg' });
-      el.append(msg);
-      Object.assign(el, { _v: null, _msg: msg, _design: design });
+      const shutter = h('button', { type: 'button', class: 'pho-shutter', 'aria-label': 'Take a photo', title: 'Take a photo', hidden: true });
+      el.append(msg, shutter);
+      Object.assign(el, { _v: null, _msg: msg, _design: design, _shutter: shutter, _shutterOn: true });
+      shutter.addEventListener('click', () => { if (el._stream) report(el, { shoot: true }); });
       msg.textContent = design ? '📷 Camera: the user taps here to start it when the app runs' : '📷 Tap to start the camera';
       if (design) return el;
       el.addEventListener('click', () => { if (!el._stream) startCamera(el); });
       return el;
     },
-    write: (el) => { if (el._design) return; if (!el._stream && !el._starting && !media.camera()) el._msg.textContent = '📷 The camera is off for this app. To use it, tick Allow camera in the Photo\u2019s properties (Design).'; else if (!el._stream && !el._starting && !el._failed) el._msg.textContent = '📷 Tap to start the camera'; },
-    read: (v) => !!v.srcObject?.active,
+    write: (el, p) => { el._shutterOn = p.shutter !== false; el._shutter.hidden = !(el._stream && el._shutterOn); if (el._design) return; if (!el._stream && !el._starting && !media.camera()) el._msg.textContent = '📷 The camera is off for this app. To use it, tick Allow camera in the Photo\u2019s properties (Design).'; else if (!el._stream && !el._starting && !el._failed) el._msg.textContent = '📷 Tap to start the camera'; },
+    read: (t) => (t.classList?.contains('pho') ? t._value : !!t.srcObject?.active),
     snapshot: (el) => {
       const v = el._v;
       if (!el._stream || !v?.videoWidth) return null;
@@ -324,6 +326,7 @@ async function startCamera(el) {
     el._v.srcObject = stream;
     await el._v.play().catch(() => {});
     el.classList.add('live');
+    el._shutter.hidden = !el._shutterOn;
     el._v.dispatchEvent(new Event('input', { bubbles: true })); // the stage reports it: Photo.ready
   } catch (e) {
     el._failed = true;

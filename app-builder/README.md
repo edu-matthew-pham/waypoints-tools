@@ -239,7 +239,7 @@ Pictures made while the app runs. Like an upload, each one is a file in the medi
   changes, so reading it twice doesn't make two files. An empty drawing gives its background, or "" with none.
 - **Photo**: the camera. Off unless **Allow camera** is ticked (project setting, shown in the Photo's properties, like
   Allow YouTube links). Starts only when the user taps it; the browser also asks. A refused or missing camera (some
-  school devices block it) gets a plain message on the object. Action: *Take a photo with*; `Photo.picture` is the last
+  school devices block it) gets a plain message on the object. A built-in **take-photo button** (a round shutter, shown once the camera is on; untick *Show a take-photo button* to use your own) runs *A photo is taken with* (only the built-in button runs it, so an event can't loop by taking a photo when one is taken). Action: *Take a photo with*; `Photo.picture` is the last
   photo (a JPEG, at most 640 px), `Photo.ready` is whether the camera is on. The camera turns off when the screen or Run
   stops.
 - **Set picture to the one in** (Image): any expression giving a picture: `Drawing.picture`, `ClickedItem.picture`, or a
@@ -284,4 +284,9 @@ Pictures made while the app runs. Like an upload, each one is a file in the medi
   project is updated. With no media store, files go inside the project as data: URLs.
 - The zip code is hand-written (store-only writer, no dependency; Matthew, 26 Nov). If odd zips ever cause trouble, the
   fallback is the fflate library. Tests: `tests/zip.test.js` (including a compressed zip and damage).
+
+## Run and Stop (26 Nov 2026)
+
+While the app runs, the Run tab reads **■ Stop**; clicking it stops the app and goes back to the tab you came from.
+Restart (on the Run tab) starts it again from the beginning. Leaving the Run tab any other way also stops it.
 
