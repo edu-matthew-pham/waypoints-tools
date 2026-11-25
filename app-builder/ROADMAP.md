@@ -227,7 +227,7 @@ skipped on that screen (quietly: it isn't a mistake). Shared objects (one HomeBu
 Construct's global layers) were considered and left for later: they need new Design tab and layer work. The Map draws a
 shared Go to screen as an arrow from each screen it applies to.
 
-**Functions** (Level 4, advanced; *design agreed 26 Nov 2026; built 26 Nov on branch `functions`, see README › Functions*). Whole-app, named, with parameters: "Define function
+**Functions** (Level 4, advanced; *design agreed 26 Nov 2026; built and live 26 Nov, see README › Functions*). Whole-app, named, with parameters: "Define function
 SaveEntry(text)", then an action "Call SaveEntry with …". Matches Construct's functions, with less switched on at first:
 - **Where:** a Functions row in the side panel under All screens; each function opens in the Events tab.
 - **Body:** a small event sheet (conditions, sub-events and Else allowed). Students first see it as a list of actions
@@ -256,13 +256,27 @@ Done (24–25 Nov 2026): toggle, slider, keys, timers, image and assets, lists, 
 rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever classes say; map view first as the smaller job):
 
 1. §8 Map view (built and live 26 Nov; snapshot still to do).
-2. §11 All screens sheet (built and live 26 Nov), then §11 Functions (built 26 Nov, not yet live; agreed 26 Nov: smaller than media, help every app; media doesn't need
+2. §11 All screens sheet (built and live 26 Nov), then §11 Functions (built and live 26 Nov; agreed 26 Nov: smaller than media, help every app; media doesn't need
    them and they don't need media).
 3. §10 media store in IndexedDB (also fixes uploads filling the ~5 MB a project has now).
 4. §10 Drawing and Photo, with the picture field and Set image to an expression.
 5. §10 Recorder and the sound field; zip Save and Open with the data made while running.
 6. §9 AI help, once how AI is used in class is decided.  7. Layout and tabs, yes/no fields, Grid.
 Alongside: Data apps tried with a class; its feedback can reorder this.
+
+## Testing *(flagged 26 Nov 2026, Matthew: later)*
+
+Now: `npm test` covers the logic (running events, expressions, renames, sheet text, map, levels) with no browser,
+which is where most risky behaviour is. Gaps: nothing tests the editor itself (side panel, dialogs, Events tab), the
+built `index.html` isn't checked against `src/`, and tests only run when someone remembers. The README's
+`npm run test:ui` / `tools/embed-test.mjs` don't exist in the repo (out of date, or lost).
+
+1. **A check on every push** (GitHub Actions, about 20 minutes to set up): run the tests, rebuild, fail if
+   `index.html` is out of date. Worth doing first once several chats push to main.
+2. **A few browser checks** (5–10) using the `data-ab` labels: add an event, make and call a function, run, check
+   the result. Before a class trial, when an editor bug costs a lesson.
+3. **Golden sheet text** for the samples plus a project with functions, so wording changes that lesson checks rely
+   on can't slip through.
 
 ## Automation hooks *(done, 24 Nov 2026)*
 
