@@ -250,6 +250,13 @@ before relying on them in a Construct unit). Groups that change while the app ru
 checks cover both), and an All screens event that mentions a family runs on a screen with any of its members. In "show as
 code" a family becomes an HTML class. Also plan class projects that use families (Matthew, 26 Nov 2026).
 
+**An object on every screen (later; idea agreed 26 Nov 2026).** Like Construct's Global objects, but suited to apps: add
+an object once (a nav bar, header, Home button, later a Sound that keeps playing) and it appears on every screen as one
+copy that keeps its text, position and variables when the screen changes. Pairs with the All screens sheet (shared
+object + shared events). Now, objects reset when you go to a screen; whole-app variables and All screens events cover
+most needs, so this waits. Check then: how it shows in Design (edited once, not per screen), a screen that hides it, and
+names (it would clash with a same-named object on a screen).
+
 ## Suggested order
 
 Done (24–25 Nov 2026): toggle, slider, keys, timers, image and assets, lists, tables, linked tables, nested view, paste
