@@ -66,7 +66,7 @@ test('every catalog entry is assigned to a level, so new entries are not forgott
 test('samples and new projects carry sensible levels', () => {
   assert.equal(musicTracker().features.level, 2);
   assert.equal(dailyChores().features.level, 3);
-  assert.equal(newProject().features.level, 2);
+  assert.equal(newProject().features.level, 4); // New and the plain address are a playground: everything offered
 });
 
 test('the choose-between-values builder is a level 3 feature (typed if() always works)', () => {

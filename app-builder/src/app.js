@@ -38,11 +38,10 @@ S.locked = params.locked;
 const GUIDED_KEY = 'appbuilder.guided';
 S.guided = store((ls) => ls.getItem(GUIDED_KEY)) !== 'quick';
 function applyParams(p) {
-  if (params.level || params.allow || params.on) {
+  if (params.level || params.allow) {
     p.features = { ...(p.features || { level: 4 }) };
     if (params.level) p.features.level = params.level;
     if (params.allow) p.features.allow = params.allow;
-    if (params.on) p.features.ui = { ...(p.features.ui || {}), ...Object.fromEntries(params.on.map((k) => [k, true])) }; // ?on=functionLogic,...
   }
 }
 
@@ -217,7 +216,9 @@ let codeStart = null;
 try { if (QS.get('code')) { const p = JSON.parse(QS.get('code')); codeStart = () => structuredClone(p); } } catch { queueMicrotask(() => notify('The starter project for this step could not be read.')); }
 const lessonStart = codeStart || (lessonId && sampleById(lessonId) ? () => sampleById(lessonId) : null);
 if (lessonId && !lessonStart) queueMicrotask(() => notify(`There is no lesson called "${lessonId}". Opening your last project instead.`));
-initial = checkProject(initial || (lessonStart ? lessonStart() : SAMPLES['Minutes and goal (two screens)']()));
+// No lesson link: a playground, so everything is offered (Level 4), like MakeCode or Construct. Lessons set their own level.
+const playground = () => ({ ...SAMPLES['Minutes and goal (two screens)'](), features: { level: 4 } });
+initial = checkProject(initial || (lessonStart ? lessonStart() : playground()));
 applyParams(initial);
 setProject(initial);
 refresh();

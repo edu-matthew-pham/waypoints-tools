@@ -317,8 +317,8 @@ export function openExpressionBrowser(sheet, insert) {
   const sc = sheet._scope;
   const PROP_HELP = { text: 'its text', value: 'its number', on: 'true if switched on', min: 'its smallest value', max: 'its largest value', visible: 'true if showing', x: 'distance from the left', y: 'distance from the top', w: 'its width', h: 'its height' };
   const params = [...(sheet._exprScope.params || [])];
-  // the app's own functions, once return values are on (or a function already gives one back)
-  const ownFns = sheet._ui('returnValues') ? (sc.functions || []) : [];
+  // the app's own functions that give a value back (Set return value)
+  const ownFns = (sc.functions || []).filter((f) => f.gives);
   const sections = [
     ['Parameters of this function', params.map((v) => ({ code: v, desc: 'the value the call gave' }))],
     ['Variables', sc.variables.map((v) => ({ code: v, desc: 'whole-app variable' }))],

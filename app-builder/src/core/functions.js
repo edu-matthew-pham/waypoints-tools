@@ -2,8 +2,9 @@
 //
 //   project.functions = [{ id, name, params: [name], copyPicked?: true, events: [event] }]
 //
-// A function starts as a list of actions: one event with no conditions ("when called, do ..."). With the
-// functionLogic switch on (core/features.js) its body can be a small event sheet (conditions, sub-events, Else).
+// A function starts as a list of actions: one event with no conditions ("when called, do ..."). Its "+ Check"
+// button (asSheet: true) turns it into a small event sheet (conditions, sub-events, Else), and it stays one.
+//   project.functions[i].asSheet?: true   shown as an event sheet even while it has no conditions yet
 // It is called by the action "Call SaveEntry with text = ..." or, once it sets a return value, as a value:
 // Total(price, qty). Parameters have no type (like variables) and are plain names inside it. Objects are matched
 // by name, like the All screens sheet: an action on an object the calling screen doesn't have is skipped there.
@@ -23,7 +24,11 @@ export function newFunction(project, base = 'MyFunction') {
   return fn;
 }
 
-// a plain list of actions: what students see first (no conditions, sub-events or Else)
+// does this function give a value back (Set return value), so it can be used in a value box?
+export const givesValue = (fn) => [...allEvents(fn?.events)].some((ev) => (ev.actions || []).some((a) => a.type === 'setReturn'));
+// shown as a plain list of actions: what students see first (no conditions, sub-events or Else)
+export const showsAsList = (fn) => !fn.asSheet && isSequence(fn);
+// a plain list of actions (no conditions, sub-events or Else)
 export function isSequence(fn) {
   const evs = fn?.events || [];
   return evs.length <= 1 && !evs.some((ev) => ev.else || (ev.conds || []).length || (ev.children || []).length);
@@ -70,6 +75,6 @@ export function functionUsers(project, name) {
 }
 
 // true if any function sets a return value (the editor then keeps offering it)
-export const usesReturn = (project) => functionsOf(project).some((f) => [...allEvents(f.events)].some((ev) => (ev.actions || []).some((a) => a.type === 'setReturn')));
+export const usesReturn = (project) => functionsOf(project).some(givesValue);
 // every parameter name of every function (a whole-app variable can't take one)
 export const paramNames = (project) => functionsOf(project).flatMap((f) => f.params);

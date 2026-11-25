@@ -554,7 +554,7 @@ p.small, .muted.small { font-size: 12px; }
 .tree-row.fn { padding: 3px 0; }
 .tree-row.fn .link { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
 .tree-row.fn.on .link { font-weight: 600; color: var(--accent); }
-.fn-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fafbfd; }
+.fn-bar { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fafbfd; }
 .fn-bar[hidden] { display: none; }
 .fn-sig { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-family: ui-monospace, Menlo, Consolas, monospace; }
 .fn-sig .fn-name { font-size: 15px; }
@@ -562,3 +562,8 @@ p.small, .muted.small { font-size: 12px; }
 .param-chip .link-name { font-family: inherit; }
 .fn-sig .ctl.rename { width: 9em; }
 .ev.seq .badge.when-called { white-space: nowrap; }
+.fn-extras { display: flex; flex-wrap: wrap; gap: 6px; }
+.fn-extra { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; font: inherit; font-size: 12px; color: var(--muted); background: transparent; border: 1px dashed var(--line); border-radius: 99px; cursor: pointer; }
+.fn-extra:hover, .fn-extra:focus-visible { color: var(--ink); border-style: solid; }
+.fn-extra.check.on { color: var(--accent); border-style: solid; border-color: var(--accent); }
+.fn-extra.check input { margin: 0; }

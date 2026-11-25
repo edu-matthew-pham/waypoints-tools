@@ -10,6 +10,7 @@
 // instance= { id, x, y, w, h, text, visible, vars:{} }
 // event   = { id, else, conds:[{type,...params}], actions:[{type,...params}], children:[event] }
 
+import { givesValue } from './functions.js';
 import { OBJECT_KINDS } from './catalog.js';
 import { imageNames, soundNames } from './assets.js';
 
@@ -25,7 +26,7 @@ export const uid = (prefix = '') => prefix + Math.random().toString(36).slice(2,
 
 export function newScreen(name = 'Screen') { return { id: uid('s'), name, objects: [], events: [] }; }
 export function newProject(name = 'My app') {
-  return { version: 1, name, device: 'web', features: { level: 2 }, variables: [], screens: [newScreen('Home')] };
+  return { version: 1, name, device: 'web', features: { level: 4 }, variables: [], screens: [newScreen('Home')] }; // New: everything offered; lessons set a level
 }
 export function newEvent(extra = {}) { return { id: uid('e'), else: false, conds: [], actions: [], children: [], ...extra }; }
 
@@ -191,7 +192,7 @@ export function scopeFor(project, screen) {
     tables: project.variables.filter(isTable).map((v) => v.name),
     tableFields: Object.fromEntries(project.variables.filter(isTable).map((v) => [v.name, tableFields(v)])),
     screens: project.screens.map((s) => ({ id: s.id, name: s.name })),
-    functions: (project.functions || []).map((f) => ({ name: f.name, params: [...f.params] })),
+    functions: (project.functions || []).map((f) => ({ name: f.name, params: [...f.params], gives: givesValue(f) })),
     pictures: imageNames(project),
     sounds: soundNames(project),
   };

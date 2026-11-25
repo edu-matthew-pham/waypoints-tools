@@ -57,7 +57,7 @@ export class EventSheet extends HTMLElement {
 
   _ui(flag) { return this._features ? !!this._features[flag] : true; }
   _can(kind, type) {
-    if (type === 'setReturn' && (this._where !== 'function' || !this._ui('returnValues'))) return false;
+    if (type === 'setReturn' && this._where !== 'function') return false;
     if (type === 'callFunction' && !this._ui('functions')) return false;
     return canUse(this._features, kind, type);
   }

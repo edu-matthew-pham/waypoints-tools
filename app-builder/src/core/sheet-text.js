@@ -3,7 +3,7 @@
 // project without opening it. Stable on purpose: change the wording only with the checks that use it.
 //
 //   all screens                                            (only when the All screens sheet has events; its event: lines follow)
-//   function SaveEntry(text)                               (one per function, its event: lines follow; "(copy picked)" at the end if set)
+//   function SaveEntry(text)                               (one per function, its event: lines follow; "(only the picked ones)" at the end if Copy picked is set)
 //   event: always | do: Add text to the end of list Journal; Call Refresh     (a call: Call Total with price = 3, qty = Qty.text)
 //   screen Home
 //   variable Minutes = 0
@@ -56,7 +56,7 @@ export function sheetText(project) {
     }
   };
   if (allScreensEvents(project).length) { out.push('all screens'); walk(allScreensEvents(project), []); }
-  for (const f of functionsOf(project)) { out.push(`function ${f.name}(${f.params.join(', ')})${f.copyPicked ? ' (copy picked)' : ''}`); walk(f.events, []); }
+  for (const f of functionsOf(project)) { out.push(`function ${f.name}(${f.params.join(', ')})${f.copyPicked ? ' (only the picked ones)' : ''}`); walk(f.events, []); }
   for (const s of project.screens || []) {
     out.push(`screen ${s.name}`);
     for (const o of s.objects || []) {

@@ -3,13 +3,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { Runtime } from '../src/core/runtime.js';
 import { newProject, newScreen, newEvent, addObject, checkProject, exprScopeFor } from '../src/core/project.js';
-import { isSequence, functionUsers, newFunction, callsInExpr } from '../src/core/functions.js';
+import { isSequence, functionUsers, newFunction, callsInExpr, showsAsList, givesValue } from '../src/core/functions.js';
 import { renameFunction, renameParam, addParam, removeParam, renameObject, renameVariable, functionNamesTaken, paramNamesTaken, nameProblem } from '../src/core/rename.js';
 import { validateSheet } from '../src/core/catalog.js';
 import { check } from '../src/core/expr.js';
 import { sheetText } from '../src/core/sheet-text.js';
 import { screenMap } from '../src/core/map.js';
-import { resolve, fromParams, canUse } from '../src/core/features.js';
+import { resolve, canUse } from '../src/core/features.js';
 import { starterOf } from '../src/samples.js';
 
 const click = (target) => ({ type: 'onClicked', target });
@@ -214,7 +214,7 @@ test('sheet text: a function line, then its events; calls read "Call F with a = 
   p.functions.push(fn('Refresh', [], []));
   home.events.push(newEvent({ conds: [click('Save')], actions: [call('SaveEntry', { text: 'Entry.text' }), call('Refresh')] }));
   const lines = sheetText(p).split('\n');
-  const at = lines.indexOf('function SaveEntry(text) (copy picked)');
+  const at = lines.indexOf('function SaveEntry(text) (only the picked ones)');
   assert.ok(at > 0);
   assert.equal(lines[at + 1], 'event: always | do: Add text to the end of list log');
   assert.equal(lines[at + 2], 'function Refresh()');
@@ -238,18 +238,28 @@ test('the map follows calls: a function that goes to a screen gives an arrow fro
   assert.equal(map.screens.find((s) => s.id === third.id).reachable, true);
 });
 
-test('functions are Level 4; the later switches are off until turned on', () => {
+test('functions are Level 4 (or a lesson that lists them); a new project offers everything', () => {
   assert.equal(resolve({ level: 3 }).functions, false);
   assert.equal(canUse(resolve({ level: 3 }), 'act', 'callFunction'), false);
-  const l4 = resolve({ level: 4 });
-  assert.equal(l4.functions, true);
-  assert.deepEqual([l4.functionLogic, l4.returnValues, l4.copyPicked], [false, false, false]);
-  const on = resolve({ level: 4, ui: { functionLogic: true, returnValues: true } });
-  assert.deepEqual([on.functionLogic, on.returnValues, on.copyPicked], [true, true, false]);
-  assert.deepEqual(fromParams('?level=4&on=functionLogic,copyPicked,nonsense').on, ['functionLogic', 'copyPicked']);
-  const lesson = resolve({ level: 2, allow: { act: ['callFunction', 'setReturn'] } });
-  assert.equal(lesson.functions && lesson.returnValues, true);
+  assert.equal(resolve({ level: 4 }).functions, true);
+  const lesson = resolve({ level: 2, allow: { act: ['callFunction'] } });
+  assert.equal(lesson.functions, true);
   assert.equal(lesson.tables, false);
+  assert.equal(newProject().features.level, 4);
+});
+
+test('a function shows as a list until "+ Check"; it gives a value back once it has Set return value', () => {
+  const f = fn('F', [], [{ type: 'setText', target: 'Note', value: '"x"' }]);
+  assert.equal(showsAsList(f), true);
+  f.asSheet = true;
+  assert.equal(showsAsList(f), false);
+  assert.equal(givesValue(f), false);
+  f.events[0].actions.push({ type: 'setReturn', value: '1' });
+  assert.equal(givesValue(f), true);
+  const { p } = app();
+  p.functions.push(f);
+  const f2 = checkProject(JSON.parse(JSON.stringify(p))).functions[0];
+  assert.equal(f2.asSheet, true); // kept when saved and opened
 });
 
 test('helpers: new functions get a free name; users list where a function is called; starters drop functions', () => {

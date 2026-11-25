@@ -5,7 +5,8 @@ import { h } from '../ui/dom.js';
 import { Runner } from '../run-engine.js';
 import { scopeFor, exprScopeFor } from '../core/project.js';
 import { allObjectsScreen, sharedEventsFor } from '../core/shared.js';
-import { isSequence, usesReturn } from '../core/functions.js';
+import { showsAsList, givesValue } from '../core/functions.js';
+import { newEvent } from '../core/project.js';
 import { renameParam, addParam, removeParam, paramNamesTaken, nameProblem } from '../core/rename.js';
 import { renameInput } from '../ui/rename-input.js';
 import { S, screen, hooks, showAllScreens, showFunctions, openFunction } from '../state.js';
@@ -23,7 +24,8 @@ export function initEvents(root) {
       showAllScreens() ? btn('all', 'All screens', 'Events that run on every screen (like a Home button), before each screen’s own') : null,
       fn ? btn('fn:' + fn.id, `Function: ${fn.name}`, 'The actions this function does when an event calls it', 'sheet:function') : null].filter(Boolean));
   };
-  // A function's name line: its parameters (click one to rename it), + Parameter, and Copy picked once offered.
+  // A function's name line: its parameters (click one to rename it) and + Parameter. Below, small quiet buttons open
+  // up the extra parts when a student needs them: + Check, Give back a value, Only the picked ones.
   const fnBar = h('div', { class: 'fn-bar', hidden: true });
   let renamingParam = null, addingParam = false;
   const drawFnBar = (fn) => {
@@ -55,12 +57,19 @@ export function initEvents(root) {
       queueMicrotask(() => input.focus());
       return input;
     })() : h('button', { class: 'mini', type: 'button', 'data-ab': 'add-param', title: 'A value the call gives the function, like the text to save', onclick: () => { addingParam = true; hooks.refresh(); } }, '+ Parameter');
-    const copyOn = !S.rf || S.rf.copyPicked || !!fn.copyPicked; // offered once switched on (or already used)
-    fnBar.replaceChildren(...[
+    const list = showsAsList(fn);
+    const extra = (ab, label, title, onclick) => h('button', { class: 'fn-extra', type: 'button', 'data-ab': ab, title, onclick }, label);
+    fnBar.replaceChildren(
       h('div', { class: 'fn-sig' }, h('strong', { class: 'fn-name' }, fn.name), h('span', { class: 'lbl' }, '('), ...fn.params.map(chip), adder, h('span', { class: 'lbl' }, ')')),
-      copyOn ? h('label', { class: 'check-inline', title: 'On: the function works on the objects the calling event picked (like only the clicked Tile). Off: it starts with every copy.' },
-        h('input', { type: 'checkbox', 'data-ab': 'copy-picked', checked: !!fn.copyPicked, onchange: (e) => { if (e.target.checked) fn.copyPicked = true; else delete fn.copyPicked; hooks.commit(); } }),
-        'Copy picked: work on the objects the calling event picked') : null].filter(Boolean));
+      h('div', { class: 'fn-extras' }, ...[
+        list ? extra('fn-add-check', '+ Check', 'Only do some actions if something is true. The function becomes a small event sheet (with sub-events and Otherwise).',
+          () => { fn.asSheet = true; hooks.commit(); }) : null,
+        !givesValue(fn) ? extra('fn-give-value', '+ Give back a value', `Lets ${fn.name}(…) be used in a value box, like Total(price, qty). Adds a "Set return value" action to fill in.`,
+          () => { (fn.events[fn.events.length - 1] || (fn.events.push(newEvent()), fn.events[0])).actions.push({ type: 'setReturn', value: '' }); hooks.commit(); }) : null,
+        h('label', { class: 'fn-extra check' + (fn.copyPicked ? ' on' : ''), title: 'Ticked: the function works only on the objects the calling event picked (like the clicked Tile). Not ticked: it starts with every copy.' },
+          h('input', { type: 'checkbox', 'data-ab': 'copy-picked', checked: !!fn.copyPicked, onchange: (e) => { if (e.target.checked) fn.copyPicked = true; else delete fn.copyPicked; hooks.commit(); } }),
+          'Only the picked ones'),
+      ].filter(Boolean)));
   };
   const sheet = document.createElement('event-sheet');
   const banner = h('div', { class: 'pick-banner', hidden: true }, 'Click an object in the preview to choose it. Esc to cancel.');
@@ -123,9 +132,8 @@ export function initEvents(root) {
       drawFnBar(fn);
       const all = S.sheet === 'all';
       const shared = all || fn ? [] : sharedEventsFor(S.project, screen());
-      // a function stays a plain list of actions until conditions inside functions are switched on (or it already has them)
-      const logic = !S.rf || S.rf.functionLogic;
-      const sequence = !!fn && !logic && isSequence(fn);
+      // a function shows as a plain list of actions until its "+ Check" button (or it already has conditions)
+      const sequence = !!fn && showsAsList(fn);
       hint.textContent = fn
         ? (sequence
           ? `What ${fn.name} does when an event calls it, top to bottom. Its parameters are plain names in the value boxes. It works on any screen: an action on an object the screen doesn’t have is skipped there.`
@@ -137,8 +145,8 @@ export function initEvents(root) {
           + (shared.length ? ` ${shared.length === 1 ? '1 event' : shared.length + ' events'} from All screens run${shared.length === 1 ? 's' : ''} here first.` : '');
       if (source !== 'sheet') {
         const scr = all || fn ? allObjectsScreen(S.project) : screen();
-        // what the add menus offer: functions once Level 4 has them or the project does; return values once switched on or used
-        const features = S.rf && { ...S.rf, functions: showFunctions(), returnValues: S.rf.returnValues || usesReturn(S.project) };
+        // what the add menus offer: functions once Level 4 has them or the project does
+        const features = S.rf && { ...S.rf, functions: showFunctions() };
         sheet.setData({ events: fn ? fn.events : all ? S.project.allScreens.events : screen().events, scope: scopeFor(S.project, scr), exprScope: exprScopeFor(S.project, scr, fn),
           mode: S.guided ? 'guided' : 'edit', canPick: true, features, where: fn ? 'function' : all ? 'all' : 'screen', sequence });
       }
