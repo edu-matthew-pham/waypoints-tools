@@ -4,8 +4,9 @@
 // Pure data, so the Map tab, tests and lesson checks share it.
 //
 //   screenMap(project) -> {
-//     screens: [{ id, name, first, reachable, deadEnd, depth, links: [{ to, label }], broken: [label] }],
-//     links: [{ from, to, labels: [..] }],     one per pair of screens (several events can make the same link)
+//     screens: [{ id, name, first, reachable, deadEnd, depth, links: [{ to, label, kind }], broken: [label] }],
+//     links: [{ from, to, labels: [..], kinds: [..] }],   one per pair of screens (several events can make the same link);
+//                                                        kinds[i] is what starts labels[i] (WAY_KINDS)
 //   }
 // first: the first screen in the list, where a finished app starts.
 // reachable: some chain of links leads to it from the first screen.
@@ -13,14 +14,40 @@
 // depth: fewest links from the first screen (null if not reachable); the map lays screens out by it.
 // broken: links to a screen that no longer exists.
 import { itemText } from './sheet-text.js';
+import { CONDITIONS } from './catalog.js';
+
+// What kind of thing starts an event, in words for the map's summary ("6 ways: 4 clicks, 1 timer, 1 check").
+// Decided by the first trigger in the event or its parents; with no trigger, it is a test checked every tick.
+export const WAY_KINDS = {
+  click: ['click', 'clicks'], key: ['key', 'keys'], timer: ['timer', 'timers'], start: ['on start', 'on start'],
+  change: ['change', 'changes'], media: ['media end', 'media ends'], check: ['check', 'checks'],
+};
+const KIND_OF_TRIGGER = {
+  clicked: 'click', pressed: 'click', released: 'click', itemClicked: 'click',
+  keyDown: 'key', keyUp: 'key', timer: 'timer', start: 'start',
+  changed: 'change', submitted: 'change', ended: 'media',
+};
+const wayKind = (conds) => {
+  for (const c of conds) { const t = CONDITIONS[c.type]?.trigger; if (t) return KIND_OF_TRIGGER[t] || 'check'; }
+  return 'check';
+};
 
 function walk(events, path, screens, out) {
   for (const ev of events || []) {
-    const conds = (ev.conds || []).map((c) => itemText('cond', c, screens));
-    const here = [...path, ...(ev.else ? ['otherwise'] : []), ...conds];
-    for (const a of ev.actions || []) if (a.type === 'goToScreen') out.push({ to: a.screen, label: here.join(', ') || 'all the time' });
-    walk(ev.children, here, screens, out);
+    const conds = [...path.conds, ...(ev.conds || [])];
+    const words = [...path.words, ...(ev.else ? ['otherwise'] : []), ...(ev.conds || []).map((c) => itemText('cond', c, screens))];
+    for (const a of ev.actions || []) if (a.type === 'goToScreen') out.push({ to: a.screen, label: words.join(', ') || 'all the time', kind: wayKind(conds) });
+    walk(ev.children, { conds, words }, screens, out);
   }
+}
+
+// The words on an arrow: its one label, or a count of each kind ("6 ways: 4 clicks, 1 timer, 1 check").
+export function linkSummary(link) {
+  if (link.labels.length === 1) return link.labels[0];
+  const counts = new Map();
+  for (const k of link.kinds) counts.set(k, (counts.get(k) || 0) + 1);
+  const parts = Object.keys(WAY_KINDS).filter((k) => counts.has(k)).map((k) => `${counts.get(k)} ${WAY_KINDS[k][counts.get(k) === 1 ? 0 : 1]}`);
+  return `${link.labels.length} ways: ${parts.join(', ')}`;
 }
 
 export function screenMap(project) {
@@ -28,7 +55,7 @@ export function screenMap(project) {
   const ids = new Set(all.map((s) => s.id));
   const screens = all.map((s, i) => {
     const found = [];
-    walk(s.events, [], all, found);
+    walk(s.events, { conds: [], words: [] }, all, found);
     return {
       id: s.id, name: s.name, first: i === 0,
       links: found.filter((l) => ids.has(l.to)),
@@ -51,8 +78,9 @@ export function screenMap(project) {
     for (const l of s.links) {
       if (l.to === s.id) continue; // going to the screen you are on restarts it; not drawn as an arrow
       const key = s.id + '>' + l.to;
-      if (!links.has(key)) links.set(key, { from: s.id, to: l.to, labels: [] });
-      if (!links.get(key).labels.includes(l.label)) links.get(key).labels.push(l.label);
+      if (!links.has(key)) links.set(key, { from: s.id, to: l.to, labels: [], kinds: [] });
+      const link = links.get(key);
+      if (!link.labels.includes(l.label)) { link.labels.push(l.label); link.kinds.push(l.kind); }
     }
   }
   return { screens, links: [...links.values()] };

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { screenMap, mapProblems } from '../src/core/map.js';
+import { screenMap, mapProblems, linkSummary } from '../src/core/map.js';
 import { SAMPLES } from '../src/samples.js';
 import { newProject, newScreen, newEvent } from '../src/core/project.js';
 
@@ -21,9 +21,9 @@ test('links come from Go to screen actions, labelled with their conditions', () 
   const { p, home, add, saved } = threeScreens();
   const m = screenMap(p);
   assert.deepEqual(m.links, [
-    { from: home.id, to: add.id, labels: ['AddButton is clicked'] },
-    { from: add.id, to: saved.id, labels: ['SaveButton is clicked'] },
-    { from: add.id, to: home.id, labels: ['BackButton is clicked'] },
+    { from: home.id, to: add.id, labels: ['AddButton is clicked'], kinds: ['click'] },
+    { from: add.id, to: saved.id, labels: ['SaveButton is clicked'], kinds: ['click'] },
+    { from: add.id, to: home.id, labels: ['BackButton is clicked'], kinds: ['click'] },
   ]);
   const byName = Object.fromEntries(m.screens.map((s) => [s.name, s]));
   assert.equal(byName.Home.first, true);
@@ -67,4 +67,19 @@ test('one screen: no flags; every sample maps without throwing', () => {
   const two = screenMap(SAMPLES['Minutes and goal (two screens)']());
   assert.equal(two.screens.length, 2);
   assert.ok(two.links.length >= 1);
+});
+
+test('several ways between two screens are summed up by what starts them', () => {
+  const { p, home, add } = threeScreens();
+  const score = { type: 'compareVar', var: 'Score', op: '>=', value: '10' };
+  home.events.push(
+    go(add.id, [click('OtherButton')]), go(add.id, [click('ThirdButton')]), go(add.id, [click('FourthButton')]),
+    go(add.id, [{ type: 'onAfter', seconds: '3' }]),
+    go(add.id, [score]),
+    newEvent({ conds: [{ type: 'onKey', key: 'Enter' }], children: [go(add.id, [score])] }), // a sub-event keeps its parent's trigger
+  );
+  const link = screenMap(p).links.find((l) => l.from === home.id);
+  assert.deepEqual(link.kinds, ['click', 'click', 'click', 'click', 'timer', 'check', 'key']);
+  assert.equal(linkSummary(link), '7 ways: 4 clicks, 1 key, 1 timer, 1 check');
+  assert.equal(linkSummary(screenMap(p).links.find((l) => l.from === add.id)), 'SaveButton is clicked');
 });

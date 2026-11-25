@@ -64,6 +64,9 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
 
 The **Map** tab shows every screen as a small picture, with an arrow for each **Go to screen** action, labelled with the
 conditions it sits under. Arrows can't be drawn by hand: they come only from events, so the map always matches the app.
+When several events go between the same two screens, one arrow sums them up by what starts each event, for example
+"6 ways: 4 clicks, 1 timer, 1 check" (kinds: clicks, keys, timers, on start, changes, media ends, and checks for events with
+no trigger, tested every tick; a sub-event counts as its parent's trigger). The screen's card lists every event in full.
 Screens are laid out by how many steps they are from the first screen (where the app starts); screens nothing leads to sit
 in a last column. It notes screens that can't be reached, screens with no way out, and links to a deleted screen, as things
 to check rather than errors (a planned screen is "not linked yet"). **+ Add screen** makes a new, empty screen ready to

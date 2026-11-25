@@ -524,7 +524,8 @@ p.small, .muted.small { font-size: 12px; }
 .map-arrows { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
 .map-link path { fill: none; stroke: #8a93a8; stroke-width: 1.8; }
 .map-head { fill: #8a93a8; }
-.map-link text { font-size: 11px; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+.map-labels { z-index: 2; }
+.map-label { font-size: 11px; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
 .map-col { display: flex; flex-direction: column; gap: 40px; position: relative; z-index: 1; }
 .map-col.none { padding-left: 24px; border-left: 2px dashed var(--line); }
 .map-col-head { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: -28px; }

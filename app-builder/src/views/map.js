@@ -5,7 +5,7 @@
 import { h } from '../ui/dom.js';
 import { Stage } from '../ui/stage.js';
 import { screenItems } from '../ui/screen-items.js';
-import { screenMap, mapProblems } from '../core/map.js';
+import { screenMap, mapProblems, linkSummary } from '../core/map.js';
 import { sizeOf } from '../core/project.js';
 import { addScreen } from '../panels/side.js';
 import { S, hooks } from '../state.js';
@@ -24,6 +24,7 @@ export function initMap(root) {
   const bar = h('div', { class: 'map-bar' });
   const board = h('div', { class: 'map-board' });
   const arrows = svg('svg', { class: 'map-arrows', 'aria-hidden': 'true' });
+  const labels = svg('svg', { class: 'map-arrows map-labels', 'aria-hidden': 'true' });
   root.append(bar, board);
   let active = false, map = null;
   const cards = new Map(); // screen id -> card element
@@ -98,7 +99,7 @@ export function initMap(root) {
     cards.clear();
     colOf.clear();
     cols.forEach((col, i) => col.items.forEach((info) => colOf.set(info.id, i)));
-    board.replaceChildren(arrows, ...cols.map((col) => h('div', { class: 'map-col' + (col.key === 'none' ? ' none' : '') },
+    board.replaceChildren(arrows, labels, ...cols.map((col) => h('div', { class: 'map-col' + (col.key === 'none' ? ' none' : '') },
       col.key === 'none' ? h('div', { class: 'map-col-head' }, 'Not reached from Start') : null,
       col.items.map((info) => {
         const el = card(info, S.project.screens.find((s) => s.id === info.id));
@@ -127,21 +128,28 @@ export function initMap(root) {
     const kids = [svg('defs', {}, svg('marker', { id: 'map-head', viewBox: '0 0 10 10', refX: '9', refY: '5', markerWidth: '7', markerHeight: '7', orient: 'auto-start-reverse' },
       svg('path', { d: 'M0,0 L10,5 L0,10 z', class: 'map-head' })))];
     let lane = 0;
+    const texts = [];
     // lowest card in the columns from i to j, so a route underneath clears them
     const bottomOf = (i, j) => Math.max(...[...cards.keys()].filter((id) => colOf.get(id) >= Math.min(i, j) && colOf.get(id) <= Math.max(i, j)).map((id) => { const r = box(id); return r.y + r.h; }));
     for (const l of map.links) {
       const a = box(l.from), b = box(l.to);
       if (!a || !b) continue;
-      const text = l.labels.length > 1 ? `${l.labels.length} ways` : short(l.labels[0]); // the card lists them all
-      const g = (d, x, y, t = text) => svg('g', { class: 'map-link', 'data-from': l.from, 'data-to': l.to },
+      // one label as it reads, or "6 ways" over "4 clicks, 1 timer, 1 check"; every event is listed on the card
+      const summary = linkSummary(l);
+      const [head, tail] = l.labels.length > 1 ? summary.split(': ') : [summary];
+      const g = (d) => svg('g', { class: 'map-link', 'data-from': l.from, 'data-to': l.to },
         svg('title', {}, l.labels.join('\n')),
-        svg('path', { d, 'marker-end': 'url(#map-head)' }),
-        svg('text', { x, y, 'text-anchor': 'middle', 'dominant-baseline': 'middle' }, t));
+        svg('path', { d, 'marker-end': 'url(#map-head)' }));
+      // labels go in a layer above the cards, so a long one may overlap a card's edge rather than hide behind it
+      const label = (x, y, lines) => svg('text', { class: 'map-label', x, y: y - (lines.length - 1) * 7, 'text-anchor': 'middle', 'dominant-baseline': 'middle' },
+        svg('title', {}, l.labels.join('\n')),
+        ...lines.map((t, i) => svg('tspan', { x, dy: i ? 14 : 0 }, t)));
       if (Math.abs(colOf.get(l.from) - colOf.get(l.to)) > 1) {
         // would pass behind the screens in between: go down under all of them, across, and back up
         const low = bottomOf(colOf.get(l.from), colOf.get(l.to)) + 26 + lane++ * 22;
         const sx = a.x + a.w / 2 + 12, ex = b.x + b.w / 2 - 12;
-        kids.push(g(`M${sx},${a.y + a.h} C${sx},${low} ${sx},${low} ${(sx + ex) / 2},${low} S${ex},${low} ${ex},${b.y + b.h}`, (sx + ex) / 2, low - 9, l.labels.length > 1 ? text : l.labels[0])); // room for the whole label down here
+        kids.push(g(`M${sx},${a.y + a.h} C${sx},${low} ${sx},${low} ${(sx + ex) / 2},${low} S${ex},${low} ${ex},${b.y + b.h}`));
+        texts.push(label((sx + ex) / 2, low - 9, [summary])); // room for the whole label down here
         continue;
       }
       const ax = a.x + a.w / 2, ay = a.y + a.h / 2, bx = b.x + b.w / 2, by = b.y + b.h / 2;
@@ -151,9 +159,13 @@ export function initMap(root) {
       const cx = (ax + bx) / 2 + ((by - ay) / len) * bend, cy = (ay + by) / 2 - ((bx - ax) / len) * bend;
       const [sx, sy] = edge(a, cx, cy), [ex, ey] = edge(b, cx, cy);
       const mx = 0.25 * sx + 0.5 * cx + 0.25 * ex, my = 0.25 * sy + 0.5 * cy + 0.25 * ey;
-      kids.push(g(`M${sx},${sy} Q${cx},${cy} ${ex},${ey}`, mx, my));
+      kids.push(g(`M${sx},${sy} Q${cx},${cy} ${ex},${ey}`));
+      texts.push(label(mx, my, tail ? [head, tail] : [short(head)]));
     }
     arrows.replaceChildren(...kids);
+    labels.setAttribute('width', board.scrollWidth);
+    labels.setAttribute('height', board.scrollHeight);
+    labels.replaceChildren(...texts);
   }
   new ResizeObserver(() => requestAnimationFrame(draw)).observe(board);
 
