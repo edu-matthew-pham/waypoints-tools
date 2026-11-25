@@ -83,6 +83,35 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
 - Events -> JavaScript read-only view, then a *Run script* action (Level 4), so students can graduate to code.
 - Teacher view: share a project link with `?level=` / `?allow=` / `?lock=1` (done); later, a starter-project link.
 
+## 8. Map view (wireflow) *(proposed 25 Nov 2026, agreed in principle; not built)*
+
+A **Map** tab beside Design and Events: a wireflow of the whole app.
+- Every screen as a card with a small live render of its layout; clicking a card opens that screen.
+- Arrows drawn **automatically from events**: each `Go to screen` action becomes an arrow from its screen to the target,
+  labelled with its trigger (for example "SaveButton is clicked").
+- Flags **unreachable** screens (nothing goes to them) and **dead ends** (no way out).
+- An **Add screen** button on the map, so every screen can be named before it has content.
+
+Decided:
+- **Read-only for links.** No drawing arrows on the map: links come only from ordinary events (a button's
+  `is clicked` → `Go to screen`), so students learn the real event from lesson one. Skeleton-first and screen-first both
+  work; the map shows whatever exists.
+- No separate sketch mode: placing objects with no events is already a UI prototype.
+
+- **A tool, not a method.** The Map shows what exists; it doesn't prescribe how students plan. Teachers can use it for
+  skeleton-first planning, alongside a paper plan, for debugging, or not at all. Tutorials use it where it helps (for
+  example, spotting a dead end) and leave planning approaches to the teacher's own unit.
+
+Also on the map: **Save a snapshot** (optional) keeps the map as it is now, so it can be shown beside the current app
+later with screens and links added, removed or changed highlighted.
+
+Why: debugging (missing links and dead ends at a glance); a picture of the whole app that can't drift from it; checks
+(sheet text already holds the screen-change events, so a rule such as "every screen reachable" is cheap).
+
+Later (optional): a **storyboard strip** (click a route through the map, such as Home → Add → Saved, and lay it out left
+to right with a caption box under each frame); a per-screen note of which variables and lists it reads or writes
+(probably too much for Years 7–8).
+
 ## Suggested order
 
 1. Toggle, Slider (small, prove the registry).  2. Key pressed + Enter-submits + pressed/released.  3. Timers.
