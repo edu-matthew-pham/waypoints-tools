@@ -731,3 +731,4 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
 .tab.stop.on { background: #fde8e7; color: #b42318; }
 .pic-row .snd-ico { width: 28px; text-align: center; font-size: 16px; flex: none; }
 .side .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.top .btn.save-as { margin-left: -4px; padding: 6px 6px; color: #fff; }

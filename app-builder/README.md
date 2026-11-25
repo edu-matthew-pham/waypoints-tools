@@ -272,6 +272,12 @@ Pictures made while the app runs. Like an upload, each one is a file in the medi
 
 ## Saving and opening (ROADMAP §10, step 3, 26 Nov 2026)
 
+- **Save and Save as…** (26 Nov): in Chrome and Edge (File System Access API) the first Save opens the computer's own
+  Save box (Google Drive on a Chromebook, a synced OneDrive folder, anywhere), later Saves and Ctrl+S update that same
+  file, and Save as… (the ▾ beside Save, Ctrl+Shift+S) always asks. Open uses the Open box, so Save goes back to the
+  file you opened. Loading another app, a reload, or the app gaining its first picture (a .json can't hold it) makes the
+  next Save ask again. Elsewhere (Safari, Firefox, some embedded pages) Save downloads a file each time, as before.
+
 - **No pictures or recordings:** Save writes `name.app.json`, as before.
 - **With them:** `name.app.zip`, an ordinary zip: `project.json` (keeps its `media:` references, plus `mediaFiles`,
   reference -> file and type) and `media/<id>.<ext>` for each file (`src/project-file.js`, `src/core/zip.js`).

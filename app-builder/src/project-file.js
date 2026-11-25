@@ -37,6 +37,10 @@ export async function buildSave(project, remembered = null) {
   return { filename: fileName(project.name, '.app.zip'), data: makeZip(files), type: 'application/zip', missing };
 }
 
+// Will Save make a zip (the app or what it kept has pictures or recordings) or plain JSON? Quick, no reading of files.
+export const savesAsZip = (project, remembered = null) => collectRefs([project, remembered]).size > 0;
+export const saveName = (project, zip) => fileName(project.name, zip ? '.app.zip' : '.app.json');
+
 // a File (or bytes) -> { project, remembered, missing }
 export async function readProjectFile(file) {
   const bytes = file instanceof Uint8Array ? file : new Uint8Array(await file.arrayBuffer());

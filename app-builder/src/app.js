@@ -22,7 +22,7 @@ useMedia(projectMedia(() => S.project));
 fetch(MEDIA_SOURCES.extraSounds, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : [])).then((list) => { addBuiltinSounds(list); hooks.refresh?.(); }).catch(() => {});
 import { SAMPLES, sampleById } from './samples.js';
 import * as mediaStore from './media-store.js';
-import { buildSave, readProjectFile } from './project-file.js';
+import { buildSave, readProjectFile, savesAsZip, saveName } from './project-file.js';
 import { modal } from './ui/sheet-dialogs.js';
 import { openMenu } from './ui/menu.js';
 
@@ -154,7 +154,8 @@ function renderTop() {
         : h('button', { class: 'btn', 'data-ab': 'new', title: 'Start a new app', onclick: () => loadProject(newProject()) }, icon('new'), 'New'),
       h('button', { class: 'btn', 'data-ab': 'open', title: 'Open a saved app (.json or .zip)', onclick: openFile }, icon('open'), 'Open…'),
       S.locked ? '' : h('button', { class: 'btn', 'data-ab': 'recent', title: 'Apps you had before in this browser', 'aria-haspopup': 'menu', onclick: (e) => recentMenu(e.currentTarget) }, icon('recent'), 'Recent'),
-      h('button', { class: 'btn primary', 'data-ab': 'save', title: 'Save a copy of this app as a file', onclick: saveFile }, icon('save'), 'Save')),
+      h('button', { class: 'btn primary', 'data-ab': 'save', title: saveTo ? `Save to ${saveTo.handle.name} (Ctrl+S)` : 'Save this app as a file (Ctrl+S)', onclick: () => saveFile() }, icon('save'), 'Save'),
+      canPick ? h('button', { class: 'btn icon-only save-as', 'data-ab': 'save-as', title: 'Save as… a new file (Ctrl+Shift+S)', onclick: () => saveFile({ as: true }) }, h('span', { 'aria-hidden': 'true' }, '▾'), h('span', { class: 'lbl' }, 'Save as…')) : ''),
     h('span', { class: 'grp' },
       h('button', { class: 'btn icon-only', 'data-ab': 'undo', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, icon('undo'), h('span', { class: 'lbl' }, 'Undo')),
       h('button', { class: 'btn icon-only', 'data-ab': 'redo', disabled: !history.canRedo, title: 'Redo (Ctrl+Shift+Z)', onclick: () => undo(1) }, icon('redo'), h('span', { class: 'lbl' }, 'Redo'))),
@@ -214,6 +215,7 @@ async function loadProject(p, { toRecent = true } = {}) {
   await prepareMedia(p);
   const before = history && S.project;
   if (toRecent && before) keepInRecent(before);
+  saveTo = null; // a different app: the next Save asks where
   setTab('design');
   S.screenId = null; S.selId = null; S.sheet = 'screen';
   setProject(p, { resetHistory: !before });
@@ -235,22 +237,66 @@ function rememberedNow() {
   }
   return out;
 }
-function saveFile() {
+// Save works like a desktop app where the browser allows it (Chrome, Edge: the File System Access API). The first Save
+// asks where to save (the computer's own Save box, which can be Google Drive on a Chromebook or a synced OneDrive
+// folder); later Saves (and Ctrl+S) update that same file. Save as… (Ctrl+Shift+S) always asks. Elsewhere (Safari,
+// Firefox) Save downloads a file each time, as before. The browser forgets the file on reload, so the next Save asks.
+const canPick = typeof window.showSaveFilePicker === 'function' && !window.claude;
+let saveTo = null;        // { handle, zip, kept } : the file the last Save went to, and whether it included kept data
+function saveFile({ as = false } = {}) {
+  if (!as && saveTo && canPick) { writeTo(saveTo.handle, saveTo.kept ? rememberedNow() : null, saveTo); return; }
   const kept = rememberedNow(), n = Object.keys(kept).length;
-  if (!n) { writeSave(null); return; }
-  const box = h('input', { type: 'checkbox', checked: true, 'data-ab': 'save-include-data' });
-  const { close } = modal('Save a copy',
+  if (!n) { chooseAndSave(null); return; }
+  const box = h('input', { type: 'checkbox', checked: saveTo ? saveTo.kept : true, 'data-ab': 'save-include-data' });
+  const { close } = modal(as ? 'Save a copy as…' : 'Save',
     h('div', {},
       h('label', { class: 'f check wide' }, box,
         h('span', {}, `Include what the app kept while running (${n === 1 ? '1 saved value' : n + ' saved values'}: rows, lists, and any drawings, photos or recordings in them)`)),
       h('p', { class: 'muted small' }, 'Untick it to save just the app, for example to share it as a starting point. Saving is also the backup: things kept in this browser stay on this computer only.')),
     [h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Cancel'),
-      h('button', { class: 'btn primary', type: 'button', 'data-ab': 'save-confirm', onclick: () => { close(); writeSave(box.checked ? kept : null); } }, 'Save')]);
+      h('button', { class: 'btn primary', type: 'button', 'data-ab': 'save-confirm', onclick: () => { close(); chooseAndSave(box.checked ? kept : null); } }, 'Save')]);
 }
-async function writeSave(remembered) {
+// Ask where (where the browser can), then write. The Save box opens first, while the click still counts as the user's.
+async function chooseAndSave(remembered) {
+  const zip = savesAsZip(S.project, remembered);
+  if (!canPick) { download(remembered); return; }
+  let handle;
+  try {
+    handle = await window.showSaveFilePicker({ suggestedName: saveName(S.project, zip),
+      types: [zip ? { description: 'App Builder app with pictures and sounds', accept: { 'application/zip': ['.zip'] } }
+        : { description: 'App Builder app', accept: { 'application/json': ['.json'] } }] });
+  } catch (e) {
+    if (e?.name === 'AbortError') return; // the user closed the Save box
+    download(remembered); return;          // not allowed here (some embedded pages): download instead
+  }
+  writeTo(handle, remembered, { handle, zip, kept: !!remembered });
+}
+async function writeTo(handle, remembered, target) {
+  // the app gained its first picture or recording since: a .json file can't hold it, so ask for a new place
+  if (savesAsZip(S.project, remembered) !== target.zip) { saveTo = null; notify('This app now has pictures or sounds, so it saves as a .zip: choose where.'); saveFile({ as: true }); return; }
   let file;
   try { file = await buildSave(S.project, remembered); } catch (e) { notify('Could not save: ' + (e?.message || 'unknown problem')); return; }
+  missingNote(file);
+  try {
+    if ((await handle.queryPermission?.({ mode: 'readwrite' })) === 'prompt') await handle.requestPermission({ mode: 'readwrite' });
+    const w = await handle.createWritable();
+    await w.write(new Blob([file.data], { type: file.type }));
+    await w.close();
+    saveTo = target;
+    renderTop();
+    notify(`Saved to ${handle.name}`);
+  } catch (e) {
+    saveTo = null; renderTop();
+    notify('Could not save to that file (' + (e?.message || 'it may have moved') + '). Press Save to choose again.');
+  }
+}
+function missingNote(file) {
   if (file.missing) notify(`${file.missing} picture${file.missing === 1 ? '' : 's'} or recording${file.missing === 1 ? '' : 's'} could not be found in this browser, so ${file.missing === 1 ? 'it is' : 'they are'} not in the file.`);
+}
+async function download(remembered) {
+  let file;
+  try { file = await buildSave(S.project, remembered); } catch (e) { notify('Could not save: ' + (e?.message || 'unknown problem')); return; }
+  missingNote(file);
   // Hosted pages can't start downloads themselves; use the page-download feature when it exists.
   try {
     const dl = await window.claude?.use?.('downloads');
@@ -263,18 +309,28 @@ async function writeSave(remembered) {
   const a = h('a', { href: URL.createObjectURL(new Blob([file.data], { type: file.type })), download: file.filename });
   document.body.append(a); a.click(); a.remove();
 }
-function openFile() {
-  const input = h('input', { type: 'file', accept: '.json,.zip,application/json,application/zip' });
-  input.addEventListener('change', async () => {
+// Open: the computer's Open box where the browser allows it, so Save then goes back to that same file
+async function openFile() {
+  if (typeof window.showOpenFilePicker === 'function' && canPick) {
+    let handle;
     try {
-      const { project, remembered, missing } = await readProjectFile(input.files[0]);
-      // what the app kept while running goes back first, so its pictures and recordings load with the project
-      if (remembered) store((ls) => { for (const [k, v] of Object.entries(remembered)) ls.setItem(`${STORE_KEY}.remember.${k}`, JSON.stringify(v)); });
-      await loadProject(project);
-      if (missing) notify(`${missing} picture${missing === 1 ? '' : 's'} or recording${missing === 1 ? '' : 's'} weren’t in the file.`);
-    } catch (e) { notify('Could not open that file: ' + e.message); }
-  });
+      [handle] = await window.showOpenFilePicker({ types: [{ description: 'App Builder app', accept: { 'application/json': ['.json'], 'application/zip': ['.zip'] } }] });
+    } catch (e) { if (e?.name === 'AbortError') return; handle = null; }
+    if (handle) { await openFrom(await handle.getFile(), handle); return; }
+  }
+  const input = h('input', { type: 'file', accept: '.json,.zip,application/json,application/zip' });
+  input.addEventListener('change', () => openFrom(input.files[0], null));
   input.click();
+}
+async function openFrom(fileObj, handle) {
+  try {
+    const { project, remembered, missing } = await readProjectFile(fileObj);
+    // what the app kept while running goes back first, so its pictures and recordings load with the project
+    if (remembered) store((ls) => { for (const [k, v] of Object.entries(remembered)) ls.setItem(`${STORE_KEY}.remember.${k}`, JSON.stringify(v)); });
+    await loadProject(project);
+    if (handle) { saveTo = { handle, zip: /\.zip$/i.test(handle.name), kept: !!remembered }; renderTop(); }
+    if (missing) notify(`${missing} picture${missing === 1 ? '' : 's'} or recording${missing === 1 ? '' : 's'} weren’t in the file.`);
+  } catch (e) { notify('Could not open that file: ' + e.message); }
 }
 
 function renderTabs() {
@@ -312,6 +368,7 @@ function refresh(source) {
 document.addEventListener('keydown', (e) => {
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); undo(e.shiftKey ? 1 : -1); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveFile({ as: e.shiftKey }); return; }
   if (S.tab === 'design' && !typing && design.onKey(e)) e.preventDefault();
 });
 
