@@ -176,6 +176,36 @@ Planned, lightest first:
 Not planned: built-in LLM calls (keys, costs, privacy for under-13s, upkeep). An in-browser model for option 1
 (Transformers.js, about 20–30 MB) only if plain phrase matching proves too weak.
 
+## 10. Make your own media *(proposed 26 Nov 2026, agreed with Matthew; not built)*
+
+Apps where the user makes the content: a drawing gallery, a plant or science photo log, voice notes, a sound board.
+The same principle as tables: a row holds a *reference* to a picture or recording, and the file lives elsewhere, the way
+real apps and databases keep images. Construct 3 covers the same ground (Drawing Canvas, User Media for camera and mic,
+its Local Storage plugin on IndexedDB, `.c3p` projects as a zip with image and sound folders), so this keeps App Builder
+a fair stepping stone to it.
+
+1. **Media store.** Pictures and recordings are kept in IndexedDB (site data for this site only, like localStorage: in
+   the browser profile on that device, nothing sent, not the cache; usually hundreds of MB rather than about 5 MB, and
+   files rather than base64 text). Table fields and lists hold a short reference, `media:7f3a`, shown as a thumbnail or a
+   play button in the sidebar and the JSON view. Variables and text or number tables stay in localStorage (instant to
+   read, so the runtime stays simple). Uploaded pictures and sounds move there too (today they sit in the project as
+   data: URLs and can fill the 5 MB). Media nothing points to any more is tidied up. Ask for persistent storage; show
+   how much is used and warn before it runs out.
+2. **Make media**, in this order: a **Drawing** object (pen, colours, clear, undo; `Drawing.picture`) and a **Photo**
+   object (camera snapshot, shrunk to a small JPEG) with a **picture** field type and **Set image to** an expression
+   (`ClickedItem.picture`); then a **Recorder** object (record, stop, play back; a time cap of about 10–20 s) with a
+   **sound** field type, played by Set sound to the one named (taking a reference too); video last, as it is several
+   MB a minute.
+3. **Save and Open** (option 2: design plus the data made while running). Save writes one zip: `project.json` (rows
+   say `picture = media/7f3a.png`) plus a `media/` folder; plain JSON as now when there is no media. A tick box chooses
+   "include data made while running" or design only (a teacher sending out a starter). Open puts each file back into
+   IndexedDB, giving it a new id (and updating the rows) if that id is taken. A student hands in one file with the app
+   and what they made with it.
+4. **Privacy and school rules.** Camera and mic are off unless the teacher turns them on for the app (like Allow YouTube
+   links); the browser asks permission and some school devices block it, so say so plainly when it does. Media stays in
+   that browser; Forget saved data clears it. Lessons use photos of objects and made-up recordings, not students' faces
+   or personal stories. Shared computers that wipe profiles at log-out lose it all: Save is the backup.
+
 ## Suggested order
 
 1. Toggle, Slider (small, prove the registry).  2. Key pressed + Enter-submits + pressed/released.  3. Timers.
