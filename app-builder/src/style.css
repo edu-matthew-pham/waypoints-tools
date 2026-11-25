@@ -514,3 +514,29 @@ p.small, .muted.small { font-size: 12px; }
 .json-nest { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 6px 0; }
 .json-nest select { flex: 1; min-width: 0; font-size: 13px; }
 .json-wrap > .btn { margin-top: 4px; }
+
+/* map tab */
+.view-map { display: flex; flex-direction: column; gap: 10px; }
+.map-bar .hint { margin-bottom: 8px; }
+.map-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.map-problems { margin: 8px 0 0; padding-left: 20px; color: var(--trig); font-size: 13px; }
+.map-board { position: relative; display: flex; gap: 130px; align-items: flex-start; padding: 16px 8px 110px; min-width: min-content; }
+.map-arrows { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
+.map-link path { fill: none; stroke: #8a93a8; stroke-width: 1.8; }
+.map-head { fill: #8a93a8; }
+.map-link text { font-size: 11px; fill: var(--ink); paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+.map-col { display: flex; flex-direction: column; gap: 40px; position: relative; z-index: 1; }
+.map-col.none { padding-left: 24px; border-left: 2px dashed var(--line); }
+.map-col-head { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: -28px; }
+.map-card { width: 190px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; box-shadow: 0 4px 14px rgba(20, 30, 60, .07); }
+.map-card.current { border-color: var(--accent); }
+.map-card.unreached { border-style: dashed; }
+.map-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
+.map-flag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; }
+.map-flag.start { background: var(--accent-soft); color: var(--accent); }
+.map-flag.warn { background: var(--trig-soft); color: var(--trig); }
+.map-thumb { display: flex; justify-content: center; width: 100%; border: 0; padding: 4px 0; background: none; border-radius: 8px; cursor: pointer; }
+.map-thumb:hover { background: #f0f2f7; }
+.map-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.map-thumb-stage .stage { pointer-events: none; box-shadow: none; }
+.map-ways { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }

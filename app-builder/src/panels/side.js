@@ -72,6 +72,12 @@ function objectRow(o) {
 // screens whose object list the user has folded away (the screen stays selected)
 const collapsed = new Set();
 let renaming = null; // id of the screen whose name is being edited
+// a new empty screen, opened with its name ready to type (the Map tab's Add screen uses this too)
+export function addScreen() {
+  const names = new Set(S.project.screens.map((x) => x.name));
+  let n = S.project.screens.length + 1; while (names.has('Screen ' + n)) n++;
+  const sc2 = newScreen('Screen ' + n); S.project.screens.push(sc2); S.screenId = sc2.id; S.selId = null; renaming = sc2.id; hooks.commit();
+}
 let renamingObj = null; // name of the object being renamed
 let renamingVar = null; // name of the variable being renamed
 
@@ -138,11 +144,7 @@ export function renderSide(el) {
   el.replaceChildren(
     h('h3', {}, 'Project'),
     h('div', { class: 'tree' }, ...tree),
-    h('button', { class: 'btn add-screen', type: 'button', 'data-ab': 'add-screen', onclick: () => {
-      const names = new Set(S.project.screens.map((x) => x.name));
-      let n = S.project.screens.length + 1; while (names.has('Screen ' + n)) n++;
-      const sc2 = newScreen('Screen ' + n); S.project.screens.push(sc2); S.screenId = sc2.id; S.selId = null; renaming = sc2.id; hooks.commit();
-    } }, '+ Screen'),
+    h('button', { class: 'btn add-screen', type: 'button', 'data-ab': 'add-screen', onclick: addScreen }, '+ Screen'),
     h('h3', {}, 'Variables (whole app)'),
     ...(vars.some(Boolean) ? [h('div', { class: 'var var-head' }, h('span', { class: 'vname' }), h('span', { class: 'col-start' }, 'starts at'), h('span', { class: 'col-now' }, 'now'), h('span', { class: 'col-x' })), ...vars.filter(Boolean)] : [h('p', { class: 'muted' }, 'None yet.')]),
     addRow('New variable', (name, value) => {

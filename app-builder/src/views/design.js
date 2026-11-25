@@ -8,6 +8,7 @@ import { renameInput } from '../ui/rename-input.js';
 import { pickPicture, pickSound } from '../ui/upload.js';
 import { imageNames, imageData, assetName, soundNames, soundInfo, soundAssetName, videoSource, BUILTIN_SOUNDS } from '../core/assets.js';
 import { renameInstVar } from '../core/rename.js';
+import { screenItems } from '../ui/screen-items.js';
 
 let renamingIvar = null;
 
@@ -27,11 +28,8 @@ export function initDesign(root) {
     },
   });
 
-  const listItems = (name) => S.project.variables.find((v) => v.name === name && Array.isArray(v.value))?.value;
   stage.fitTo(stageCol, () => innerHeight - 170);
-  const items = () => screen().objects.flatMap((o) => o.instances.map((i) => ({ id: i.id, name: o.name, kind: o.kind, props: o.kind === 'list' || o.kind === 'table' ? withItems(i) : i })));
-  // a live view of the instance plus its list items, so dragging still moves the real instance
-  const withItems = (i) => new Proxy(i, { get: (t, k) => (k === 'items' ? listItems(t.source) : k === 'fields' ? tableColumns(S.project, t) : t[k]) });
+  const items = () => screenItems(S.project, screen());
   function sync() { stage.sync(items()); stage.setSelected(S.selId); }
 
   function numField(label, key, inst, min = 0) {

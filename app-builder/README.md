@@ -51,11 +51,24 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
     src/views/design.js     Design tab: drag-and-drop stage + properties
     src/views/events.js     Events tab: editable sheet beside a live preview; on-screen picker
     src/views/run.js        Run tab: full-size app + read-only sheet that flashes as rows run
+    src/views/map.js        Map tab: every screen as a small picture, arrows from Go to screen actions
+    src/core/map.js         screenMap(project): links, start, unreachable screens, dead ends (no DOM; tests and checks use it)
+    src/ui/screen-items.js  what the stage draws for one screen (shared by Design and Map)
     src/app.js              shell: top bar, tabs, save/open, wiring
     src/samples.js          Practice tracker, Daily chores
     tests/                  interpreter and features tests
 
 `core/` has no DOM, so it runs in Node: tests today, checking student projects tomorrow.
+
+## Map
+
+The **Map** tab shows every screen as a small picture, with an arrow for each **Go to screen** action, labelled with the
+conditions it sits under. Arrows can't be drawn by hand: they come only from events, so the map always matches the app.
+Screens are laid out by how many steps they are from the first screen (where the app starts); screens nothing leads to sit
+in a last column. It notes screens that can't be reached, screens with no way out, and links to a deleted screen, as things
+to check rather than errors (a planned screen is "not linked yet"). **+ Add screen** makes a new, empty screen ready to
+name, so a class can lay out every screen first; or build one screen at a time. Click a screen to open it.
+Open it directly with `?tab=map`. Labels: `tab:map`, `map-add-screen`, `map-card:<screen>`, `map-open:<screen>`.
 
 ## Event model (same ideas as an event sheet)
 

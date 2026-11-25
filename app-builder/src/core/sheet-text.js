@@ -16,7 +16,7 @@ import { COMPONENTS } from './components.js';
 const SHOW = { showhide: { show: 'Show', hide: 'Hide' }, onoff: { on: 'on', off: 'off' }, posSize: { w: 'width', h: 'height', x: 'x position', y: 'y position' }, sortdir: Object.fromEntries(SORT_DIRS) };
 const KEY_NAMES = Object.fromEntries(KEYS);
 
-function itemText(kind, item, screens) {
+export function itemText(kind, item, screens) {
   const entry = entryFor(kind, item.type);
   if (!entry) return `(unknown ${item.type})`;
   return entry.label.replace(/\{(\w+)\}/g, (m, name) => {

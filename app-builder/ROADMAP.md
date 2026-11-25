@@ -119,7 +119,14 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
 - Events -> JavaScript read-only view, then a *Run script* action (Level 4), so students can graduate to code.
 - Teacher view: share a project link with `?level=` / `?allow=` / `?lock=1` (done); later, a starter-project link.
 
-## 8. Map view (wireflow) *(proposed 25 Nov 2026, agreed in principle; not built)*
+## 8. Map view (wireflow) *(proposed 25 Nov 2026; built 26 Nov 2026 except Save a snapshot)*
+
+Built: Map tab (all levels), screen cards with a small picture, arrows from `Go to screen` labelled with their conditions
+(routes that would pass behind other screens go underneath), Start / Can't be reached / No way out / Not linked yet flags and a
+plain list of things to check, + Add screen, click to open. `core/map.js` (`screenMap`, `mapProblems`) has no DOM, so lesson
+checks can use it. Not yet: Save a snapshot, storyboard strip. Notes are shown as things to check, not errors, so planning
+screens first doesn't look wrong.
+
 
 A **Map** tab beside Design and Events: a wireflow of the whole app.
 - Every screen as a card with a small live render of its layout; clicking a card opens that screen.
@@ -211,7 +218,7 @@ a fair stepping stone to it.
 Done (24–25 Nov 2026): toggle, slider, keys, timers, image and assets, lists, tables, linked tables, nested view, paste
 rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever classes say; map view first as the smaller job):
 
-1. §8 Map view.
+1. §8 Map view (built 26 Nov; snapshot still to do).
 2. §10 media store in IndexedDB (also fixes uploads filling the ~5 MB a project has now).
 3. §10 Drawing and Photo, with the picture field and Set image to an expression.
 4. §10 Recorder and the sound field; zip Save and Open with the data made while running.

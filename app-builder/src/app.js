@@ -8,6 +8,7 @@ import { renderSide } from './panels/side.js';
 import { initDesign } from './views/design.js';
 import { initEvents } from './views/events.js';
 import { initRun } from './views/run.js';
+import { initMap } from './views/map.js';
 import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './core/features.js';
 import { pictures, media } from './ui/component-ui.js';
@@ -86,12 +87,14 @@ els.tabs = h('nav', { class: 'tabs' });
 els.design = h('section', { class: 'view view-design' });
 els.events = h('section', { class: 'view view-events' });
 els.run = h('section', { class: 'view view-run' });
-app.append(els.top, els.side, h('main', { class: 'main' }, els.tabs, els.design, els.events, els.run));
+els.map = h('section', { class: 'view view-map' });
+app.append(els.top, els.side, h('main', { class: 'main' }, els.tabs, els.design, els.events, els.run, els.map));
 
 const design = initDesign(els.design);
 const events = initEvents(els.events);
 const run = initRun(els.run);
-const tabViews = { design: null, events, run };
+const map = initMap(els.map);
+const tabViews = { design: null, events, run, map };
 Object.assign(hooks, { commit, refresh, select, notify, setTab });
 
 // ---------------- top bar & tabs ----------------
@@ -174,11 +177,12 @@ function openFile() {
 }
 
 function renderTabs() {
-  els.tabs.replaceChildren(...[['design', 'Design'], ['events', 'Events'], ['run', 'Run ▶']].map(([id, label]) =>
+  els.tabs.replaceChildren(...[['design', 'Design'], ['events', 'Events'], ['map', 'Map'], ['run', 'Run ▶']].map(([id, label]) =>
     h('button', { class: 'tab' + (S.tab === id ? ' on' : ''), 'data-ab': 'tab:' + id, role: 'tab', 'aria-selected': S.tab === id, onclick: () => setTab(id) }, label)));
   els.design.hidden = S.tab !== 'design';
   els.events.hidden = S.tab !== 'events';
   els.run.hidden = S.tab !== 'run';
+  els.map.hidden = S.tab !== 'map';
 }
 function setTab(t) {
   tabViews[S.tab]?.deactivate();
@@ -194,6 +198,7 @@ function refresh(source) {
   renderSide(els.side);
   design.render();
   events.render(source);
+  map.render();
   renderTabs();
 }
 
