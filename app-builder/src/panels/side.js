@@ -7,8 +7,8 @@ import { openObjectPicker } from '../ui/object-picker.js';
 import { renameInput } from '../ui/rename-input.js';
 import { renameObject, renameVariable, renameField, nameProblem, renameFunction, functionNamesTaken } from '../core/rename.js';
 import { newFunction, functionUsers, paramNames, functionsOf } from '../core/functions.js';
-import { pickPicture } from '../ui/upload.js';
-import { assetName, imageData, imageNames, soundNames } from '../core/assets.js';
+import { pickPicture, pickSound } from '../ui/upload.js';
+import { assetName, imageData, imageNames, soundNames, soundAssetName } from '../core/assets.js';
 import { uploadSize, isRef } from '../core/media.js';
 import { keep, usage, mb } from '../media-store.js';
 import { S, screen, hooks, showAllScreens, showFunctions } from '../state.js';
@@ -159,29 +159,37 @@ export function renderSide(el) {
     }, true),
     ...(!S.rf || S.rf.lists ? listSection() : []),
     ...(!S.rf || S.rf.tables || S.project.variables.some(isTable) ? tableSection() : []),
-    ...(!S.rf || S.rf.kinds.includes('image') ? [
-      h('h3', {}, 'Pictures (whole app)'),
-      ...(S.project.assets.length ? [h('div', { class: 'pic-list' }, S.project.assets.map((a) => h('div', { class: 'var pic-row' },
-        h('img', { src: imageData(S.project, a.name), alt: '' }), h('span', { class: 'vname' }, a.name),
-        h('button', { class: 'icon danger', title: 'Delete picture', onclick: () => {
-          const users = pictureUsers(a.name);
-          if (users.length) { hooks.notify(`${a.name} is still used by ${users.join(', ')}. Change those first.`); return; }
-          S.project.assets = S.project.assets.filter((x) => x !== a); hooks.commit();
-        } }, '\u00d7'))))] : [h('p', { class: 'muted' }, 'Built-in pictures are ready to use. Upload your own here or on an Image.')]),
-      h('button', { class: 'btn add-screen', type: 'button', onclick: () => pickPicture(async ({ fileName, data }) => {
-        const name = assetName(S.project, fileName);
-        S.project.assets.push({ name, ...await keep(data) }); hooks.commit();
-      }, hooks.notify), 'data-ab': 'upload-picture' }, '+ Upload picture')] : []),
-    ...(S.project.sounds?.length ? [
-      h('h3', {}, 'Sounds (whole app)'),
-      h('div', { class: 'pic-list' }, S.project.sounds.map((a) => h('div', { class: 'var' },
-        h('span', { class: 'vname' }, '🔊 ' + a.name),
-        h('span', { class: 'muted start-count' }, `${Math.round(uploadSize(a) / 1024)} KB`),
-        h('button', { class: 'icon danger', title: 'Delete sound', onclick: () => {
-          const users = soundUsers(a.name);
-          if (users.length) { hooks.notify(`${a.name} is still used by ${users.join(', ')}. Change those first.`); return; }
-          S.project.sounds = S.project.sounds.filter((x) => x !== a); hooks.commit();
-        } }, '\u00d7'))))] : []),
+    // Pictures and sounds: one list of the app's own uploads (thumbnails, and a speaker for sounds), with both upload
+    // buttons. Built-in pictures and sounds need no upload.
+    ...(!S.rf || S.rf.kinds.includes('image') || S.rf.kinds.includes('sound') ? [
+      h('h3', {}, 'Pictures and sounds (whole app)'),
+      ...(S.project.assets.length || S.project.sounds?.length ? [h('div', { class: 'pic-list' },
+        S.project.assets.map((a) => h('div', { class: 'var pic-row' },
+          h('img', { src: imageData(S.project, a.name), alt: '' }), h('span', { class: 'vname' }, a.name),
+          h('span', { class: 'muted start-count' }, `${Math.round(uploadSize(a) / 1024)} KB`),
+          h('button', { class: 'icon danger', title: 'Delete picture', onclick: () => {
+            const users = pictureUsers(a.name);
+            if (users.length) { hooks.notify(`${a.name} is still used by ${users.join(', ')}. Change those first.`); return; }
+            S.project.assets = S.project.assets.filter((x) => x !== a); hooks.commit();
+          } }, '×'))),
+        (S.project.sounds || []).map((a) => h('div', { class: 'var pic-row' },
+          h('span', { class: 'snd-ico', 'aria-hidden': 'true' }, '🔊'), h('span', { class: 'vname' }, a.name),
+          h('span', { class: 'muted start-count' }, `${Math.round(uploadSize(a) / 1024)} KB`),
+          h('button', { class: 'icon danger', title: 'Delete sound', onclick: () => {
+            const users = soundUsers(a.name);
+            if (users.length) { hooks.notify(`${a.name} is still used by ${users.join(', ')}. Change those first.`); return; }
+            S.project.sounds = S.project.sounds.filter((x) => x !== a); hooks.commit();
+          } }, '×'))))]
+        : [h('p', { class: 'muted' }, 'Built-in pictures and sounds are ready to use. Upload your own here, or on an Image or a Sound.')]),
+      h('div', { class: 'btn-row' },
+        h('button', { class: 'btn add-screen', type: 'button', onclick: () => pickPicture(async ({ fileName, data }) => {
+          const name = assetName(S.project, fileName);
+          S.project.assets.push({ name, ...await keep(data) }); hooks.commit();
+        }, hooks.notify), 'data-ab': 'upload-picture' }, '+ Upload picture'),
+        h('button', { class: 'btn add-screen', type: 'button', onclick: () => pickSound(async ({ fileName, data }) => {
+          const name = soundAssetName(S.project, fileName);
+          S.project.sounds.push({ name, ...await keep(data), title: fileName.replace(/\.[^.]*$/, '') }); hooks.commit();
+        }, hooks.notify), 'data-ab': 'side-upload-sound' }, '+ Upload sound'))] : []),
     ...(S.project.assets.length || S.project.sounds?.length ? [storageNote()] : []),
     h('p', { class: 'muted legal' }, 'Free for education. Commercial use by permission only.'),
   );

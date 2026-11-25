@@ -729,3 +729,5 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
 .pho-shutter:active { transform: translateX(-50%) scale(.94); }
 .pho-shutter[hidden] { display: none; }
 .tab.stop.on { background: #fde8e7; color: #b42318; }
+.pic-row .snd-ico { width: 28px; text-align: center; font-size: 16px; flex: none; }
+.side .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
