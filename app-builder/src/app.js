@@ -132,27 +132,39 @@ function renderTop() {
       l.addEventListener('change', () => { if (l.value === 'custom') return; S.project.features = { level: Number(l.value) }; S.rf = resolve(S.project.features); commit(); });
       return l;
     })();
+  // the brand bar: name, then File (Open, Save), Edit (Undo, Redo), then the app's settings and samples
+  const ICON = {
+    open: '<path d="M4 7h6l2 2h8v10H4z"/>',
+    save: '<path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/>',
+    undo: '<path d="M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3"/>',
+    redo: '<path d="m15 14 5-5-5-5M20 9H9a5 5 0 0 0 0 10h3"/>',
+    again: '<path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/>',
+    new: '<path d="M12 5v14M5 12h14"/>',
+  };
+  const icon = (k) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICON[k]; return s; };
   els.top.replaceChildren(
-    h('strong', { class: 'brand' }, 'App Builder', h('span', { class: 'tag' }, 'prototype')),
+    h('strong', { class: 'brand' }, h('span', { class: 'logo', 'aria-hidden': 'true' }, '⚡'), 'App Builder', h('span', { class: 'tag' }, 'prototype')),
     h('input', { class: 'ctl name', 'data-ab': 'project-name', value: S.project.name, 'aria-label': 'Project name', oninput: (e) => { S.project.name = e.target.value; }, onchange: () => commit() }),
+    h('span', { class: 'grp' },
+      lessonStart ? h('button', { class: 'btn', 'data-ab': 'start-again', title: 'Throw away your changes and reload the lesson project', onclick: () => {
+        if (confirmTwice('Start again? Your changes to this lesson will be lost.')) loadProject(lessonStart());
+      } }, icon('again'), 'Start again')
+        : h('button', { class: 'btn', 'data-ab': 'new', title: 'Start a new app', onclick: () => loadProject(newProject()) }, icon('new'), 'New'),
+      h('button', { class: 'btn', 'data-ab': 'open', title: 'Open a saved app (.json or .zip)', onclick: openFile }, icon('open'), 'Open…'),
+      h('button', { class: 'btn primary', 'data-ab': 'save', title: 'Save a copy of this app as a file', onclick: saveFile }, icon('save'), 'Save')),
+    h('span', { class: 'grp' },
+      h('button', { class: 'btn icon-only', 'data-ab': 'undo', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, icon('undo'), h('span', { class: 'lbl' }, 'Undo')),
+      h('button', { class: 'btn icon-only', 'data-ab': 'redo', disabled: !history.canRedo, title: 'Redo (Ctrl+Shift+Z)', onclick: () => undo(1) }, icon('redo'), h('span', { class: 'lbl' }, 'Redo'))),
     h('span', { class: 'spacer' }),
-    (() => {
-      const d = h('select', { class: 'ctl', 'data-ab': 'screen-size', 'aria-label': 'Screen size', title: 'The size of the app you are building' },
-        Object.entries(DEVICES).map(([k, v]) => h('option', { value: k, selected: S.project.device === k, title: `${v.w} \u00d7 ${v.h}` }, v.label)));
-      d.addEventListener('change', () => { S.project.device = d.value; commit(); });
-      return d;
-    })(),
-    level,
-    h('button', { class: 'btn', 'data-ab': 'undo', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, 'Undo'),
-    h('button', { class: 'btn', 'data-ab': 'redo', disabled: !history.canRedo, title: 'Redo (Ctrl+Shift+Z)', onclick: () => undo(1) }, 'Redo'),
-    h('span', { class: 'sep' }),
-    S.locked ? '' : sel, // a locked lesson link keeps students in the lesson project
-    lessonStart ? h('button', { class: 'btn', 'data-ab': 'start-again', title: 'Throw away your changes and reload the lesson project', onclick: () => {
-      if (confirmTwice('Start again? Your changes to this lesson will be lost.')) loadProject(lessonStart());
-    } }, 'Start again')
-      : h('button', { class: 'btn', 'data-ab': 'new', onclick: () => loadProject(newProject()) }, 'New'),
-    h('button', { class: 'btn', 'data-ab': 'open', onclick: openFile }, 'Open…'),
-    h('button', { class: 'btn primary', 'data-ab': 'save', onclick: saveFile }, 'Save'),
+    h('span', { class: 'grp' },
+      S.locked ? '' : sel, // a locked lesson link keeps students in the lesson project
+      level,
+      (() => {
+        const d = h('select', { class: 'ctl', 'data-ab': 'screen-size', 'aria-label': 'Screen size', title: 'The size of the app you are building' },
+          Object.entries(DEVICES).map(([k, v]) => h('option', { value: k, selected: S.project.device === k, title: `${v.w} × ${v.h}` }, v.label)));
+        d.addEventListener('change', () => { S.project.device = d.value; commit(); });
+        return d;
+      })()),
   );
 }
 // no confirm() in some hosts: ask by pressing twice within 4 seconds
