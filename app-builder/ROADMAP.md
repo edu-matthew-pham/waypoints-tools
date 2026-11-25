@@ -131,6 +131,34 @@ Later (optional): a **storyboard strip** (click a route through the map, such as
 to right with a caption box under each frame); a per-screen note of which variables and lists it reads or writes
 (probably too much for Years 7–8).
 
+## 9. AI help *(proposed 25 Nov 2026; not built)*
+
+Aim: the middle ground between no AI and open-ended vibe coding. Students may get help from AI, but they still add and
+understand every event themselves. Same rule as Create in the tutorials: **no AI required; the only AI route is a copyable
+prompt.** No API keys, no backend, works with whatever AI the school allows, and every lesson works without it.
+
+Why (checked 25 Nov 2026):
+- Research on vibe coding with novices: what helps is how AI use is scaffolded, not access to it. Unrestricted AI lets
+  students hand over the thinking that builds understanding; making students explain the code before they can keep it
+  roughly halved later failures without AI (77% vs 39% in one 2026 study).
+- Classroom tools (for example CodeHS Vibe Coding) offer teacher on/off switches and visibility of AI chats, but nothing
+  that makes students explain or limits how much the AI writes. That is left to each teacher.
+- Close relatives: MIT Aptly (App Inventor; AI writes the blocks), Cognimates Scratch Copilot, TutoriaLLM (Blockly; AI
+  *highlights* the block in the toolbox instead of placing it). TutoriaLLM's maker found children leaned on AI entirely
+  when it built the program for them, so he switched to pointing. None of these use event sheets.
+
+Planned, lightest first:
+1. **Search by meaning, no AI.** Tag every condition and action with plain phrases ("when clicked", "save between
+   visits", "count up"); a search box highlights the matching entry (reuse the `data-ab` labels). Start here.
+2. **Copy for AI.** One button copies the current sheet text plus a short guide to App Builder's events and actions, and
+   asks the AI to answer in event-sheet terms ("Add: On SaveButton clicked → Add 1 to score"). Students build what it
+   suggests themselves. Line under the button: "Use an AI tool your school allows, if your teacher says you can."
+3. *(optional, later)* **Paste back.** Paste the AI's reply; App Builder lists the suggested events for students to accept
+   **one at a time** (never a one-click import), perhaps with a short "what does this do?" box first.
+
+Not planned: built-in LLM calls (keys, costs, privacy for under-13s, upkeep). An in-browser model for option 1
+(Transformers.js, about 20–30 MB) only if plain phrase matching proves too weak.
+
 ## Suggested order
 
 1. Toggle, Slider (small, prove the registry).  2. Key pressed + Enter-submits + pressed/released.  3. Timers.
@@ -158,3 +186,6 @@ For lessons, tests and (later) guided tutorials:
   from any finished project (one step per object, then per event), for a teacher to edit.
 - **From Thunkable:** open the app being built on a phone (QR code beside the link, never instead of it), share a finished app as a
   play-only link, and screen templates for prototype lessons. Not native device APIs, app stores or a block editor.
+- **Code snippets (HTML/CSS/JS inside App Builder): speculative, probably never** (25 Nov 2026). Classes usually move to
+  text code at a unit boundary; the read-only JS view plus a web bridge course is the link. If ever revisited: Level 4+
+  only, run in a Web Worker or sandboxed iframe that returns values only, and expect sheet-text checks not to see inside.
