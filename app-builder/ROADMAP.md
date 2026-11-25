@@ -227,11 +227,28 @@ skipped on that screen (quietly: it isn't a mistake). Shared objects (one HomeBu
 Construct's global layers) were considered and left for later: they need new Design tab and layer work. The Map draws a
 shared Go to screen as an arrow from each screen it applies to.
 
-**Functions** (Level 4, advanced). Whole-app, named, with parameters: "Define function SaveEntry(text)" holding its
-actions, and an action "Call SaveEntry with …". Parameters take any value, like variables (not limited to text and
-numbers), so media references from §10 pass through unchanged. Return values later. The Map follows calls: a function
-that goes to a screen gives an arrow from every screen that calls it. Maps onto JavaScript and Python functions for the
-"show as code" step.
+**Functions** (Level 4, advanced; *design agreed 26 Nov 2026*). Whole-app, named, with parameters: "Define function
+SaveEntry(text)", then an action "Call SaveEntry with …". Matches Construct's functions, with less switched on at first:
+- **Where:** a Functions row in the side panel under All screens; each function opens in the Events tab.
+- **Body:** a small event sheet (conditions, sub-events and Else allowed). Students first see it as a list of actions
+  (a sequence); sub-events inside functions are switched on later, like Else and sub-events now.
+- **Built now, switched on later:** return values ("Set return value", then `Total(price, qty)` as a value) and
+  **Copy picked** (the function works on the objects the calling event picked, e.g. only the clicked Tile; off by default,
+  so a call starts fresh, as in Construct).
+- **Parameters** have no type, like variables (so §10 media references pass through). Inside the function they are plain
+  names (`text`) and can't share a name with a whole-app variable. Objects are not passed in: Copy picked does that job.
+- **Objects** are matched by name, like All screens: actions on an object the calling screen doesn't have are skipped quietly.
+- **Names** are single words (`SaveEntry`), so they become real function names in "show as code".
+- **Not planned:** asynchronous functions (App Builder has no Wait; things that take time end in a trigger, like "has
+  ended"), mapped functions, object-only custom actions.
+- The Map follows calls: a function that goes to a screen gives an arrow from every screen that calls it.
+
+**Families (later, Level 4).** A family groups different objects (HomeButton, SaveButton, BackButton as `MenuButtons`) so
+one event works on all of them, as in Construct 3 (note: families have been limited to paid Construct licences, so check
+before relying on them in a Construct unit). Groups that change while the app runs use object variables instead (`selected
+= true`), so no separate tags or HTML-style classes. Plan ahead now: objects and families share one set of names (rename
+checks cover both), and an All screens event that mentions a family runs on a screen with any of its members. In "show as
+code" a family becomes an HTML class. Also plan class projects that use families (Matthew, 26 Nov 2026).
 
 ## Suggested order
 
@@ -239,7 +256,7 @@ Done (24–25 Nov 2026): toggle, slider, keys, timers, image and assets, lists, 
 rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever classes say; map view first as the smaller job):
 
 1. §8 Map view (built and live 26 Nov; snapshot still to do).
-2. §11 All screens sheet (built 26 Nov), then §11 Functions (agreed 26 Nov: smaller than media, help every app; media doesn't need
+2. §11 All screens sheet (built 26 Nov; released together with Functions), then §11 Functions (agreed 26 Nov: smaller than media, help every app; media doesn't need
    them and they don't need media).
 3. §10 media store in IndexedDB (also fixes uploads filling the ~5 MB a project has now).
 4. §10 Drawing and Photo, with the picture field and Set image to an expression.
