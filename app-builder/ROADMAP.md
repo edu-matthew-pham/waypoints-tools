@@ -328,8 +328,12 @@ Left, on purpose:
 - **Editing media** (Matthew, 26 Nov 2026): picture editing fits (drawing on a picture is built; simple edits such as crop
   or rotate could come later). Sound and video editing is left to tools made for it (Audacity, an online trimmer), then
   uploaded or linked: no point reinventing them. The one exception is a basic trim of recordings (§10 step 5).
-- **Recording video** (Matthew, 26 Nov 2026): left to other tools, or perhaps a separate tool of its own one day.
-  Video stays link-only in App Builder.
+- **Recording or uploading video** (Matthew, 26 Nov 2026): video is a hook, not a necessity, for learning to build
+  apps. A size cap only works with compression on upload, and compressing in the browser isn't cheap (real-time
+  re-recording, WebCodecs plus an MP4 muxer, or ffmpeg.wasm at ~30 MB). So App Builder keeps video link-only. A
+  **separate video tool** might be worth more anyway: students sharing videos for discussion, or questions placed in a
+  video (like Edpuzzle). Note that sharing between students needs a server, unlike today's tools, which keep
+  everything in the browser.
 
 - **Code snippets (HTML/CSS/JS inside App Builder)** *(25 Nov 2026)*: speculative, probably never. Teachers usually move a
   class to text code at a unit boundary rather than mixing the two; "show as code" (a read-only JavaScript view of the
