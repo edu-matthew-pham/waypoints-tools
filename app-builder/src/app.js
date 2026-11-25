@@ -38,10 +38,11 @@ S.locked = params.locked;
 const GUIDED_KEY = 'appbuilder.guided';
 S.guided = store((ls) => ls.getItem(GUIDED_KEY)) !== 'quick';
 function applyParams(p) {
-  if (params.level || params.allow) {
+  if (params.level || params.allow || params.on) {
     p.features = { ...(p.features || { level: 4 }) };
     if (params.level) p.features.level = params.level;
     if (params.allow) p.features.allow = params.allow;
+    if (params.on) p.features.ui = { ...(p.features.ui || {}), ...Object.fromEntries(params.on.map((k) => [k, true])) }; // ?on=functionLogic,...
   }
 }
 

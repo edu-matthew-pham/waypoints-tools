@@ -5,10 +5,11 @@ import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, 
 import { openMenu } from '../ui/menu.js';
 import { openObjectPicker } from '../ui/object-picker.js';
 import { renameInput } from '../ui/rename-input.js';
-import { renameObject, renameVariable, renameField, nameProblem } from '../core/rename.js';
+import { renameObject, renameVariable, renameField, nameProblem, renameFunction, functionNamesTaken } from '../core/rename.js';
+import { newFunction, functionUsers, paramNames, functionsOf } from '../core/functions.js';
 import { pickPicture } from '../ui/upload.js';
 import { assetName } from '../core/assets.js';
-import { S, screen, hooks, showAllScreens } from '../state.js';
+import { S, screen, hooks, showAllScreens, showFunctions } from '../state.js';
 import { allScreensEvents } from '../core/shared.js';
 import { nowText, liveTable } from '../run-engine.js';
 
@@ -50,7 +51,7 @@ function objectRow(o) {
     const done = () => { renamingObj = null; hooks.refresh(); };
     return h('div', { class: 'tree-row obj on' }, renameInput({
       value: o.name, label: 'Object name', notify: hooks.notify, onDone: done,
-      taken: screen().objects.map((x) => x.name),
+      taken: [...screen().objects.map((x) => x.name), ...functionsOf(S.project).map((f) => f.name), ...paramNames(S.project)],
       onSave: (v) => { renameObject(screen(), o.name, v, S.project); renamingObj = null; hooks.commit(); },
     }));
   }
@@ -133,7 +134,7 @@ export function renderSide(el) {
 
   const vars = S.project.variables.map((v, i) => Array.isArray(v.value) ? null : h('div', { class: 'var' },
     renamingVar === v.name
-      ? renameInput({ value: v.name, label: 'Variable name', notify: hooks.notify, taken: S.project.variables.map((x) => x.name),
+      ? renameInput({ value: v.name, label: 'Variable name', notify: hooks.notify, taken: usedNames(),
         onDone: () => { renamingVar = null; hooks.refresh(); },
         onSave: (nv) => { renameVariable(S.project, v.name, nv); renamingVar = null; hooks.commit(); } })
       : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingVar = v.name; hooks.refresh(); } }, v.name),
@@ -144,13 +145,14 @@ export function renderSide(el) {
 
   el.replaceChildren(
     h('h3', {}, 'Project'),
-    h('div', { class: 'tree' }, ...tree, showAllScreens() ? allScreensRow() : null),
+    h('div', { class: 'tree' }, ...tree, showAllScreens() ? allScreensRow() : null, showFunctions() ? functionsRows() : null),
     h('button', { class: 'btn add-screen', type: 'button', 'data-ab': 'add-screen', onclick: addScreen }, '+ Screen'),
     h('h3', {}, 'Variables (whole app)'),
     ...(vars.some(Boolean) ? [h('div', { class: 'var var-head' }, h('span', { class: 'vname' }), h('span', { class: 'col-start' }, 'starts at'), h('span', { class: 'col-now' }, 'now'), h('span', { class: 'col-x' })), ...vars.filter(Boolean)] : [h('p', { class: 'muted' }, 'None yet.')]),
     addRow('New variable', (name, value) => {
       if (!isIdentifier(name)) { hooks.notify('Variable names use letters, numbers and _ only, and can’t start with a number.'); return false; }
       if (S.project.variables.some((v) => v.name === name)) { hooks.notify('There is already a variable called ' + name); return false; }
+      if (usedNames().includes(name)) { hooks.notify(`${name} is already the name of a function or a parameter; pick another name`); return false; }
       S.project.variables.push({ name, value }); hooks.commit();
     }, true),
     ...(!S.rf || S.rf.lists ? listSection() : []),
@@ -192,11 +194,64 @@ function allScreensRow() {
     '\u29c9 All screens', h('span', { class: 'kind' }, n ? `${n} event${n === 1 ? '' : 's'}` : 'events'))));
 }
 
+// Names a whole-app variable, list or table can't take: other variables, functions and parameters
+// (a parameter is a plain name inside its function, so the two would mean the same thing there)
+function usedNames() { return [...S.project.variables.map((x) => x.name), ...functionsOf(S.project).map((f) => f.name), ...paramNames(S.project)]; }
+
+// Functions (Level 4): named pieces of event sheet any event can call. Each opens in the Events tab.
+let renamingFn = null; // id of the function being renamed
+function functionsRows() {
+  const fns = functionsOf(S.project);
+  const open = (f) => { S.sheet = 'fn:' + f.id; if (S.tab === 'events') hooks.refresh(); else hooks.setTab('events'); };
+  const row = (f) => {
+    const on = S.sheet === 'fn:' + f.id && S.tab === 'events';
+    if (renamingFn === f.id) {
+      return h('div', { class: 'tree-row fn on' }, renameInput({ value: f.name, label: 'Function name', notify: hooks.notify,
+        taken: functionNamesTaken(S.project, f.name),
+        onDone: () => { renamingFn = null; hooks.refresh(); },
+        onSave: (v) => { renameFunction(S.project, f.name, v); renamingFn = null; hooks.commit(); } }));
+    }
+    const menu = (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      openMenu({ x: r.left, y: r.bottom + 4, returnFocus: e.currentTarget, items: [
+        { label: 'Rename', fn: () => { renamingFn = f.id; hooks.refresh(); } },
+        { label: 'Delete function', danger: true, fn: () => {
+          const users = functionUsers(S.project, f.name).filter((w) => w !== f.name);
+          if (users.length) { hooks.notify(`${f.name} is still called on ${users.join(', ')}. Remove those calls first.`); return; }
+          S.project.functions = fns.filter((x) => x !== f);
+          if (S.sheet === 'fn:' + f.id) S.sheet = 'screen';
+          hooks.commit();
+        } },
+      ] });
+    };
+    return h('div', { class: 'tree-row fn' + (on ? ' on' : '') },
+      h('button', { class: 'link', type: 'button', 'data-ab': 'function:' + f.name, 'aria-current': on ? 'true' : null, title: `Open ${f.name} (double-click to rename)`,
+        ondblclick: () => { renamingFn = f.id; hooks.refresh(); }, onclick: () => open(f) },
+      `${f.name}(${f.params.join(', ')})`),
+      on ? h('button', { class: 'icon more', type: 'button', title: 'More', 'aria-label': `More for ${f.name}`, 'data-ab': 'function-menu', 'aria-haspopup': 'menu', onclick: menu }, '\u22ef') : null);
+  };
+  return h('div', { class: 'tree-node fns' },
+    h('div', { class: 'tree-row screen fns-head' }, h('span', { class: 'fns-title', title: 'Named lists of actions that any event can call, like SaveEntry(text)' }, '\u0192 Functions'),
+      h('span', { class: 'kind' }, fns.length ? `${fns.length}` : '')),
+    h('div', { class: 'tree-children' },
+      ...fns.map(row),
+      h('button', { class: 'btn add-obj', type: 'button', 'data-ab': 'add-function', title: 'A named list of actions you can call from any event', onclick: () => {
+        const taken = new Set(functionNamesTaken(S.project));
+        let name = 'MyFunction', n = 2;
+        while (taken.has(name)) name = 'MyFunction' + n++;
+        const f = newFunction(S.project, name);
+        renamingFn = f.id; S.sheet = 'fn:' + f.id;
+        if (S.tab !== 'events') hooks.setTab('events');
+        hooks.commit();
+      } }, '+ Function')));
+}
+
 // every event in a list, sub-events included, with where it is ("an event on Home")
 function eachEventWhere(cb) {
   const walk = (evs, where) => { for (const ev of evs || []) { cb(ev, where); walk(ev.children, where); } };
   for (const sc of S.project.screens) walk(sc.events, 'an event on ' + sc.name);
   walk(allScreensEvents(S.project), 'an event on All screens');
+  for (const f of functionsOf(S.project)) walk(f.events, 'the function ' + f.name);
 }
 
 // objects and events that use a picture (so it isn't deleted out from under them)
@@ -224,7 +279,7 @@ function listSection() {
   const rows = S.project.variables.filter(isList).map((v) => h('div', { class: 'list-var' },
     h('div', { class: 'var' },
       renamingVar === v.name
-        ? renameInput({ value: v.name, label: 'List name', notify: hooks.notify, taken: S.project.variables.map((x) => x.name),
+        ? renameInput({ value: v.name, label: 'List name', notify: hooks.notify, taken: usedNames(),
           onDone: () => { renamingVar = null; hooks.refresh(); },
           onSave: (nv) => { renameVariable(S.project, v.name, nv); renamingVar = null; hooks.commit(); } })
         : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingVar = v.name; hooks.refresh(); } }, v.name),
@@ -239,7 +294,7 @@ function listSection() {
     ...(rows.length ? rows : [h('p', { class: 'muted' }, 'None yet.')]),
     addRow('New list', (name) => {
       if (!isIdentifier(name)) { hooks.notify('List names use letters, numbers and _ only, and can\u2019t start with a number.'); return false; }
-      if (S.project.variables.some((v) => v.name === name)) { hooks.notify('There is already something called ' + name); return false; }
+      if (usedNames().includes(name)) { hooks.notify('There is already something called ' + name); return false; }
       S.project.variables.push({ name, value: [] }); hooks.commit();
     }),
   ];
@@ -251,7 +306,7 @@ let renamingField = null; // `${table}.${field}` being renamed
 const jsonOpen = new Set();  // tables whose JSON view is open
 
 function tableSection() {
-  const used = () => S.project.variables.map((x) => x.name);
+  const used = usedNames;
   const blocks = S.project.variables.filter(isTable).map((v) => {
     const fields = v.table.fields;
     const fieldHead = (f, fi) => {

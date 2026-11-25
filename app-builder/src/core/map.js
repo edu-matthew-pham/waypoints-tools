@@ -14,9 +14,12 @@
 // depth: fewest links from the first screen (null if not reachable); the map lays screens out by it.
 // broken: links to a screen that no longer exists.
 // A Go to screen on the All screens sheet is a link from every screen it runs on, its label ending "(all screens)".
+// Calls are followed: a Go to screen inside a function is a link from every screen whose events call it (directly,
+// from All screens or from another function), labelled "..., via SaveEntry".
 import { itemText } from './sheet-text.js';
 import { CONDITIONS } from './catalog.js';
 import { sharedEventsFor } from './shared.js';
+import { findFunction, functionsOf, callsInExpr } from './functions.js';
 
 // What kind of thing starts an event, in words for the map's summary ("6 ways: 4 clicks, 1 timer, 1 check").
 // Decided by the first trigger in the event or its parents; with no trigger, it is a test checked every tick.
@@ -34,12 +37,34 @@ const wayKind = (conds) => {
   return 'check';
 };
 
-function walk(events, path, screens, out, tag = '') {
+// the functions a condition or action calls: "Call SaveEntry" or Total(...) in a value box
+function calledBy(item, names) {
+  const out = item.type === 'callFunction' && item.fn ? [item.fn] : [];
+  for (const v of Object.values(item)) {
+    if (typeof v === 'string') out.push(...callsInExpr(v, names));
+    else if (v && typeof v === 'object') for (const x of Object.values(v)) if (typeof x === 'string') out.push(...callsInExpr(x, names));
+  }
+  return out;
+}
+
+// w = { screens, out, tag, project, names, inside: [function names on the way here] }
+function walk(events, path, w) {
   for (const ev of events || []) {
     const conds = [...path.conds, ...(ev.conds || [])];
-    const words = [...path.words, ...(ev.else ? ['otherwise'] : []), ...(ev.conds || []).map((c) => itemText('cond', c, screens))];
-    for (const a of ev.actions || []) if (a.type === 'goToScreen') out.push({ to: a.screen, label: (words.join(', ') || 'all the time') + tag, kind: wayKind(conds) });
-    walk(ev.children, { conds, words }, screens, out, tag);
+    const words = [...path.words, ...(ev.else ? ['otherwise'] : []), ...(ev.conds || []).map((c) => itemText('cond', c, w.screens))];
+    const follow = (item) => {
+      for (const name of calledBy(item, w.names)) {
+        const f = findFunction(w.project, name);
+        if (!f || w.inside.includes(name)) continue; // a function calling itself adds nothing new
+        walk(f.events, { conds, words: [...words, 'via ' + name] }, { ...w, inside: [...w.inside, name] });
+      }
+    };
+    for (const c of ev.conds || []) follow(c);
+    for (const a of ev.actions || []) {
+      if (a.type === 'goToScreen') w.out.push({ to: a.screen, label: (words.join(', ') || 'all the time') + w.tag, kind: wayKind(conds) });
+      else follow(a);
+    }
+    walk(ev.children, { conds, words }, w);
   }
 }
 
@@ -55,10 +80,12 @@ export function linkSummary(link) {
 export function screenMap(project) {
   const all = project.screens || [];
   const ids = new Set(all.map((s) => s.id));
+  const names = new Set(functionsOf(project).map((f) => f.name));
   const screens = all.map((s, i) => {
     const found = [];
-    walk(sharedEventsFor(project, s), { conds: [], words: [] }, all, found, ' (all screens)');
-    walk(s.events, { conds: [], words: [] }, all, found);
+    const w = { screens: all, out: found, tag: '', project, names, inside: [] };
+    walk(sharedEventsFor(project, s), { conds: [], words: [] }, { ...w, tag: ' (all screens)' });
+    walk(s.events, { conds: [], words: [] }, w);
     return {
       id: s.id, name: s.name, first: i === 0,
       links: found.filter((l) => ids.has(l.to)),

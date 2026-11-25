@@ -6,7 +6,7 @@ import { check, OPERATORS, highlight, FUNCTION_HELP, OPERATOR_HELP, parse, evalu
 import { COMPONENTS } from '../core/components.js';
 import { ICONS, FALLBACK_ICON } from './component-ui.js';
 
-const CATEGORIES = ['Screen', 'Object', 'Keyboard', 'Variables', 'Lists', 'Tables', 'System'];
+const CATEGORIES = ['Screen', 'Object', 'Keyboard', 'Variables', 'Lists', 'Tables', 'Functions', 'System'];
 const plain = (label) => label.replace(/\{\w+\}/g, '\u2026');
 
 export function modal(title, body, foot) {
@@ -33,6 +33,7 @@ const GROUPS = [
   { id: 'Variables', label: 'Variables', icon: 'variables' },
   { id: 'Lists', label: 'Lists', icon: 'list' },
   { id: 'Tables', label: 'Tables', icon: 'table' },
+  { id: 'Functions', label: 'Functions', icon: 'function' },
 ];
 const objParam = (e) => e.params.find((p) => p.type === 'object');
 const fitsObject = (e, o) => { const p = objParam(e); return !!p && (!p.kinds || p.kinds.includes(o.kind)); };
@@ -74,7 +75,7 @@ export function openChooser(sheet, kind, ev, depth, onPick) {
       })), 'group:object:' + o.name));
     body.replaceChildren(
       h('div', { class: 'op-grid small' }, general),
-      objs.length ? h('div', { class: 'es-cat' }, 'On this screen') : null,
+      objs.length ? h('div', { class: 'es-cat' }, sheet._where === 'screen' ? 'On this screen' : 'Objects (matched by name on each screen)') : null,
       objs.length ? h('div', { class: 'op-grid small' }, objs) : h('p', { class: 'muted' }, 'Add objects on the Design tab to see what they can do here.'));
     body.querySelector('.op-tile')?.focus();
   }
@@ -133,7 +134,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
     let line = wrap._preview;
     if (!line) { line = wrap._preview = h('p', { class: 'es-preview', 'aria-live': 'polite' }); (helps._last?.isConnected ? helps._last : helps).after(line); helps._last = line; }
     const start = sheet._exprScope.start;
-    if (msg || !start || !input.value.trim() || /\b(Loop|Clicked)(Item|Index)\b/.test(input.value)) { line.hidden = true; return; } // those only have values while the app runs
+    if (msg || !start || !input.value.trim() || /\b(Loop|Clicked)(Item|Index)\b/.test(input.value) || runTimeOnly(input.value, sheet._exprScope)) { line.hidden = true; return; } // those only have values while the app runs
     line.hidden = false;
     try {
       const v = evaluate(parse(input.value), {
@@ -183,7 +184,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
       if (prm) sentence.append(sheet._control(prm, draft, entry, ctx));
     }
     exprs.forEach(colourBox);
-    const exprParams = entry.params.filter((p) => p.type === 'expr' || p.type === 'fields');
+    const exprParams = entry.params.filter((p) => p.type === 'expr' || p.type === 'fields' || p.type === 'args');
     helps.replaceChildren(...exprParams.map((p) => h('p', { class: 'es-help' },
       exprParams.length > 1 ? h('strong', {}, (p.name === 'left' ? 'First value' : p.name === 'right' ? 'Second value' : 'Value') + ': ') : null, p.help || '')));
     chips.replaceChildren();
@@ -193,6 +194,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
     if (exprParams.length) {
       const sc = sheet._scope;
       const names = [
+        ...(sheet._exprScope.params || []), // inside a function: its parameters
         ...sc.variables,
         ...sc.objects.flatMap((o) => [...(o.kind === 'input' ? [`${o.name}.text`] : []), ...o.vars.map((v) => `${o.name}.${v}`)]),
       ];
@@ -287,6 +289,11 @@ export function openChoiceBuilder(sheet, onInsert) {
   (left || m.dlg.querySelector('button')).focus();
 }
 
+// A value that uses a parameter or one of the app's functions only has a value while the app runs (no preview).
+function runTimeOnly(src, scope) {
+  return highlight(src).some(([k, t]) => (k === 'name' && scope.params?.has(t.split('.')[0])) || (k === 'fn' && scope.functions?.has(t)));
+}
+
 // Colour an expression box as you type (like Construct): a coloured copy sits behind a see-through input.
 function colourBox(input) {
   if (input.parentElement?.classList.contains('hl')) return;
@@ -309,7 +316,11 @@ function colourBox(input) {
 export function openExpressionBrowser(sheet, insert) {
   const sc = sheet._scope;
   const PROP_HELP = { text: 'its text', value: 'its number', on: 'true if switched on', min: 'its smallest value', max: 'its largest value', visible: 'true if showing', x: 'distance from the left', y: 'distance from the top', w: 'its width', h: 'its height' };
+  const params = [...(sheet._exprScope.params || [])];
+  // the app's own functions, once return values are on (or a function already gives one back)
+  const ownFns = sheet._ui('returnValues') ? (sc.functions || []) : [];
   const sections = [
+    ['Parameters of this function', params.map((v) => ({ code: v, desc: 'the value the call gave' }))],
     ['Variables', sc.variables.map((v) => ({ code: v, desc: 'whole-app variable' }))],
     ['Lists', (sc.lists || []).flatMap((l) => [{ code: `count(${l})`, desc: 'how many items' }, { code: `item(${l}, 1)`, desc: 'the first item' }, { code: `join(${l}, ", ")`, desc: 'all items as text' }])],
     ['Tables', (sc.tables || []).flatMap((t) => [{ code: `count(${t})`, desc: 'how many rows' },
@@ -323,6 +334,7 @@ export function openExpressionBrowser(sheet, insert) {
       ...['visible', 'x', 'y', 'w', 'h'].map((p) => ({ code: `${o.name}.${p}`, desc: PROP_HELP[p], extra: true })),
     ]]),
     ['Joining and maths', OPERATOR_HELP.map(([op, desc, ex]) => ({ code: op.split(/\s+/)[0], label: op, desc, ex }))],
+    ['Your functions', ownFns.map((f) => ({ code: `${f.name}()`, label: `${f.name}(${f.params.join(', ')})`, desc: 'the value it gives back (Set return value)', fn: true }))],
     ['Functions', Object.values(FUNCTION_HELP).map(([sig, desc, ex]) => ({ code: sig.replace(/\(.*\)/, '()'), label: sig, desc, ex, fn: true }))],
   ];
   const body = h('div', { class: 'xb' });

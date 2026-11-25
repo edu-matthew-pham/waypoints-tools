@@ -1,11 +1,13 @@
 // <event-sheet>: the reusable event editor / viewer.
 //
 //   const el = document.createElement('event-sheet');
-//   el.setData({ events, scope, exprScope, mode, canPick, features });
+//   el.setData({ events, scope, exprScope, mode, canPick, features, where, sequence });
 //       mode: 'guided'   clean read view; click a condition/action to edit it in a dialog (beginners)
 //             'edit'     quick edit: dropdowns and boxes inline (confident users)
 //             'readonly' static (lesson pages, Run tab)
 //       features: resolved feature list (core/features.js), or null for everything
+//       where: 'screen' | 'all' | 'function' (a function's body: no triggers; Set return value is offered)
+//       sequence: show a function as one list of actions ("When called, do ..."), with no conditions or sub-events
 //   el.addEventListener('sheetchange', ...)   // the events array was edited in place
 //   el.addEventListener('pickobject', e => e.detail.apply(name) / e.detail.cancel())
 //        // the host lets the user click an object on screen; only offered when canPick is true
@@ -31,11 +33,15 @@ export class EventSheet extends HTMLElement {
     this._mode = 'edit';
     this._canPick = false;
     this._features = null;
+    this._where = 'screen';
+    this._sequence = false;
     this._sel = null;
     this._timers = new Map();
   }
 
-  setData({ events, scope, exprScope, mode = 'edit', canPick = false, features = null }) {
+  setData({ events, scope, exprScope, mode = 'edit', canPick = false, features = null, where = 'screen', sequence = false }) {
+    this._where = where;
+    this._sequence = sequence;
     this._events = events;
     this._scope = scope;
     this._exprScope = exprScope;
@@ -50,7 +56,11 @@ export class EventSheet extends HTMLElement {
   connectedCallback() { this.render(); }
 
   _ui(flag) { return this._features ? !!this._features[flag] : true; }
-  _can(kind, type) { return canUse(this._features, kind, type); }
+  _can(kind, type) {
+    if (type === 'setReturn' && (this._where !== 'function' || !this._ui('returnValues'))) return false;
+    if (type === 'callFunction' && !this._ui('functions')) return false;
+    return canUse(this._features, kind, type);
+  }
 
   render() { this.replaceChildren(this._build()); }
   _changed() { this.render(); this._emit(); }
@@ -72,10 +82,11 @@ export class EventSheet extends HTMLElement {
   // ---------- building ----------
   _build() {
     const issues = new Map();
-    for (const i of validateSheet(this._events)) issues.set(i.id, [...(issues.get(i.id) || []), i.message]);
+    for (const i of validateSheet(this._events, 0, [], false, this._where === 'function')) issues.set(i.id, [...(issues.get(i.id) || []), i.message]);
     const root = h('div', { class: 'es' + (this.guided ? ' guided' : this.edit ? '' : ' ro') });
+    if (this._sequence) { root.append(this._sequenceRow(issues)); return root; }
     if (!this._events.length) {
-      root.append(h('p', { class: 'es-empty' }, this.edit || this.guided ? 'No events on this screen yet. An event says: when this happens, do that.' : 'No events on this screen.'));
+      root.append(h('p', { class: 'es-empty' }, this._where === 'function' ? 'Nothing in this function yet.' : this.edit || this.guided ? 'No events on this screen yet. An event says: when this happens, do that.' : 'No events on this screen.'));
     }
     root.append(...this._rows(this._events, 0, issues));
     if (this.edit || this.guided) {
@@ -87,6 +98,21 @@ export class EventSheet extends HTMLElement {
       }, 'data-ab': 'add-event' }, '+ Add event'));
     }
     return root;
+  }
+
+  // A function shown as a plain list of actions: "When called, do this, then this". Its one event has no conditions.
+  _sequenceRow(issues) {
+    if (!this._events.length) this._events.push(newEvent());
+    const ev = this._events[0];
+    const msgs = issues.get(ev.id);
+    const acts = h('div', { class: 'ev-acts' });
+    ev.actions.forEach((a, ai) => acts.append(this._item('act', ev, ev.actions, a, ai)));
+    if (this.edit || this.guided) acts.append(this._addBtn('act', ev, 0));
+    else if (!ev.actions.length) acts.append(h('span', { class: 'muted' }, '(no actions yet)'));
+    const row = h('div', { class: 'ev seq' + (msgs ? ' bad' : ''), 'data-id': ev.id, 'data-ab': 'event' },
+      h('div', { class: 'ev-main' }, h('div', { class: 'ev-conds' }, h('div', { class: 'badge when-called', title: 'A function runs when an event calls it' }, 'When called')), acts));
+    if (msgs) row.append(h('div', { class: 'ev-warn' }, '⚠ ' + msgs.join(' ')));
+    return row;
   }
 
   _addBtn(kind, ev, depth) {
@@ -248,6 +274,7 @@ export class EventSheet extends HTMLElement {
       case 'picture': return (sc.pictures || []).map((n) => [n, n]);
       case 'sound': return (sc.sounds || []).map((n) => [n, n]);
       case 'posSize': return [['w', 'width'], ['h', 'height'], ['x', 'x position'], ['y', 'y position']];
+      case 'function': return (sc.functions || []).map((f) => [f.name, f.name]);
     }
     return [];
   }
@@ -260,6 +287,7 @@ export class EventSheet extends HTMLElement {
     const cur = item[prm.name] ?? '';
     if (prm.type === 'expr') return this._exprControl(prm, item, interactive, ctx);
     if (prm.type === 'fields') return this._fieldsControl(prm, item, entry, interactive, ctx);
+    if (prm.type === 'args') return this._argsControl(prm, item, entry, interactive, ctx);
     const options = this._options(prm, item, entry);
     const known = options.some(([v]) => v === cur);
     if (!interactive) {
@@ -268,6 +296,12 @@ export class EventSheet extends HTMLElement {
     }
     const apply = (value) => {
       item[prm.name] = value;
+      if (prm.type === 'function') {
+        // a value box for each parameter of the newly chosen function (values for the same names are kept)
+        const a = entry.params.find((p) => p.type === 'args');
+        const f = (this._scope.functions || []).find((x) => x.name === value);
+        if (a) item[a.name] = Object.fromEntries((f?.params || []).map((p) => [p, item[a.name]?.[p] ?? '']));
+      }
       if (prm.type === 'object' || prm.type === 'table') {
         // keep any variable or field picker of the same item pointing at something that exists
         for (const other of entry.params.filter((p) => p.type === 'instVar' || p.type === 'field')) {
@@ -304,6 +338,22 @@ export class EventSheet extends HTMLElement {
       this._exprControl({ ...prm, name: f, type: 'expr' }, vals, interactive, { ...ctx, dataAb: 'value:' + f }))));
   }
 
+  // "Call SaveEntry with text = …": one value box per parameter of the chosen function, in its order.
+  // The values live in item[prm.name] = { param: expression }.
+  _argsControl(prm, item, entry, interactive, ctx) {
+    const fp = entry.params.find((p) => p.type === 'function');
+    const f = (this._scope.functions || []).find((x) => x.name === item[fp?.name]);
+    const vals = (item[prm.name] && typeof item[prm.name] === 'object') ? item[prm.name] : (item[prm.name] = {});
+    const params = f ? f.params : Object.keys(vals);
+    if (!params.length) return h('span', { class: 'args' });
+    if (interactive && f) item[prm.name] = Object.fromEntries(params.map((p) => [p, vals[p] ?? '']));
+    const live = item[prm.name];
+    return h('span', { class: 'fields args' }, h('span', { class: 'lbl' }, 'with '), params.map((p, i) => h('span', { class: 'field-box' },
+      h('span', { class: 'lbl field-name' }, p + (interactive ? ' ' : ' = ')),
+      this._exprControl({ ...prm, name: p, type: 'expr' }, live, interactive, { ...ctx, dataAb: 'arg:' + p }),
+      i < params.length - 1 ? h('span', { class: 'lbl' }, ', ') : null)));
+  }
+
   _exprControl(prm, item, interactive, ctx) {
     const val = String(item[prm.name] ?? '');
     if (!interactive) return h('span', { class: 'val expr' }, val || '…');
@@ -333,12 +383,14 @@ export class EventSheet extends HTMLElement {
       if (prm.type === 'list' && !(sc.lists || []).length) return 'Add a list first (left side, under Lists)';
       if (prm.type === 'table' && !(sc.tables || []).length) return 'Add a table first (left side, under Tables)';
       if (prm.type === 'instVar' && !sc.objects.some((o) => o.vars.length)) return 'Needs an object with a variable of its own';
+      if (prm.type === 'function' && !(sc.functions || []).length) return 'Make a function first (left side, under Functions)';
     }
     return '';
   }
 
   _blocked(kind, entry, ev, depth) {
     if (kind === 'cond' && entry.trigger) {
+      if (this._where === 'function') return "Triggers can't go in a function: calling it is what starts it";
       if (depth > 0) return "Triggers can't go in sub-events";
       if (ev.else) return "An Else event can't have a trigger";
       if (ev.conds.some((c) => CONDITIONS[c.type]?.trigger)) return 'This event already has a trigger';

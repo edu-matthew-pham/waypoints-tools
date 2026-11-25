@@ -5,7 +5,8 @@ import { COMPONENTS } from './components.js';
 //
 // Label templates use {param} placeholders; the editor turns them into controls.
 // Param types: object, variable, instVar (belongs to the event's `target`),
-//              expr, operator, screen, showhide
+//              expr, operator, screen, showhide, function (one of the app's functions),
+//              args (one value box per parameter of the chosen function: { param: expression })
 
 import { ExprError, fmt, OPERATORS, compare } from './expr.js';
 
@@ -337,6 +338,18 @@ export const ACTIONS = {
       rt.tableChange(p.table, (t) => { const sorted = [...t].sort((a, b) => sign * cmp(a, b)); t.splice(0, t.length, ...sorted); }); // stable: equal rows keep their order
     },
   },
+  callFunction: {
+    category: 'Functions', label: 'Call {fn} {args}',
+    params: [{ name: 'fn', type: 'function' }, { name: 'args', type: 'args' }],
+    help: 'Runs the function\'s actions now, then carries on with this event. Each value you give is a parameter: a plain name inside the function.',
+    run: (rt, ctx, p) => rt.callFunction(p.fn, rt.argValues(p.fn, p.args, ctx), ctx),
+  },
+  setReturn: {
+    category: 'Functions', label: 'Set return value to {value}',
+    params: [expr()],
+    help: 'Only inside a function. The value the function gives back when it is used in a value box, like Total(price, qty).',
+    run: (rt, ctx, p) => rt.setReturn(ctx, rt.evalExpr(p.value, ctx)),
+  },
   goToScreen: {
     category: 'Screen', label: 'Go to screen {screen}',
     params: [{ name: 'screen', type: 'screen' }],
@@ -369,7 +382,8 @@ export function defaultParams(entry, scope) {
       case 'list': out[prm.name] = scope.lists?.[0] ?? ''; break;
       case 'table': out[prm.name] = scope.tables?.[0] ?? ''; break;
       case 'field': out[prm.name] = ''; break; // filled in below, once the table is known
-      case 'fields': out[prm.name] = {}; break;
+      case 'fields': case 'args': out[prm.name] = {}; break;
+      case 'function': out[prm.name] = scope.functions?.[0]?.name ?? ''; break;
       case 'sortdir': out[prm.name] = 'up'; break;
       case 'instVar': {
         const t = entry.params.find((x) => x.type === 'object');
@@ -396,7 +410,8 @@ export function defaultParams(entry, scope) {
 export const SORT_DIRS = [['up', 'A to Z, smallest first'], ['down', 'Z to A, biggest first']];
 
 // Structural checks the editor shows as warnings. Returns [{ id, message }].
-export function validateSheet(events, depth = 0, out = [], underTrigger = false) {
+// inFunction: the events are a function's body (no triggers there: calling it is what starts it).
+export function validateSheet(events, depth = 0, out = [], underTrigger = false, inFunction = false) {
   let prevOk = false; // can an Else follow the previous event?
   for (const ev of events) {
     const trigs = (ev.conds || []).filter((c) => CONDITIONS[c.type]?.trigger);
@@ -408,14 +423,16 @@ export function validateSheet(events, depth = 0, out = [], underTrigger = false)
     });
     if (trigs.length > 1) out.push({ id: ev.id, message: 'An event can have only one trigger.' });
     if (trigs.length && (ev.conds[0] !== trigs[0])) out.push({ id: ev.id, message: 'The trigger must be the first condition.' });
-    if (trigs.length && depth > 0) out.push({ id: ev.id, message: "Triggers can't go in sub-events." });
+    if (trigs.length && inFunction) out.push({ id: ev.id, message: "Triggers can't go in a function: calling it is what starts it." });
+    else if (trigs.length && depth > 0) out.push({ id: ev.id, message: "Triggers can't go in sub-events." });
+    if (!inFunction && (ev.actions || []).some((a) => a.type === 'setReturn')) out.push({ id: ev.id, message: 'Set return value only works inside a function.' });
     if (ev.else && !prevOk) out.push({ id: ev.id, message: 'Else needs a normal (non-trigger) event right above it.' });
     if (ev.else && trigs.length) out.push({ id: ev.id, message: "An Else event can't have a trigger." });
     const onceAt = (ev.conds || []).findIndex((c) => c.type === 'triggerOnce');
     if (onceAt >= 0 && onceAt !== ev.conds.length - 1) out.push({ id: ev.id, message: 'Trigger once should be the last condition (it only looks at the ones above it).' });
     if (onceAt >= 0 && (trigs.length || underTrigger)) out.push({ id: ev.id, message: 'Trigger once is only needed in events checked every tick. ⚡ events already run once.' });
     prevOk = ev.else ? prevOk : trigs.length === 0;
-    if (ev.children?.length) validateSheet(ev.children, depth + 1, out, underTrigger || trigs.length > 0);
+    if (ev.children?.length) validateSheet(ev.children, depth + 1, out, underTrigger || trigs.length > 0, inFunction);
   }
   return out;
 }
@@ -448,9 +465,11 @@ const PARAM_HELP = {
   'setVar.value': 'The new value: a number, "text in quotes", or a calculation like score + 1.',
   'addTo.value': 'How much to add. ' + NUM_OR_CALC,
   'subtractFrom.value': 'How much to take away. ' + NUM_OR_CALC,
+  'setReturn.value': 'What the function gives back: a number, "text in quotes", or a calculation like price * qty.',
 };
 for (const table of [CONDITIONS, ACTIONS]) {
   for (const [id, e] of Object.entries(table)) {
+    for (const p of e.params) if (p.type === 'args') p.help = 'One value for each parameter of the function: a number, "text in quotes", a variable, or something like Entry.text.';
     for (const p of e.params) if (p.type === 'fields') p.help = 'One value for each field: "text in quotes", a number, or something like Title.text. An empty box gives empty text (or 0 for a number field).';
     for (const p of e.params) if (p.type === 'expr') p.help = PARAM_HELP[`${id}.${p.name}`] || 'A value: a number, "text in quotes", a variable, or a calculation.';
   }

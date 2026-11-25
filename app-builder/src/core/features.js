@@ -1,6 +1,12 @@
 // Features: what a project (or a lesson) lets the student see and use.
 //
-// project.features = { level: 1-4, allow?: { cond?: [ids], act?: [ids] }, ui?: { sub, else, pick, instVars, choice, lists, remember, tables, allScreens }   (choice = the "choose between two values" builder; typed if() always works) }
+// project.features = { level: 1-4, allow?: { cond?: [ids], act?: [ids] }, ui?: { sub, else, pick, instVars, choice, lists, remember, tables, allScreens, functions, functionLogic, returnValues, copyPicked } }
+//   (choice = the "choose between two values" builder; typed if() always works)
+//   Functions (Level 4) start simple: a function is a list of actions. Three switches are built but off at every level
+//   until a teacher turns them on (ui, or ?on=functionLogic,returnValues,copyPicked):
+//     functionLogic  conditions, sub-events and Else inside a function
+//     returnValues   "Set return value", so a function can be used as a value: Total(price, qty)
+//     copyPicked     a function can work on the objects the calling event picked (e.g. only the clicked Tile)
 //   level  a named preset (Starter, Conditions, Copies, Everything)
 //   allow  a lesson's own list of catalog ids; overrides the level's lists (like a MakeCode tutorial toolbox)
 //   ui     optional overrides for the UI switches
@@ -21,13 +27,14 @@ const L3_COND = [...L2_COND, 'compareInst', 'keyHeld', 'forEach', 'repeat', 'lis
 const L2_ACT = [...L1_ACT, 'setOn', 'setSlider', 'setSize', 'setImage', 'playSound', 'stopSound', 'setSound', 'setVideo', 'openLink'];
 const L3_ACT = [...L2_ACT, 'setSoundNamed', 'setInst', 'addToInst', 'listAdd', 'listRemoveAt', 'listRemoveValue', 'listSet', 'listClear'];
 // Level 4 only (level 4 offers everything; these lists say which entries are new there, so none is forgotten)
-export const L4_ONLY = { cond: ['forEachRow'], act: ['tableAdd', 'tableSet', 'tableRemove', 'tableClear', 'tableSort'] };
+export const L4_ONLY = { cond: ['forEachRow'], act: ['tableAdd', 'tableSet', 'tableRemove', 'tableClear', 'tableSort', 'callFunction', 'setReturn'] };
+export const LATER_SWITCHES = ['functionLogic', 'returnValues', 'copyPicked']; // built, off until turned on
 
 export const LEVELS = {
   1: { name: 'Starter',    kinds: ['button', 'text'], cond: L1_COND, act: L1_ACT, sub: false, else: false, pick: true, instVars: false, choice: false },
   2: { name: 'Conditions', kinds: BASIC_KINDS,          cond: L2_COND, act: L2_ACT, sub: true,  else: true,  pick: true, instVars: false, choice: false },
   3: { name: 'Copies & lists',     kinds: [...BASIC_KINDS, 'list'],          cond: L3_COND, act: L3_ACT, sub: true,  else: true,  pick: true, instVars: true,  choice: true, lists: true, remember: true, allScreens: true },
-  4: { name: 'Everything', kinds: ALL_KINDS,          cond: null,    act: null,    sub: true,  else: true,  pick: true, instVars: true,  choice: true, lists: true, remember: true, tables: true, allScreens: true },
+  4: { name: 'Everything', kinds: ALL_KINDS,          cond: null,    act: null,    sub: true,  else: true,  pick: true, instVars: true,  choice: true, lists: true, remember: true, tables: true, allScreens: true, functions: true },
 };
 
 export function resolve(feat) {
@@ -37,14 +44,19 @@ export function resolve(feat) {
     level, name: lv.name, kinds: lv.kinds,
     cond: lv.cond ? new Set(lv.cond) : null,
     act: lv.act ? new Set(lv.act) : null,
-    sub: lv.sub, else: lv.else, pick: lv.pick, instVars: lv.instVars, choice: lv.choice, lists: !!lv.lists, remember: !!lv.remember, tables: !!lv.tables, allScreens: !!lv.allScreens,
+    sub: lv.sub, else: lv.else, pick: lv.pick, instVars: lv.instVars, choice: lv.choice, lists: !!lv.lists, remember: !!lv.remember, tables: !!lv.tables, allScreens: !!lv.allScreens, functions: !!lv.functions,
+    functionLogic: false, returnValues: false, copyPicked: false,
     custom: !!feat?.allow,
   };
   if (feat?.allow?.cond) out.cond = new Set(feat.allow.cond);
   if (feat?.allow?.act) out.act = new Set(feat.allow.act);
   // a lesson's allow-list that uses table entries shows the Tables section too
-  if (feat?.allow && [...(feat.allow.cond || []), ...(feat.allow.act || [])].some((id) => L4_ONLY.cond.includes(id) || L4_ONLY.act.includes(id))) out.tables = true;
-  for (const k of ['sub', 'else', 'pick', 'instVars', 'choice', 'lists', 'remember', 'tables', 'allScreens']) if (typeof feat?.ui?.[k] === 'boolean') out[k] = feat.ui[k];
+  const allowed = feat?.allow ? [...(feat.allow.cond || []), ...(feat.allow.act || [])] : [];
+  if (allowed.some((id) => L4_ONLY.cond.includes(id) || (L4_ONLY.act.includes(id) && !['callFunction', 'setReturn'].includes(id)))) out.tables = true;
+  // ... and one that calls functions shows the Functions section (and return values, if it lists them)
+  if (allowed.includes('callFunction') || allowed.includes('setReturn')) out.functions = true;
+  if (allowed.includes('setReturn')) out.returnValues = true;
+  for (const k of ['sub', 'else', 'pick', 'instVars', 'choice', 'lists', 'remember', 'tables', 'allScreens', 'functions', ...LATER_SWITCHES]) if (typeof feat?.ui?.[k] === 'boolean') out[k] = feat.ui[k];
   return out;
 }
 
@@ -55,7 +67,7 @@ export function canUse(rf, kind, type) {
   return !set || set.has(type);
 }
 
-// ?level=1&allow=onClicked,addTo,setText&lock=1
+// ?level=1&allow=onClicked,addTo,setText&lock=1&on=functionLogic,returnValues
 export function fromParams(search) {
   const p = new URLSearchParams(search);
   const out = { locked: p.get('lock') === '1' };
@@ -66,5 +78,7 @@ export function fromParams(search) {
     const ids = allow.split(',').map((s) => s.trim()).filter(Boolean);
     out.allow = { cond: ids.filter((i) => CONDITIONS[i]), act: ids.filter((i) => ACTIONS[i]) };
   }
+  const on = (p.get('on') || '').split(',').map((s) => s.trim()).filter((s) => LATER_SWITCHES.includes(s));
+  if (on.length) out.on = on;
   return out;
 }

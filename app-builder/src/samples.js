@@ -293,6 +293,7 @@ export function starterOf(project) {
   p.variables = [];
   for (const s of p.screens) s.events = [];
   if (p.allScreens) p.allScreens.events = [];
+  if (p.functions) p.functions = [];
   return p;
 }
 const LESSONS = {

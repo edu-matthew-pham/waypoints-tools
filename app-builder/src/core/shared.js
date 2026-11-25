@@ -19,6 +19,17 @@ export function objectNames(project) {
 // Only names that are objects somewhere count, so LoopItem.x, ClickedItem.x and table rows aren't mistaken for objects.
 export function objectsMentioned(ev, known) {
   const out = new Set();
+  (function walk(e) {
+    for (const c of e.conds || []) itemObjects(c, CONDITIONS[c.type], known, out);
+    for (const a of e.actions || []) itemObjects(a, ACTIONS[a.type], known, out);
+    for (const ch of e.children || []) walk(ch);
+  })(ev);
+  return out;
+}
+
+// The object names one condition or action mentions (added to out). Functions use it per action: an action on an
+// object the calling screen doesn't have is skipped there.
+export function itemObjects(item, entry, known, out = new Set()) {
   const fromExpr = (src) => {
     for (const [k, t] of highlight(String(src ?? ''))) {
       if (k !== 'name') continue;
@@ -26,18 +37,11 @@ export function objectsMentioned(ev, known) {
       if (dot > 0 && known.has(t.slice(0, dot))) out.add(t.slice(0, dot)); // a plain name is a variable, never an object
     }
   };
-  const visit = (item, entry) => {
-    for (const p of entry?.params || []) {
-      if (p.type === 'object' && item[p.name]) out.add(item[p.name]);
-      else if (p.type === 'expr') fromExpr(item[p.name]);
-      else if (p.type === 'fields') for (const v of Object.values(item[p.name] || {})) fromExpr(v);
-    }
-  };
-  (function walk(e) {
-    for (const c of e.conds || []) visit(c, CONDITIONS[c.type]);
-    for (const a of e.actions || []) visit(a, ACTIONS[a.type]);
-    for (const ch of e.children || []) walk(ch);
-  })(ev);
+  for (const p of entry?.params || []) {
+    if (p.type === 'object' && item[p.name]) out.add(item[p.name]);
+    else if (p.type === 'expr') fromExpr(item[p.name]);
+    else if (p.type === 'fields' || p.type === 'args') for (const v of Object.values(item[p.name] || {})) fromExpr(v);
+  }
   return out;
 }
 

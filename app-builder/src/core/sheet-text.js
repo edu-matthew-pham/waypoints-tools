@@ -3,6 +3,8 @@
 // project without opening it. Stable on purpose: change the wording only with the checks that use it.
 //
 //   all screens                                            (only when the All screens sheet has events; its event: lines follow)
+//   function SaveEntry(text)                               (one per function, its event: lines follow; "(copy picked)" at the end if set)
+//   event: always | do: Add text to the end of list Journal; Call Refresh     (a call: Call Total with price = 3, qty = Qty.text)
 //   screen Home
 //   variable Minutes = 0
 //   list Journal = ["a", "b"]
@@ -14,6 +16,7 @@
 import { entryFor, KEYS, SORT_DIRS } from './catalog.js';
 import { COMPONENTS } from './components.js';
 import { allScreensEvents } from './shared.js';
+import { functionsOf } from './functions.js';
 
 const SHOW = { showhide: { show: 'Show', hide: 'Hide' }, onoff: { on: 'on', off: 'off' }, posSize: { w: 'width', h: 'height', x: 'x position', y: 'y position' }, sortdir: Object.fromEntries(SORT_DIRS) };
 const KEY_NAMES = Object.fromEntries(KEYS);
@@ -28,9 +31,10 @@ export function itemText(kind, item, screens) {
     if (prm.type === 'screen') return screens.find((s) => s.id === v)?.name ?? v;
     if (prm.type === 'key') return KEY_NAMES[v] ?? v;
     if (prm.type === 'fields') return Object.entries(v || {}).filter(([, x]) => String(x).trim() !== '').map(([f, x]) => `${f} = ${x}`).join(', ');
+    if (prm.type === 'args') { const set = Object.entries(v || {}).filter(([, x]) => String(x).trim() !== ''); return set.length ? 'with ' + set.map(([a, x]) => `${a} = ${x}`).join(', ') : ''; }
     if (SHOW[prm.type]) return SHOW[prm.type][v] ?? v;
     return String(v);
-  });
+  }).trim();
 }
 
 export function sheetText(project) {
@@ -52,6 +56,7 @@ export function sheetText(project) {
     }
   };
   if (allScreensEvents(project).length) { out.push('all screens'); walk(allScreensEvents(project), []); }
+  for (const f of functionsOf(project)) { out.push(`function ${f.name}(${f.params.join(', ')})${f.copyPicked ? ' (copy picked)' : ''}`); walk(f.events, []); }
   for (const s of project.screens || []) {
     out.push(`screen ${s.name}`);
     for (const o of s.objects || []) {

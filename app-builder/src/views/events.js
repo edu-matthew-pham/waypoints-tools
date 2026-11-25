@@ -5,19 +5,62 @@ import { h } from '../ui/dom.js';
 import { Runner } from '../run-engine.js';
 import { scopeFor, exprScopeFor } from '../core/project.js';
 import { allObjectsScreen, sharedEventsFor } from '../core/shared.js';
-import { S, screen, hooks, showAllScreens } from '../state.js';
+import { isSequence, usesReturn } from '../core/functions.js';
+import { renameParam, addParam, removeParam, paramNamesTaken, nameProblem } from '../core/rename.js';
+import { renameInput } from '../ui/rename-input.js';
+import { S, screen, hooks, showAllScreens, showFunctions, openFunction } from '../state.js';
 
 export function initEvents(root) {
   const hint = h('p', { class: 'hint' });
   // which sheet: this screen's, or the All screens sheet (Level 3+)
   const whichBar = h('div', { class: 'which-sheet', role: 'group', 'aria-label': 'Which event sheet' });
-  const drawWhich = () => {
-    whichBar.hidden = !showAllScreens();
-    const btn = (id, label, title) => h('button', { class: 'seg' + (S.sheet === id ? ' on' : ''), type: 'button', 'data-ab': 'sheet:' + id, 'aria-pressed': String(S.sheet === id), title,
+  const drawWhich = (fn) => {
+    whichBar.hidden = !showAllScreens() && !fn;
+    const btn = (id, label, title, ab = 'sheet:' + id) => h('button', { class: 'seg' + (S.sheet === id ? ' on' : ''), type: 'button', 'data-ab': ab, 'aria-pressed': String(S.sheet === id), title,
       onclick: () => { if (S.sheet !== id) { S.sheet = id; hooks.refresh(); } } }, label);
-    whichBar.replaceChildren(
+    whichBar.replaceChildren(...[
       btn('screen', `This screen: ${screen().name}`, 'Events that run only on this screen'),
-      btn('all', 'All screens', 'Events that run on every screen (like a Home button), before each screen’s own'));
+      showAllScreens() ? btn('all', 'All screens', 'Events that run on every screen (like a Home button), before each screen’s own') : null,
+      fn ? btn('fn:' + fn.id, `Function: ${fn.name}`, 'The actions this function does when an event calls it', 'sheet:function') : null].filter(Boolean));
+  };
+  // A function's name line: its parameters (click one to rename it), + Parameter, and Copy picked once offered.
+  const fnBar = h('div', { class: 'fn-bar', hidden: true });
+  let renamingParam = null, addingParam = false;
+  const drawFnBar = (fn) => {
+    fnBar.hidden = !fn;
+    if (!fn) { fnBar.replaceChildren(); return; }
+    const chip = (p) => (renamingParam === p
+      ? renameInput({ value: p, label: 'Parameter name', notify: hooks.notify, taken: paramNamesTaken(S.project, fn),
+        onDone: () => { renamingParam = null; hooks.refresh(); },
+        onSave: (v) => { renameParam(S.project, fn.name, p, v); renamingParam = null; hooks.commit(); } })
+      : h('span', { class: 'param-chip' },
+        h('button', { class: 'link-name', type: 'button', 'data-ab': 'param-name:' + p, title: 'Click to rename (the function and its calls are updated too)', onclick: () => { renamingParam = p; hooks.refresh(); } }, p),
+        h('button', { class: 'icon danger', type: 'button', 'data-ab': 'param-remove:' + p, title: `Remove ${p} (calls lose its value)`, 'aria-label': `Remove parameter ${p}`,
+          onclick: () => { removeParam(S.project, fn.name, p); hooks.commit(); } }, '\u00d7')));
+    const adder = addingParam ? (() => {
+      const input = h('input', { class: 'ctl rename', placeholder: 'name', 'aria-label': 'New parameter name', 'data-ab': 'param-new', spellcheck: 'false', autocomplete: 'off' });
+      let done = false;
+      const finish = (save) => {
+        if (done) return; done = true; addingParam = false;
+        const v = input.value.trim();
+        if (save && v) {
+          const why = nameProblem(v, paramNamesTaken(S.project, fn));
+          if (why) { hooks.notify(why); hooks.refresh(); return; }
+          addParam(S.project, fn.name, v); hooks.commit(); return;
+        }
+        hooks.refresh();
+      };
+      input.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); finish(true); } else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); } });
+      input.addEventListener('blur', () => finish(true));
+      queueMicrotask(() => input.focus());
+      return input;
+    })() : h('button', { class: 'mini', type: 'button', 'data-ab': 'add-param', title: 'A value the call gives the function, like the text to save', onclick: () => { addingParam = true; hooks.refresh(); } }, '+ Parameter');
+    const copyOn = !S.rf || S.rf.copyPicked || !!fn.copyPicked; // offered once switched on (or already used)
+    fnBar.replaceChildren(...[
+      h('div', { class: 'fn-sig' }, h('strong', { class: 'fn-name' }, fn.name), h('span', { class: 'lbl' }, '('), ...fn.params.map(chip), adder, h('span', { class: 'lbl' }, ')')),
+      copyOn ? h('label', { class: 'check-inline', title: 'On: the function works on the objects the calling event picked (like only the clicked Tile). Off: it starts with every copy.' },
+        h('input', { type: 'checkbox', 'data-ab': 'copy-picked', checked: !!fn.copyPicked, onchange: (e) => { if (e.target.checked) fn.copyPicked = true; else delete fn.copyPicked; hooks.commit(); } }),
+        'Copy picked: work on the objects the calling event picked') : null].filter(Boolean));
   };
   const sheet = document.createElement('event-sheet');
   const banner = h('div', { class: 'pick-banner', hidden: true }, 'Click an object in the preview to choose it. Esc to cancel.');
@@ -42,7 +85,7 @@ export function initEvents(root) {
   });
   drawMode();
   root.append(
-    h('div', { class: 'sheet-col' }, whichBar, h('div', { class: 'sheet-bar' }, hint, modeBtn), sheet),
+    h('div', { class: 'sheet-col' }, whichBar, fnBar, h('div', { class: 'sheet-bar' }, hint, modeBtn), sheet),
     h('div', { class: 'preview-col' },
       h('div', { class: 'run-bar' },
         h('button', { class: 'btn', 'data-ab': 'restart', onclick: restart }, '↻ Restart'),
@@ -74,17 +117,30 @@ export function initEvents(root) {
 
   return {
     render(source) {
-      if (!showAllScreens()) S.sheet = 'screen';
-      drawWhich();
+      const fn = openFunction();
+      if ((S.sheet === 'all' && !showAllScreens()) || (S.sheet.startsWith('fn:') && !fn)) S.sheet = 'screen';
+      drawWhich(fn);
+      drawFnBar(fn);
       const all = S.sheet === 'all';
-      const shared = all ? [] : sharedEventsFor(S.project, screen());
-      hint.textContent = all
+      const shared = all || fn ? [] : sharedEventsFor(S.project, screen());
+      // a function stays a plain list of actions until conditions inside functions are switched on (or it already has them)
+      const logic = !S.rf || S.rf.functionLogic;
+      const sequence = !!fn && !logic && isSequence(fn);
+      hint.textContent = fn
+        ? (sequence
+          ? `What ${fn.name} does when an event calls it, top to bottom. Its parameters are plain names in the value boxes. It works on any screen: an action on an object the screen doesn’t have is skipped there.`
+          : `What ${fn.name} does when an event calls it. Its events are checked top to bottom, like sub-events. Its parameters are plain names in the value boxes. An object the screen doesn’t have counts as having no copies.`)
+          + ' The preview shows the screen you are on.'
+        : all
         ? 'Events for all screens. They run on every screen, before that screen’s own. An event is skipped on a screen that doesn’t have every object it mentions. The preview shows the screen you are on.'
         : `Events for “${screen().name}”. ⚡ events run the moment something happens; the others are checked every tick, top to bottom.`
           + (shared.length ? ` ${shared.length === 1 ? '1 event' : shared.length + ' events'} from All screens run${shared.length === 1 ? 's' : ''} here first.` : '');
       if (source !== 'sheet') {
-        const scr = all ? allObjectsScreen(S.project) : screen();
-        sheet.setData({ events: all ? S.project.allScreens.events : screen().events, scope: scopeFor(S.project, scr), exprScope: exprScopeFor(S.project, scr), mode: S.guided ? 'guided' : 'edit', canPick: true, features: S.rf });
+        const scr = all || fn ? allObjectsScreen(S.project) : screen();
+        // what the add menus offer: functions once Level 4 has them or the project does; return values once switched on or used
+        const features = S.rf && { ...S.rf, functions: showFunctions(), returnValues: S.rf.returnValues || usesReturn(S.project) };
+        sheet.setData({ events: fn ? fn.events : all ? S.project.allScreens.events : screen().events, scope: scopeFor(S.project, scr), exprScope: exprScopeFor(S.project, scr, fn),
+          mode: S.guided ? 'guided' : 'edit', canPick: true, features, where: fn ? 'function' : all ? 'all' : 'screen', sequence });
       }
       if (active) later();
     },

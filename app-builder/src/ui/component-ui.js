@@ -25,6 +25,7 @@ export const ICONS = {
 // group icons for the event chooser
 Object.assign(ICONS, {
   screen:    svg('<rect x="13" y="5" width="22" height="38" rx="4"/><path d="M21 37h6"/>'),
+  function:  svg('<path d="M30 9c-5 0-6 3-7 8l-4 16c-1 5-2 7-6 7"/><path d="M15 21h15"/>'),
   system:    svg('<circle cx="24" cy="24" r="16"/><path d="M24 14v10l7 5"/>'),
   keyboard:  svg('<rect x="5" y="13" width="38" height="22" rx="4"/><path d="M12 20h2M19 20h2M26 20h2M33 20h2M15 28h18"/>'),
   variables: svg('<rect x="7" y="9" width="34" height="30" rx="5"/><path d="M17 18l14 12M31 18L17 30"/>'),

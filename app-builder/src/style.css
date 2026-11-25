@@ -546,3 +546,19 @@ p.small, .muted.small { font-size: 12px; }
 .map-thumb:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .map-thumb-stage .stage { pointer-events: none; box-shadow: none; }
 .map-ways { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12px; display: flex; flex-direction: column; gap: 3px; }
+
+/* functions (core/functions.js): side panel rows and the name line above a function's sheet */
+.tree-node.fns { margin-top: 4px; }
+.fns-head .fns-title { font-weight: 600; color: var(--muted); }
+.fns-head .kind { margin-left: 8px; }
+.tree-row.fn { padding: 3px 0; }
+.tree-row.fn .link { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+.tree-row.fn.on .link { font-weight: 600; color: var(--accent); }
+.fn-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: #fafbfd; }
+.fn-bar[hidden] { display: none; }
+.fn-sig { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.fn-sig .fn-name { font-size: 15px; }
+.param-chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 4px 1px 8px; border: 1px solid var(--line); border-radius: 99px; background: #fff; }
+.param-chip .link-name { font-family: inherit; }
+.fn-sig .ctl.rename { width: 9em; }
+.ev.seq .badge.when-called { white-space: nowrap; }

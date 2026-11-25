@@ -28,7 +28,8 @@ Add these to `https://tools.learningwaypoints.com/app-builder/`:
 | `?sample=goal`, `?sample=copies` | Other samples (`music` and `practice` still work) |
 
 Combine with `&level=2` (blocks offered), `&allow=onClicked,addTo,setText` (a lesson's own block list) and `&lock=1`
-(hides the level switch and Samples menu). Example: `?sample=water-start&level=2&lock=1`. Embedding, stable labels and project reports: ROADMAP.md › Automation hooks.
+(hides the level switch and Samples menu). Example: `?sample=water-start&level=2&lock=1`.
+`&on=functionLogic,returnValues,copyPicked` turns on the parts of Functions that start switched off (see Functions below). Embedding, stable labels and project reports: ROADMAP.md › Automation hooks.
 
 Each lesson link keeps its own saved work in the browser, so students carry on where they were; **Start again**
 (press twice) reloads the original. Save/Open still work for handing in a file.
@@ -54,6 +55,7 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
     src/views/map.js        Map tab: every screen as a small picture, arrows from Go to screen actions
     src/core/map.js         screenMap(project): links, start, unreachable screens, dead ends (no DOM; tests and checks use it)
     src/core/shared.js      the All screens sheet: which shared events apply to a screen (objects matched by name)
+    src/core/functions.js   functions: the model and helpers (where one is called, is it a plain list of actions)
     src/ui/screen-items.js  what the stage draws for one screen (shared by Design and Map)
     src/app.js              shell: top bar, tabs, save/open, wiring
     src/samples.js          Practice tracker, Daily chores
@@ -87,6 +89,26 @@ See [`ROADMAP.md`](ROADMAP.md) for planned components, input events (keyboard, p
 Expressions: `&` joins text, `+ - * /` for numbers, `Name.property`, helpers like `round()` and `random()`, and
 `if(test, value if true, value if false)` with `= ≠ < ≤ > ≥`. At Level 3+ a **Choose between two values** button in the
 guided dialog writes the `if()` from fill-in blanks.
+
+## Functions (Level 4)
+
+A function is a named list of actions any event can call, with parameters: **+ Function** under All screens in the
+side panel, then add parameters (`text`) and actions in the Events tab. An event runs it with **Call SaveEntry with
+text = Entry.text**; the function's actions run there and then, and the event carries on. Inside, a parameter is a
+plain name (`"Saved: " & text`). It works on any screen, with objects matched by name like the All screens sheet: an
+action on an object the screen doesn't have is skipped there (a condition on one is false).
+
+Three parts are built but start switched off, so a class meets the simple version first (`features.ui`, or
+`&on=...` on a link):
+
+- `functionLogic`: conditions, sub-events and Else inside a function (until then it shows as "When called, do ...").
+- `returnValues`: **Set return value**, so a function can be used as a value: `Total(price, qty)`.
+- `copyPicked`: a tick box on the function; the function then works on the copies the calling event picked (only the
+  clicked Tile) instead of starting with every copy, as in Construct.
+
+Anything a project already uses stays shown. Names are single words (they become real function names in code);
+a parameter can't share a name with a whole-app variable. A call stops after 50 calls inside calls (a function that
+calls itself without a way to stop). The Map follows calls; the sheet text has a `function Name(params)` line.
 
 ## Adding a feature
 

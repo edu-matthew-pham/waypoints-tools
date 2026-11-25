@@ -1,6 +1,7 @@
 // Project model helpers (plain JSON in, plain JSON out; no DOM).
 //
-// project = { version, name, features, variables:[variable], screens:[screen], allScreens:{ events:[event] } }   (features: see features.js; allScreens: core/shared.js)
+// project = { version, name, features, variables:[variable], screens:[screen], allScreens:{ events:[event] }, functions:[function] }
+//           (features: see features.js; allScreens: core/shared.js; functions: core/functions.js)
 // variable= { name, value, remember? }              value: a number or text, an array (a list), or for a table
 //           { name, table:{ fields:[{name,type}] }, value:[record], remember? }   record = { field: value }
 //           type is 'text' or 'number'. remember: kept in the browser between visits (Run, not the project file)
@@ -190,14 +191,16 @@ export function scopeFor(project, screen) {
     tables: project.variables.filter(isTable).map((v) => v.name),
     tableFields: Object.fromEntries(project.variables.filter(isTable).map((v) => [v.name, tableFields(v)])),
     screens: project.screens.map((s) => ({ id: s.id, name: s.name })),
+    functions: (project.functions || []).map((f) => ({ name: f.name, params: [...f.params] })),
     pictures: imageNames(project),
     sounds: soundNames(project),
   };
 }
 
-// Scope for expression checking: { vars:Set, objects:Map<name,Set<prop>>, start }
+// Scope for expression checking: { vars:Set, objects:Map<name,Set<prop>>, start, functions:Map<name,params>, params:Set }
 // start = starting values, used to preview what a value box will give before the app runs.
-export function exprScopeFor(project, screen) {
+// fn (optional): the function being edited; its parameters are plain names in its value boxes.
+export function exprScopeFor(project, screen, fn) {
   const start = {
     vars: Object.fromEntries(project.variables.map((v) => [v.name, v.value])),
     objects: Object.fromEntries((screen?.objects || []).map((o) => {
@@ -213,7 +216,9 @@ export function exprScopeFor(project, screen) {
   return {
     start,
     fields: new Set(project.variables.filter(isTable).flatMap(tableFields)),
-    vars: new Set(project.variables.map((v) => v.name)),
+    vars: new Set([...project.variables.map((v) => v.name), ...(fn?.params || [])]),
+    params: new Set(fn?.params || []),
+    functions: new Map((project.functions || []).map((f) => [f.name, f.params])),
     objects: new Map((screen?.objects || []).map((o) => [o.name, new Set([...PROP_NAMES, ...(OBJECT_KINDS[o.kind]?.exposes || []), ...o.instanceVars.map((v) => v.name)])])),
   };
 }
@@ -233,6 +238,8 @@ export function checkProject(p) {
   for (const v of p.variables) for (const f of v.table?.fields || []) if (f.type === 'link' && !p.variables.some((t) => t.table && t.name === f.to && t !== v)) { f.type = 'text'; delete f.to; }
   p.allScreens ||= { events: [] }; // the All screens sheet (core/shared.js)
   p.allScreens.events ||= [];
+  p.functions ||= []; // core/functions.js
+  for (const f of p.functions) { f.id ||= uid('f'); f.params ||= []; f.events ||= []; if (!f.events.length) f.events.push(newEvent()); }
   p.assets ||= [];
   p.sounds ||= [];
   p.device ||= 'phone'; // projects from before the Web page option were phone-sized

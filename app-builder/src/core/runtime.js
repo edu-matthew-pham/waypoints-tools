@@ -11,11 +11,18 @@
 //  - "Go to screen" happens after the current event finishes. Globals survive, copies reset.
 //  - The All screens sheet (core/shared.js) runs first, as its own chain: an Else at the top of a screen's sheet
 //    never follows a shared event. If a shared event goes to another screen, that screen's own events don't run for it.
+//  - A function call (core/functions.js) runs the function's events there and then, as a chain of their own, and
+//    carries on. Parameters are plain names inside it. Picking starts fresh (all copies) unless the function has
+//    Copy picked, which starts it with the caller's picks. An object the screen doesn't have is matched by name:
+//    a condition that mentions it is false and an action that mentions it is skipped, quietly.
 
 import { soundNames } from './assets.js';
 import { evaluate, parse, ExprError, fieldOf, isRecord } from './expr.js';
 import { CONDITIONS, ACTIONS, OBJECT_KINDS, normaliseKey } from './catalog.js';
-import { sharedEventsFor } from './shared.js';
+import { sharedEventsFor, objectNames, itemObjects } from './shared.js';
+import { findFunction } from './functions.js';
+
+const MAX_DEPTH = 50; // calls inside calls
 
 export const triggerOf = (ev) => (ev.conds || []).find((c) => CONDITIONS[c.type]?.trigger);
 
@@ -41,6 +48,8 @@ export class Runtime {
     this.time = 0;      // milliseconds of app time; the renderer feeds it with advance()
     this.timers = [];
     this.once = new Map(); // event id -> tick its 'Trigger once' last passed
+    this.depth = 0;        // how many function calls deep we are
+    this.mentions = new WeakMap(); // condition/action -> object names it mentions (functions skip absent ones)
   }
 
   // ---------- lifecycle ----------
@@ -54,6 +63,8 @@ export class Runtime {
       if (saved !== undefined && Array.isArray(saved) === Array.isArray(this.globals.get(name))) this.globals.set(name, saved);
     }
     this.errors = [];
+    this.known = objectNames(this.project);
+    this.depth = 0;
     this.keysDown = new Set();
     this.time = 0;
     this.queue = [{ name: 'start' }];
@@ -261,13 +272,14 @@ export class Runtime {
 
   // picking: the copies an event is currently working on
   pickList(ctx, objName) {
+    if (!this.objects.has(objName) && ctx.fn) return []; // in a function: an object this screen doesn't have has no copies
     if (!this.objects.has(objName)) throw new ExprError(`There's no object called "${objName}" on this screen`);
     return ctx.picked.get(objName) ?? this.instancesOf(objName);
   }
   ctxWith(ctx, objName, inst) {
     const picked = new Map(ctx.picked);
     picked.set(objName, [inst]);
-    return { picked, loop: ctx.loop, clicked: ctx.clicked };
+    return { picked, loop: ctx.loop, clicked: ctx.clicked, fn: ctx.fn };
   }
   // Run fn once per picked copy; expressions see just that copy.
   each(ctx, objName, fn) {
@@ -286,10 +298,11 @@ export class Runtime {
           if (!l) throw new ExprError(`${n} only works inside a "For each" or "Repeat" event`);
           return n === 'LoopIndex' ? l.index : l.item;
         }
+        if (ctx.fn?.args.has(n)) return ctx.fn.args.get(n); // a parameter of the function running
         return this.getVar(n);
       },
       getProp: (o, p) => {
-        if (!this.objects.has(o) && (this.globals.has(o) || /^(Loop|Clicked)(Item|Index)$/.test(o))) {
+        if (!this.objects.has(o) && (this.globals.has(o) || ctx.fn?.args.has(o) || /^(Loop|Clicked)(Item|Index)$/.test(o))) {
           return fieldOf(evaluate({ k: 'var', name: o }, env), p, o); // LoopItem.artist, NowPlaying.title
         }
         const list = this.pickList(ctx, o);
@@ -299,9 +312,49 @@ export class Runtime {
         if (p in inst.props) return inst.props[p];
         throw new ExprError(`${o} has no property "${p}"`);
       },
+      call: (name, values) => this.callFunction(name, values, ctx, true), // Total(price, qty)
     };
     return evaluate(parse(String(src ?? '')), env);
   }
+
+  // ---------- functions ----------
+  // the values a call gives, in the order of the function's parameters (args = { param: expression })
+  argValues(name, args, ctx) {
+    const f = findFunction(this.project, name);
+    if (!f) throw new ExprError(name ? `There's no function called "${name}"` : 'Choose a function to call');
+    return f.params.map((p) => {
+      const src = args?.[p];
+      if (src == null || String(src).trim() === '') throw new ExprError(`${name} needs a value for ${p}`);
+      return this.evalExpr(src, ctx);
+    });
+  }
+  // Run a function now. asValue: it was used in a value box, so it must set a return value.
+  callFunction(name, values, ctx, asValue = false) {
+    const f = findFunction(this.project, name);
+    if (!f) throw new ExprError(`There's no function called "${name}"`);
+    if (values.length !== f.params.length) throw new ExprError(`${name}() needs ${f.params.length} value${f.params.length === 1 ? '' : 's'}`);
+    if (this.depth >= MAX_DEPTH) throw new ExprError(`${name} was called inside itself more than ${MAX_DEPTH} times, so it was stopped. Does it call itself without a way to stop?`);
+    const frame = { fn: f, args: new Map(f.params.map((p, i) => [p, values[i]])), ret: undefined, returned: false };
+    const fctx = f.copyPicked
+      ? { picked: new Map(ctx.picked), loop: [], clicked: ctx.clicked, fn: frame }
+      : { picked: new Map(), loop: [], clicked: null, fn: frame };
+    this.depth++;
+    try { this.#runChain(f.events || [], fctx, false, null); } finally { this.depth--; }
+    if (asValue && !frame.returned) throw new ExprError(`${name} doesn't give a value back yet. Add "Set return value" inside it.`);
+    return frame.ret;
+  }
+  setReturn(ctx, value) {
+    if (!ctx.fn) throw new ExprError('Set return value only works inside a function');
+    ctx.fn.ret = isRecord(value) ? { ...value } : value;
+    ctx.fn.returned = true;
+  }
+  // in a function: does this condition or action mention an object this screen doesn't have?
+  #absent(item, entry) {
+    let names = this.mentions.get(item);
+    if (!names) { names = [...itemObjects(item, entry, this.known)]; this.mentions.set(item, names); }
+    return names.some((n) => !this.objects.has(n));
+  }
+  #where(ctx, message) { return ctx.fn ? `${ctx.fn.fn.name}: ${message}` : message; }
 
   watch() {
     return { screen: this.screen?.name, tables: [...this.tables.keys()], fields: Object.fromEntries([...this.tables].map(([k, f]) => [k, f.map((x) => x.name)])), vars: Object.fromEntries([...this.globals].map(([k, v]) => [k, Array.isArray(v) ? v.map((x) => (isRecord(x) ? { ...x } : x)) : v])) };
@@ -310,7 +363,7 @@ export class Runtime {
   forget() { for (const name of this.remembered) { try { this.store?.save(name, undefined); } catch { /* storage blocked */ } } }
 
   // ---------- internals ----------
-  #ctx() { return { picked: new Map(), loop: [], clicked: null }; }
+  #ctx() { return { picked: new Map(), loop: [], clicked: null, fn: null }; }
 
   #changed(name) {
     this.version++;
@@ -409,7 +462,7 @@ export class Runtime {
     let chainRan = true; // an Else with nothing normal above it never runs
     for (const ev of events) {
       const trig = triggerOf(ev);
-      const ctx = { picked: new Map(parentCtx.picked), loop: parentCtx.loop, clicked: parentCtx.clicked };
+      const ctx = { picked: new Map(parentCtx.picked), loop: parentCtx.loop, clicked: parentCtx.clicked, fn: parentCtx.fn };
       if (top) {
         // trigger pass runs only matching trigger events; tick pass runs only non-trigger events
         if (occ ? (!trig || !this.#matches(trig, occ, ctx, ev)) : !!trig) { chainRan = true; continue; }
@@ -419,7 +472,7 @@ export class Runtime {
       const rounds = loopC ? this.#loopRounds(ev, loopC, ctx) : [null];
       let ran = false;
       for (const round of rounds) {
-        const rctx = round ? { picked: new Map(ctx.picked), loop: [...ctx.loop, round], clicked: ctx.clicked } : ctx;
+        const rctx = round ? { picked: new Map(ctx.picked), loop: [...ctx.loop, round], clicked: ctx.clicked, fn: ctx.fn } : ctx;
         if (!this.#testConds(ev, rctx, trig)) continue;
         ran = true;
         this.hooks.onEventRan?.(ev.id);
@@ -444,7 +497,7 @@ export class Runtime {
       if (items.length > 1000) { this.#error(ev.id, 'That loop would run more than 1000 times, so it was stopped.'); items = items.slice(0, 1000); }
       return items.map((item, i) => ({ index: i + 1, item }));
     } catch (e) {
-      if (e instanceof ExprError) { this.#error(ev.id, e.message); return []; }
+      if (e instanceof ExprError) { this.#error(ev.id, this.#where(ctx, e.message)); return []; }
       throw e;
     }
   }
@@ -456,6 +509,7 @@ export class Runtime {
       if (!entry) { this.#error(ev.id, `Unknown condition "${c.type}"`); return false; }
       if (entry.trigger) { this.#error(ev.id, "A trigger can only be the first condition of a top-level event."); return false; }
       if (entry.loop) continue; // handled by #loopRounds
+      if (ctx.fn && this.#absent(c, entry)) return false; // an object this screen doesn't have: false, quietly
       if (entry.once) {
         // Construct-style: true only if the conditions above were NOT all true on the previous tick.
         // Per event, not per copy. Re-arms after a tick where the event didn't get this far.
@@ -467,7 +521,7 @@ export class Runtime {
       try {
         if (!entry.test(this, ctx, c)) return false;
       } catch (e) {
-        if (e instanceof ExprError) { this.#error(ev.id, e.message); return false; }
+        if (e instanceof ExprError) { this.#error(ev.id, this.#where(ctx, e.message)); return false; }
         throw e;
       }
     }
@@ -478,10 +532,11 @@ export class Runtime {
     for (const a of ev.actions || []) {
       const entry = ACTIONS[a.type];
       if (!entry) { this.#error(ev.id, `Unknown action "${a.type}"`); continue; }
+      if (ctx.fn && this.#absent(a, entry)) continue; // an object this screen doesn't have: skipped, quietly
       try {
         entry.run(this, ctx, a);
       } catch (e) {
-        if (e instanceof ExprError) this.#error(ev.id, e.message);
+        if (e instanceof ExprError) this.#error(ev.id, this.#where(ctx, e.message));
         else throw e;
       }
     }

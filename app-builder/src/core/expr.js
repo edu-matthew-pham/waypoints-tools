@@ -207,7 +207,7 @@ FUNCS.lowercase = FUNCS.lower;
 export const LOOP_NAMES = ['LoopIndex', 'LoopItem', 'ClickedIndex', 'ClickedItem'];
 export const FUNCTION_NAMES = () => [...Object.keys(FUNCS), 'random', 'if'];
 
-// env = { getVar(name), getProp(obj, prop), random() }
+// env = { getVar(name), getProp(obj, prop), random(), call?(name, values) }   call: the app's own functions (core/functions.js)
 export function evaluate(n, env) {
   const ev = (x) => evaluate(x, env);
   switch (n.k) {
@@ -236,6 +236,7 @@ export function evaluate(n, env) {
         return Math.floor(env.random() * needNum(ev(n.args[0])));
       }
       const fn = FUNCS[n.name];
+      if (!fn && env.call) return env.call(n.name, n.args.map(ev)); // one of the app's functions: Total(price, qty)
       if (!fn) throw new ExprError(`There's no function called "${n.name}"`);
       if (n.args.length !== fn.n) throw new ExprError(`${n.name}() needs ${fn.n} value${fn.n > 1 ? 's' : ''}`);
       return fn.f(...n.args.map(ev));
@@ -245,7 +246,7 @@ export function evaluate(n, env) {
 }
 
 // Static check for the editor: parse errors and unknown names, without running.
-// scope = { vars: Set<string>, objects: Map<string, Set<string>> }
+// scope = { vars: Set<string>, objects: Map<string, Set<string>>, functions?: Map<name, [param]> }
 export function check(src, scope) {
   const checkField = (name) => {
     if (!scope.fields || scope.fields.has(name)) return;
@@ -279,10 +280,13 @@ export function check(src, scope) {
         }
         case 'bin': walk(n.l); walk(n.r); break;
         case 'field': walk(n.e); checkField(n.name); break;
-        case 'call':
-          if (!FUNCTION_NAMES().includes(n.name)) throw new ExprError(`There's no function called "${n.name}"`);
+        case 'call': {
+          const own = scope.functions?.get(n.name);
+          if (own && n.args.length !== own.length) throw new ExprError(`${n.name}() needs ${own.length} value${own.length === 1 ? '' : 's'}${own.length ? ` (${own.join(', ')})` : ''}`);
+          if (!own && !FUNCTION_NAMES().includes(n.name)) throw new ExprError(`There's no function called "${n.name}"`);
           n.args.forEach(walk);
           break;
+        }
       }
     })(ast);
     return null;

@@ -227,7 +227,7 @@ skipped on that screen (quietly: it isn't a mistake). Shared objects (one HomeBu
 Construct's global layers) were considered and left for later: they need new Design tab and layer work. The Map draws a
 shared Go to screen as an arrow from each screen it applies to.
 
-**Functions** (Level 4, advanced; *design agreed 26 Nov 2026*). Whole-app, named, with parameters: "Define function
+**Functions** (Level 4, advanced; *design agreed 26 Nov 2026; built 26 Nov on branch `functions`, see README › Functions*). Whole-app, named, with parameters: "Define function
 SaveEntry(text)", then an action "Call SaveEntry with …". Matches Construct's functions, with less switched on at first:
 - **Where:** a Functions row in the side panel under All screens; each function opens in the Events tab.
 - **Body:** a small event sheet (conditions, sub-events and Else allowed). Students first see it as a list of actions
@@ -256,7 +256,7 @@ Done (24–25 Nov 2026): toggle, slider, keys, timers, image and assets, lists, 
 rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever classes say; map view first as the smaller job):
 
 1. §8 Map view (built and live 26 Nov; snapshot still to do).
-2. §11 All screens sheet (built and live 26 Nov), then §11 Functions (agreed 26 Nov: smaller than media, help every app; media doesn't need
+2. §11 All screens sheet (built and live 26 Nov), then §11 Functions (built 26 Nov, not yet live; agreed 26 Nov: smaller than media, help every app; media doesn't need
    them and they don't need media).
 3. §10 media store in IndexedDB (also fixes uploads filling the ~5 MB a project has now).
 4. §10 Drawing and Photo, with the picture field and Set image to an expression.
