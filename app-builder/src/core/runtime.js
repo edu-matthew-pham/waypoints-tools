@@ -16,8 +16,9 @@
 //    Copy picked, which starts it with the caller's picks. An object the screen doesn't have is matched by name:
 //    a condition that mentions it is false and an action that mentions it is skipped, quietly.
 
-import { soundNames } from './assets.js';
-import { evaluate, parse, ExprError, fieldOf, isRecord } from './expr.js';
+import { soundNames, imageNames } from './assets.js';
+import { isRef, isDataUrl } from './media.js';
+import { evaluate, parse, ExprError, fieldOf, isRecord, fmt } from './expr.js';
 import { CONDITIONS, ACTIONS, OBJECT_KINDS, normaliseKey } from './catalog.js';
 import { sharedEventsFor, objectNames, itemObjects } from './shared.js';
 import { findFunction } from './functions.js';
@@ -144,6 +145,14 @@ export class Runtime {
       const n = Number(value);
       if (Number.isNaN(n)) return;
       inst.props.value = Math.max(inst.props.min, Math.min(inst.props.max, n));
+    } else if (inst.kind === 'drawing') {
+      // the user finished a line: value is how many lines there are now
+      inst.props.lines = Math.max(0, Number(value) || 0);
+      inst.drawn = true; // Drawing.picture is made afresh when next read
+    } else if (inst.kind === 'photo') {
+      inst.props.ready = !!value; // the camera started (or stopped); not an event of its own
+      this.#changed();
+      return;
     } else return;
     this.fire('changed', { object: inst.object, instance: inst });
   }
@@ -260,6 +269,37 @@ export class Runtime {
     const inst = this.byId.get(instanceId);
     if (inst && !!inst.props.playing !== !!playing) { inst.props.playing = !!playing; this.#changed(); }
   }
+  // ---------- pictures made while the app runs (Drawing, Photo) ----------
+  // The page draws and holds the pixels; hooks.snapshot(instanceId) turns them into a picture now (a media reference,
+  // or a data: URL when there is nowhere to keep files), or null. Without a page (tests) there is nothing to snapshot.
+  drawing(inst, op) {
+    if (op === 'clear') { inst.props.lines = 0; inst.props.clearSeq = (inst.props.clearSeq || 0) + 1; }
+    if (op === 'undo') { if (!inst.props.lines) return; inst.props.lines--; inst.props.undoSeq = (inst.props.undoSeq || 0) + 1; }
+    inst.drawn = true;
+    this.#changed();
+  }
+  // Drawing.picture: made when read (not after every line), and the same reference until the drawing changes
+  pictureOf(inst) {
+    if (inst.kind !== 'drawing') return inst.props.picture ?? '';
+    if (!inst.props.lines) return inst.props.background || '';
+    if (inst.drawn || !inst.props.picture) {
+      inst.props.picture = this.hooks.snapshot?.(inst.id) || '';
+      inst.drawn = false;
+    }
+    return inst.props.picture;
+  }
+  takePhoto(inst) {
+    if (!inst.props.ready) throw new ExprError(`${inst.object}'s camera isn't on yet: the user taps ${inst.object} to start it`);
+    const ref = this.hooks.snapshot?.(inst.id);
+    if (!ref) throw new ExprError(`${inst.object} couldn't take a photo`);
+    this.setProp(inst, 'picture', ref);
+  }
+  // a value used as a picture: a reference or data: URL, or the name of a built-in or uploaded picture
+  pictureValue(v) {
+    const s = fmt(v);
+    if (isRef(s) || isDataUrl(s) || imageNames(this.project).includes(s)) return s;
+    throw new ExprError(s === '' ? 'There is no picture yet (nothing has been drawn or taken)' : `There is no picture called "${s}"`);
+  }
   hasSound(name) { return soundNames(this.project).includes(name); }
   openLink(link) { this.hooks.openLink?.(link); }
   setProp(inst, name, value) {
@@ -309,6 +349,7 @@ export class Runtime {
         const inst = list[0];
         if (!inst) throw new ExprError(`There's no ${o} to read "${p}" from`);
         if (p in inst.vars) return inst.vars[p];
+        if (p === 'picture' && (inst.kind === 'drawing' || inst.kind === 'photo')) return this.pictureOf(inst);
         if (p in inst.props) return inst.props[p];
         throw new ExprError(`${o} has no property "${p}"`);
       },
@@ -399,6 +440,8 @@ export class Runtime {
         };
         for (const [k, v] of Object.entries(kind.extra || {})) inst.props[k] = d[k] ?? v;
         if (kind.exposes?.includes('playing')) inst.props.playing = false;
+        if (od.kind === 'drawing') { inst.props.lines = 0; inst.props.picture = ''; }
+        if (od.kind === 'photo') { inst.props.ready = false; inst.props.picture = ''; }
         this.byId.set(inst.id, inst);
         return inst;
       });

@@ -28,17 +28,25 @@ export const projectMedia = (getProject, { soundBase } = {}) => ({
   picture: (name) => imageData(getProject(), name),
   sound: (name) => soundInfo(getProject(), name, soundBase),
   video: (link) => videoSource(link, { allowYoutube: !!getProject().allowYoutube }),
+  camera: () => !!getProject().allowCamera,
 });
 
+// Point the stage at these lookups ({ picture, sound, video, camera }; any left out are kept).
+export function useMedia(m) {
+  if (m.picture) pictures.lookup = m.picture;
+  if (m.sound) mediaLookups.sound = m.sound;
+  if (m.video) mediaLookups.video = m.video;
+  if (m.camera) mediaLookups.camera = m.camera;
+}
+
 export class Player {
-  // options: store (an object, or a function giving one at each start), media ({ picture, sound, video }; leave out to
-  // keep the lookups already set), and hooks: onDraw(rt), onEventRan(id), onScreen(screen, project), onStop(), openLink(link)
-  constructor(host, { store = null, media = null, onDraw, onEventRan, onScreen, onStop, openLink } = {}) {
-    if (media) {
-      if (media.picture) pictures.lookup = media.picture;
-      if (media.sound) mediaLookups.sound = media.sound;
-      if (media.video) mediaLookups.video = media.video;
-    }
+  // options: store (an object, or a function giving one at each start), media ({ picture, sound, video, camera }; leave
+  // out to keep the lookups already set), keepMedia(dataUrl) -> what a made picture is kept as (default: the data: URL
+  // itself; the editor keeps files in the media store and gives a reference), and hooks: onDraw(rt), onEventRan(id),
+  // onScreen(screen, project), onStop(), openLink(link)
+  constructor(host, { store = null, media = null, keepMedia = (d) => d, onDraw, onEventRan, onScreen, onStop, openLink } = {}) {
+    if (media) useMedia(media);
+    this.keepMedia = keepMedia;
     this.stage = new Stage(host, {
       on: {
         click: (id) => this.rt?.click(id),
@@ -75,6 +83,7 @@ export class Player {
         onEventRan: (id) => this.on.onEventRan?.(id),
         onScreen: (scr) => this.on.onScreen?.(scr, rt.project),
         openLink: (link) => this.openLink(link),
+        snapshot: (id) => { const d = this.stage.snapshot(id); return d ? this.keepMedia(d) : null; },
       },
     });
     this.rt = rt;
@@ -96,6 +105,7 @@ export class Player {
 
   stop() {
     for (const m of this.stage.el.querySelectorAll('audio, video')) m.pause();
+    this.stage.clear(); // also turns a camera off
     cancelAnimationFrame(this.raf);
     this.rt = null;
     this.stage.setPick(null);
@@ -108,7 +118,8 @@ export class Player {
     this.hint.hidden = !usesKeys(rt.events);
     this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, name: i.object, kind: i.kind,
       props: i.kind === 'list' ? { ...i.props, items: rt.globals.get(i.props.source), selected: i.selected || 0 }
-        : i.kind === 'table' ? { ...i.props, items: rt.globals.get(i.props.source), fields: tableColumns(rt.project, i.props), selected: i.selected || 0 }
+        : i.kind === 'table' ? { ...i.props, items: rt.globals.get(i.props.source), fields: tableColumns(rt.project, i.props), selected: i.selected || 0,
+          pictureFields: (rt.tables.get(i.props.source) || []).filter((f) => f.type === 'picture').map((f) => f.name) }
           : i.props })));
     this.on.onDraw?.(rt);
   }

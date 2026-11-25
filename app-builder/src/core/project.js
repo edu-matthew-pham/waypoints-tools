@@ -4,7 +4,7 @@
 //           (features: the education layer's levels, edu/features.js; core only carries it; allScreens: core/shared.js; functions: core/functions.js)
 // variable= { name, value, remember? }              value: a number or text, an array (a list), or for a table
 //           { name, table:{ fields:[{name,type}] }, value:[record], remember? }   record = { field: value }
-//           type is 'text' or 'number'. remember: kept in the browser between visits (Run, not the project file)
+//           type is 'text', 'number' or 'picture'. remember: kept in the browser between visits (Run, not the project file)
 // screen  = { id, name, objects:[object], events:[event] }
 // object  = { name, kind, instanceVars:[{name,value}], instances:[instance] }
 // instance= { id, x, y, w, h, text, visible, vars:{} }
@@ -76,7 +76,8 @@ export function deleteInstance(screen, id) {
 export const isTable = (v) => !!v?.table;
 export const isList = (v) => Array.isArray(v?.value) && !v.table;
 export const tableFields = (v) => (v?.table?.fields || []).map((f) => f.name);
-export const FIELD_TYPES = [['text', 'Text'], ['number', 'Number']];
+// picture: a picture made while the app runs (a media reference) or the name of a built-in or uploaded picture
+export const FIELD_TYPES = [['text', 'Text'], ['number', 'Number'], ['picture', 'Picture']];
 
 // Linked tables (advanced): a field of type 'link' holds the first field's value (the key) of a row in another
 // table, such as a song's playlist naming a row of Playlists. It is text underneath, so For each + a condition

@@ -224,3 +224,31 @@ files have a `data:` URL there instead, which still works.
 - No IndexedDB (blocked, some private windows): uploads stay inside the project as before.
 - Browser check used: a one-off Playwright script (old project moves out, picture loads, Save round-trips, new upload,
   Open in a fresh browser, tidy keeps another lesson's file, missing-file notice). See ROADMAP › Testing.
+
+## Drawing and Photo (ROADMAP §10, step 2, 26 Nov 2026; Level 3)
+
+Pictures made while the app runs. Like an upload, each one is a file in the media store, and the app holds a reference
+(`media:7f3a09c2`) that can go in a variable, a list or a table, and is shown by an Image.
+
+- **Drawing**: the user draws with a finger or the mouse. Properties: pen colour, pen size, and a picture to draw on
+  (for labelling a photo or a diagram). Actions: Clear, Undo the last line, Set pen colour, Set pen size, Set background
+  to the picture in (e.g. `Photo.picture`). Trigger: *is drawn on* (after each line). `Drawing.lines` counts the lines;
+  `Drawing.picture` is the drawing (with its background), made when it is read and the same reference until the drawing
+  changes, so reading it twice doesn't make two files. An empty drawing gives its background, or "" with none.
+- **Photo**: the camera. Off unless **Allow camera** is ticked (project setting, shown in the Photo's properties, like
+  Allow YouTube links). Starts only when the user taps it; the browser also asks. A refused or missing camera (some
+  school devices block it) gets a plain message on the object. Action: *Take a photo with*; `Photo.picture` is the last
+  photo (a JPEG, at most 640 px), `Photo.ready` is whether the camera is on. The camera turns off when the screen or Run
+  stops.
+- **Set picture to the one in** (Image): any expression giving a picture: `Drawing.picture`, `ClickedItem.picture`, or a
+  picture's name. Anything else is a plain error.
+- **Picture fields** in tables: the sidebar cell picks one of the app's pictures; while the app runs a row can hold a
+  made picture. Tables, lists and the live table in the sidebar show references as thumbnails.
+- How it works: the page holds the pixels; the runtime asks for a picture through `hooks.snapshot(id)` (synchronous:
+  the file shows from memory at once and is written to the store in the background, `media-store.js keepNow`). The
+  player alone (no store) keeps made pictures as data: URLs. Clear and Undo reach the page as counters (`clearSeq`,
+  `undoSeq`), like Play and Stop do for sounds.
+- Not yet: Save puts only uploads into the file; pictures made while running go in the zip with step 3. Forget saved data
+  leaves their files to the tidy-up (unused for a day). Browser check used: a one-off Playwright script with Chrome's fake
+  camera (draw, keep in a remembered table, photo, reload, camera off on leaving Run, camera not allowed).
+

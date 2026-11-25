@@ -1,11 +1,15 @@
 // How each component looks: its picker icon and how it is drawn on the stage.
 // Keyed by the ids in core/components.js. Icons are tiny inline SVGs (trusted, static) that use currentColor.
 import { h } from './dom.js';
+import { isRef, isDataUrl } from '../core/media.js';
 
 // name -> picture data; the app points this at the current project (uploads + built-ins)
 export const pictures = { lookup: () => '' };
 // name -> { src, title, credit } for sounds; link -> video source (core/assets.js videoSource). Set by the app.
-export const media = { sound: () => null, video: () => ({ kind: 'none', why: 'No video link yet' }) };
+// camera: is the camera allowed for this app (project.allowCamera; off unless the teacher turns it on)
+export const media = { sound: () => null, video: () => ({ kind: 'none', why: 'No video link yet' }), camera: () => false };
+const isPicValue = (v) => isRef(v) || isDataUrl(v);
+const thumb = (v) => h('img', { class: 'cell-pic', src: pictures.lookup(v), alt: '' });
 
 const svg = (body) => `<svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 
@@ -16,6 +20,8 @@ export const ICONS = {
   shape:  svg('<rect x="8" y="14" width="32" height="20" rx="3" fill="currentColor" fill-opacity=".25"/>'),
   image:  svg('<rect x="7" y="9" width="34" height="30" rx="4"/><circle cx="17" cy="19" r="3.5"/><path d="M8 36l11-11 8 8 5-5 9 9"/>'),
   sound:  svg('<path d="M8 19h8l10-8v26l-10-8H8z"/><path d="M32 18a8 8 0 0 1 0 12M36 13a14 14 0 0 1 0 22"/>'),
+  drawing: svg('<rect x="6" y="8" width="36" height="32" rx="4"/><path d="M13 31c4-9 8 2 12-6s6 2 10-4"/>'),
+  photo:  svg('<path d="M6 16h8l3-5h14l3 5h8v22H6z"/><circle cx="24" cy="26" r="7"/>'),
   video:  svg('<rect x="5" y="11" width="38" height="26" rx="4"/><path d="M21 18v12l10-6z" fill="currentColor"/>'),
   list:   svg('<path d="M16 14h24M16 24h24M16 34h24"/><circle cx="9" cy="14" r="1.5" fill="currentColor"/><circle cx="9" cy="24" r="1.5" fill="currentColor"/><circle cx="9" cy="34" r="1.5" fill="currentColor"/>'),
   table:  svg('<rect x="6" y="9" width="36" height="30" rx="3"/><path d="M6 18h36M6 28h36M20 9v30"/>'),
@@ -118,7 +124,7 @@ export const RENDER = {
       if (inner._key === key) return;
       inner._key = key;
       inner.replaceChildren(...(items.length
-        ? items.map((it, i) => h('div', { class: 'lst-row' + (p.selected === i + 1 ? ' sel' : ''), role: 'listitem', 'data-index': String(i + 1), 'aria-selected': p.selected === i + 1 ? 'true' : null }, Array.isArray(it) ? it.join(', ') : String(it)))
+        ? items.map((it, i) => h('div', { class: 'lst-row' + (p.selected === i + 1 ? ' sel' : ''), role: 'listitem', 'data-index': String(i + 1), 'aria-selected': p.selected === i + 1 ? 'true' : null }, isPicValue(it) ? thumb(it) : Array.isArray(it) ? it.join(', ') : String(it)))
         : [h('div', { class: 'lst-empty' }, p.source ? 'Empty list' : 'Choose a list in Properties')]));
     },
   },
@@ -136,9 +142,84 @@ export const RENDER = {
       inner.replaceChildren(h('div', { class: 'tbl-scroll' }, h('table', {},
         h('thead', {}, h('tr', { role: 'row' }, fields.map((f) => cell('th', f)))),
         h('tbody', {}, rows.length
-          ? rows.map((r, i) => h('tr', { class: 'lst-row tbl-row' + (p.selected === i + 1 ? ' sel' : ''), role: 'row', 'data-index': String(i + 1), 'aria-selected': p.selected === i + 1 ? 'true' : null }, fields.map((f) => cell('td', r && f in r ? String(r[f]) : ''))))
+          ? rows.map((r, i) => h('tr', { class: 'lst-row tbl-row' + (p.selected === i + 1 ? ' sel' : ''), role: 'row', 'data-index': String(i + 1), 'aria-selected': p.selected === i + 1 ? 'true' : null }, fields.map((f) => {
+            const v = r && f in r ? r[f] : '';
+            return (p.pictureFields?.includes(f) && v !== '') || isPicValue(v) ? h('td', { role: 'cell' }, thumb(v)) : cell('td', String(v));
+          })))
           : [h('tr', {}, h('td', { class: 'lst-empty', colspan: String(Math.max(1, fields.length)) }, 'No rows yet'))]))));
     },
+  },
+  // A space to draw on. The lines (colour, size, points) are kept here, on the page; the runtime keeps how many there
+  // are (p.lines) and counts each Clear and Undo (p.clearSeq, p.undoSeq). snapshot() gives the drawing as a PNG.
+  drawing: {
+    make: (design) => {
+      const el = h('div', { class: 'drw' }), c = h('canvas', {});
+      el.append(c);
+      Object.assign(el, { _c: c, _lines: [], _bg: null, _bgSrc: '' });
+      c._el = el;
+      if (design) { el.append(h('div', { class: 'drw-hint' }, 'Draw here when the app runs')); return el; }
+      let line = null;
+      const at = (e) => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * (c.width / r.width), (e.clientY - r.top) * (c.height / r.height)]; };
+      c.addEventListener('pointerdown', (e) => {
+        if (e.button !== 0 || c.closest('.picking')) return;
+        line = { color: el._p?.color || '#222', size: el._p?.pen || 4, pts: [at(e)] };
+        c.setPointerCapture(e.pointerId);
+        drawLine(c.getContext('2d'), line);
+      });
+      c.addEventListener('pointermove', (e) => { if (!line) return; line.pts.push(at(e)); drawLine(c.getContext('2d'), line, line.pts.length - 2); });
+      const end = () => {
+        if (!line) return;
+        el._lines.push(line); line = null;
+        c.dispatchEvent(new Event('input', { bubbles: true })); // the stage reports it: one more line
+      };
+      c.addEventListener('pointerup', end);
+      c.addEventListener('pointercancel', end);
+      return el;
+    },
+    write: (el, p) => {
+      el._p = p;
+      const c = el._c;
+      let redraw = false;
+      if (c.width !== p.w || c.height !== p.h) { c.width = p.w; c.height = p.h; redraw = true; }
+      if (el._clear === undefined) { el._clear = p.clearSeq || 0; el._undo = p.undoSeq || 0; }
+      if (el._clear !== (p.clearSeq || 0)) { el._clear = p.clearSeq || 0; el._lines = []; redraw = true; }
+      for (; el._undo < (p.undoSeq || 0); el._undo++) { el._lines.pop(); redraw = true; }
+      const src = p.background ? pictures.lookup(p.background) : '';
+      if (src !== el._bgSrc) {
+        el._bgSrc = src; el._bg = null; redraw = true;
+        if (src) { const img = new Image(); img.onload = () => { if (el._bgSrc === src) { el._bg = img; paint(el); } }; img.src = src; }
+      }
+      if (redraw) paint(el);
+    },
+    read: (c) => c._el._lines.length,
+    snapshot: (el) => { paint(el); try { return el._c.toDataURL('image/png'); } catch { return null; } },
+  },
+  // The camera. Starts only when the user taps it (and only if the app allows the camera); the browser asks too.
+  // snapshot() gives the current frame as a small JPEG. destroy() turns the camera off.
+  photo: {
+    make: (design) => {
+      const el = h('div', { class: 'pho' }), v = h('video', { playsinline: '', muted: '', autoplay: '' }), msg = h('div', { class: 'pho-msg' });
+      v.muted = true;
+      el.append(v, msg);
+      Object.assign(el, { _v: v, _msg: msg });
+      msg.textContent = design ? '📷 Camera: the user taps here to start it when the app runs' : '📷 Tap to start the camera';
+      if (design) return el;
+      el.addEventListener('click', () => { if (!el._stream) startCamera(el); });
+      return el;
+    },
+    write: (el) => { if (!el._stream && !el._starting && !media.camera()) el._msg.textContent = '📷 The camera is off for this app. To use it, tick Allow camera in the Photo\u2019s properties (Design).'; else if (!el._stream && !el._starting && !el._failed) el._msg.textContent = '📷 Tap to start the camera'; },
+    read: (v) => !!v.srcObject?.active,
+    snapshot: (el) => {
+      const v = el._v;
+      if (!el._stream || !v.videoWidth) return null;
+      const scale = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight));
+      const c = h('canvas', {});
+      c.width = Math.round(v.videoWidth * scale); c.height = Math.round(v.videoHeight * scale);
+      c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+      el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+      return c.toDataURL('image/jpeg', 0.8);
+    },
+    destroy: (el) => { el._stream?.getTracks().forEach((t) => t.stop()); el._stream = null; },
   },
   shape: {
     make: () => h('div', { class: 'box' }),
@@ -163,3 +244,48 @@ export const RENDER = {
     read: (el) => Number(el.value),
   },
 };
+
+// ---- drawing helpers ----
+function drawLine(ctx, line, from = 0) {
+  ctx.strokeStyle = line.color; ctx.fillStyle = line.color; ctx.lineWidth = line.size; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const pts = line.pts;
+  if (pts.length === 1) { ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1], line.size / 2, 0, Math.PI * 2); ctx.fill(); return; }
+  ctx.beginPath();
+  ctx.moveTo(...pts[Math.max(0, from)]);
+  for (let i = Math.max(0, from) + 1; i < pts.length; i++) ctx.lineTo(...pts[i]);
+  ctx.stroke();
+}
+// white, then the background picture (fitted inside, centred), then every line
+function paint(el) {
+  const c = el._c, ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+  const bg = el._bg;
+  if (bg?.naturalWidth) {
+    const s = Math.min(c.width / bg.naturalWidth, c.height / bg.naturalHeight);
+    const w = bg.naturalWidth * s, hh = bg.naturalHeight * s;
+    ctx.drawImage(bg, (c.width - w) / 2, (c.height - hh) / 2, w, hh);
+  }
+  for (const line of el._lines) drawLine(ctx, line);
+}
+async function startCamera(el) {
+  const say = (t) => { el._msg.textContent = t; };
+  if (!media.camera()) return; // write() already says how to turn it on
+  if (!navigator.mediaDevices?.getUserMedia) { el._failed = true; say('📷 This browser can\u2019t use a camera here.'); return; }
+  el._starting = true; el._failed = false;
+  say('📷 Starting the camera… (the browser may ask first)');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
+    if (!el.isConnected) { stream.getTracks().forEach((t) => t.stop()); return; }
+    el._stream = stream;
+    el._v.srcObject = stream;
+    await el._v.play().catch(() => {});
+    el.classList.add('live');
+    el._v.dispatchEvent(new Event('input', { bubbles: true })); // the stage reports it: Photo.ready
+  } catch (e) {
+    el._failed = true;
+    say(e?.name === 'NotAllowedError' || e?.name === 'SecurityError'
+      ? '📷 The camera is blocked: permission was refused, or this computer or browser doesn\u2019t allow it (some school devices block cameras).'
+      : e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError' ? '📷 No camera was found on this device.'
+        : '📷 The camera couldn\u2019t start. Is another app using it?');
+  } finally { el._starting = false; }
+}

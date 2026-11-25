@@ -183,7 +183,7 @@ Planned, lightest first:
 Not planned: built-in LLM calls (keys, costs, privacy for under-13s, upkeep). An in-browser model for option 1
 (Transformers.js, about 20–30 MB) only if plain phrase matching proves too weak.
 
-## 10. Make your own media *(proposed 26 Nov 2026, agreed with Matthew; step 1, the media store, built 26 Nov: README › Media store)*
+## 10. Make your own media *(proposed 26 Nov 2026, agreed with Matthew; step 1, the media store, built 26 Nov: README › Media store; step 2, Drawing and Photo, built 26 Nov: README › Drawing and Photo)*
 
 Settled with Matthew (26 Nov 2026): load the media an app uses into memory when it opens and keep new media in the
 background (events stay instant); move uploads out of a project whenever it opens, keeping data: URLs readable; camera
@@ -272,8 +272,8 @@ rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever clas
 2. §11 All screens sheet (built and live 26 Nov), then §11 Functions (built and live 26 Nov; agreed 26 Nov: smaller than media, help every app; media doesn't need
    them and they don't need media).
 3. §10 media store in IndexedDB (built 26 Nov; upload caps raised from about 1 MB to about 5 MB for pictures and sounds).
-4. §10 Drawing and Photo, with the picture field and Set image to an expression.
-5. §10 Recorder and the sound field; zip Save and Open with the data made while running.
+4. §10 Drawing and Photo, with the picture field and Set image to an expression (built 26 Nov; Level 3).
+5. §10 Recorder and the sound field (with a basic trim: start and end marks, no re-encoding; Matthew 26 Nov: useful if cheap); zip Save and Open with the data made while running.
 6. §9 AI help, once how AI is used in class is decided.  7. Layout and tabs, yes/no fields, Grid.
 Alongside: Data apps tried with a class; its feedback can reorder this.
 
@@ -321,6 +321,10 @@ Left, on purpose:
   (`app.js`, `embed.js`), which is the education tool.
 
 ## Considered, not planned
+
+- **Editing media** (Matthew, 26 Nov 2026): picture editing fits (drawing on a picture is built; simple edits such as crop
+  or rotate could come later). Sound and video editing is left to tools made for it (Audacity, an online trimmer), then
+  uploaded or linked: no point reinventing them. The one exception is a basic trim of recordings (§10 step 5).
 
 - **Code snippets (HTML/CSS/JS inside App Builder)** *(25 Nov 2026)*: speculative, probably never. Teachers usually move a
   class to text code at a unit boundary rather than mixing the two; "show as code" (a read-only JavaScript view of the

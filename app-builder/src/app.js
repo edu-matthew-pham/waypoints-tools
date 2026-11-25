@@ -11,15 +11,14 @@ import { initRun } from './views/run.js';
 import { initMap } from './views/map.js';
 import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './edu/features.js';
-import { pictures, media } from './ui/component-ui.js';
 import { embed } from './embed.js';
 import { addBuiltinSounds, sources } from './core/assets.js';
-import { projectMedia } from './player.js';
+import { projectMedia, useMedia } from './player.js';
 // Where media comes from, set here rather than in core: built-in sound files beside App Builder, plus more listed in
 // extra.json (e.g. FreePD tracks; none is fine). Video links: core/assets.js videoSource (Commons; YouTube opt-in).
 const MEDIA_SOURCES = { soundBase: 'sounds/', extraSounds: 'sounds/extra.json' };
 sources.soundBase = MEDIA_SOURCES.soundBase;
-{ const m = projectMedia(() => S.project); pictures.lookup = m.picture; media.sound = m.sound; media.video = m.video; }
+useMedia(projectMedia(() => S.project));
 fetch(MEDIA_SOURCES.extraSounds, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : [])).then((list) => { addBuiltinSounds(list); hooks.refresh?.(); }).catch(() => {});
 import { SAMPLES, sampleById } from './samples.js';
 import * as mediaStore from './media-store.js';

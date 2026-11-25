@@ -20,16 +20,17 @@ const L1_COND = ['onStart', 'onClicked'];
 const L1_ACT = ['setText', 'setVar', 'addTo', 'subtractFrom', 'goToScreen', 'setVisible'];
 const L2_COND = [...L1_COND, 'everyTick', 'compareVar', 'compareValues', 'onChanged',
   'onPressed', 'onReleased', 'onToggled', 'onSlid', 'onSubmitted', 'isOn', 'onKey', 'onKeyUp', 'onEvery', 'onAfter', 'triggerOnce', 'compareText', 'isPlaying', 'onEnded'];
-const L3_COND = [...L2_COND, 'compareInst', 'keyHeld', 'forEach', 'repeat', 'listHas', 'onItemClicked'];
+const L3_COND = [...L2_COND, 'compareInst', 'keyHeld', 'forEach', 'repeat', 'listHas', 'onItemClicked', 'onDrawn'];
 const L2_ACT = [...L1_ACT, 'setOn', 'setSlider', 'setSize', 'setImage', 'playSound', 'stopSound', 'setSound', 'setVideo', 'openLink'];
-const L3_ACT = [...L2_ACT, 'setSoundNamed', 'setInst', 'addToInst', 'listAdd', 'listRemoveAt', 'listRemoveValue', 'listSet', 'listClear'];
+const MAKE_MEDIA = ['clearDrawing', 'undoDrawing', 'setPenColour', 'setPenSize', 'setDrawingBackground', 'takePhoto', 'setImageFrom'];
+const L3_ACT = [...L2_ACT, ...MAKE_MEDIA, 'setSoundNamed', 'setInst', 'addToInst', 'listAdd', 'listRemoveAt', 'listRemoveValue', 'listSet', 'listClear'];
 // Level 4 only (level 4 offers everything; these lists say which entries are new there, so none is forgotten)
 export const L4_ONLY = { cond: ['forEachRow'], act: ['tableAdd', 'tableSet', 'tableRemove', 'tableClear', 'tableSort', 'callFunction', 'setReturn'] };
 
 export const LEVELS = {
   1: { name: 'Starter',    kinds: ['button', 'text'], cond: L1_COND, act: L1_ACT, sub: false, else: false, pick: true, instVars: false, choice: false },
   2: { name: 'Conditions', kinds: BASIC_KINDS,          cond: L2_COND, act: L2_ACT, sub: true,  else: true,  pick: true, instVars: false, choice: false },
-  3: { name: 'Copies & lists',     kinds: [...BASIC_KINDS, 'list'],          cond: L3_COND, act: L3_ACT, sub: true,  else: true,  pick: true, instVars: true,  choice: true, lists: true, remember: true, allScreens: true },
+  3: { name: 'Copies & lists',     kinds: [...BASIC_KINDS, 'list', 'drawing', 'photo'],          cond: L3_COND, act: L3_ACT, sub: true,  else: true,  pick: true, instVars: true,  choice: true, lists: true, remember: true, allScreens: true },
   4: { name: 'Everything', kinds: ALL_KINDS,          cond: null,    act: null,    sub: true,  else: true,  pick: true, instVars: true,  choice: true, lists: true, remember: true, tables: true, allScreens: true, functions: true },
 };
 

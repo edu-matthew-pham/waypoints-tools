@@ -123,7 +123,7 @@ export class Stage {
       (RENDER[it.kind] || RENDER.text).write(n.inner, p);
     }
     for (const [id, n] of this.nodes) {
-      if (!this.items.has(id)) { n.wrap.remove(); this.nodes.delete(id); }
+      if (!this.items.has(id)) { RENDER[n.kind]?.destroy?.(n.inner); n.wrap.remove(); this.nodes.delete(id); }
     }
     this.#applySelection();
   }
@@ -170,5 +170,8 @@ export class Stage {
     }
   }
 
-  clear() { this.nodes.forEach((n) => n.wrap.remove()); this.nodes.clear(); this.items.clear(); }
+  // an object's picture now (Drawing, Photo): a data: URL, or null
+  snapshot(id) { const n = this.nodes.get(id); return (n && RENDER[n.kind]?.snapshot?.(n.inner)) || null; }
+
+  clear() { this.nodes.forEach((n) => { RENDER[n.kind]?.destroy?.(n.inner); n.wrap.remove(); }); this.nodes.clear(); this.items.clear(); }
 }

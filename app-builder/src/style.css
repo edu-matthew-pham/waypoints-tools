@@ -567,3 +567,17 @@ p.small, .muted.small { font-size: 12px; }
 .fn-extra:hover, .fn-extra:focus-visible { color: var(--ink); border-style: solid; }
 .fn-extra.check.on { color: var(--accent); border-style: solid; border-color: var(--accent); }
 .fn-extra.check input { margin: 0; }
+
+/* Drawing and Photo (ROADMAP §10) */
+.drw { position: relative; width: 100%; height: 100%; background: #fff; border: 1px solid #d0d5dd; border-radius: 8px; overflow: hidden; }
+.drw canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.drw-hint { position: absolute; inset: 0; display: grid; place-items: center; color: #98a2b3; font-size: 14px; pointer-events: none; }
+.pho { position: relative; width: 100%; height: 100%; background: #1d2433; border-radius: 10px; overflow: hidden; cursor: pointer; }
+.pho video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pho-msg { position: absolute; inset: 0; display: grid; place-items: center; padding: 12px; text-align: center; color: #e4e7ec; font-size: 14px; line-height: 1.4; }
+.pho.live .pho-msg { display: none; }
+.pho.flash::after { content: ''; position: absolute; inset: 0; background: #fff; animation: pho-flash .35s ease-out forwards; pointer-events: none; }
+@keyframes pho-flash { from { opacity: .85; } to { opacity: 0; } }
+.cell-pic { width: 40px; height: 40px; object-fit: cover; border-radius: 4px; vertical-align: middle; background: #f2f4f7; }
+.cell-pic-pick { display: inline-flex; align-items: center; gap: 4px; }
+.cell-pic-pick .cell-pic { width: 26px; height: 26px; }

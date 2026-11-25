@@ -22,6 +22,9 @@ export const COMPONENTS = {
   image:  { id: 'image',  label: 'Image',      category: 'Media', hint: 'A picture: upload one or pick a built-in.', base: 'Image', props: { text: '', w: 120, h: 120 }, extra: { image: 'star' } },
   sound:  { id: 'sound',  label: 'Sound',      category: 'Media', hint: 'Music or a sound effect, with a play button.', base: 'Sound', props: { text: '', w: 260, h: 52 }, extra: { sound: 'calm' }, exposes: ['playing'] },
   video:  { id: 'video',  label: 'Video',      category: 'Media', hint: 'Plays a video from a link, e.g. Wikimedia Commons.', base: 'Video', props: { text: '', w: 320, h: 200 }, extra: { link: '' }, exposes: ['playing'] },
+  // made while the app runs: picture is a media reference (core/media.js), '' until there is one
+  drawing: { id: 'drawing', label: 'Drawing', category: 'Media', hint: 'A space to draw on with a finger or the mouse.', base: 'Drawing', props: { text: '', w: 300, h: 300 }, extra: { color: '#222222', pen: 4, background: '' }, exposes: ['picture', 'lines'] },
+  photo:  { id: 'photo',  label: 'Photo',      category: 'Media', hint: 'The camera: take a photo of something (camera on for this app only).', base: 'Photo', props: { text: '', w: 300, h: 225 }, exposes: ['picture', 'ready'] },
   list:   { id: 'list',   label: 'List',       category: 'Data', hint: 'Shows the items of a list, one per row.', base: 'List', props: { text: '', w: 342, h: 220 }, extra: { source: '' } },
   table:  { id: 'table',  label: 'Table',      category: 'Data', hint: 'Shows a table: a row for each record, a column for each field.', base: 'Table', props: { text: '', w: 460, h: 240 }, extra: { source: '', columns: '' } },
   toggle: { id: 'toggle', label: 'Toggle',     category: 'Choices', hint: 'An on/off switch with a label.',        base: 'Toggle', props: { text: 'Switch', w: 180, h: 32 }, extra: { on: false }, exposes: ['on'] },

@@ -137,6 +137,25 @@ export function initDesign(root) {
           onchange: (e) => { S.project.allowYoutube = e.target.checked; hooks.commit(); } }),
           h('span', {}, 'Allow YouTube links in this app (off by default: YouTube is social media, so turn this on only if your school is happy with it)')));
     }
+    if (obj.kind === 'drawing') {
+      const bg = h('select', { class: 'ctl', 'aria-label': 'Background picture', 'data-ab': 'prop:background', onchange: (e) => { inst.background = e.target.value; hooks.commit(); } },
+        h('option', { value: '' }, 'None (white)'),
+        imageNames(S.project).map((n) => h('option', { value: n, selected: inst.background === n }, n)));
+      extra.push(
+        h('label', { class: 'f' }, h('span', {}, 'Pen colour'), h('input', { type: 'color', value: /^#[0-9a-f]{6}$/i.test(inst.color || '') ? inst.color : '#222222', 'aria-label': 'Pen colour', 'data-ab': 'prop:color',
+          onchange: (e) => { inst.color = e.target.value; hooks.commit(); } })),
+        h('label', { class: 'f' }, h('span', {}, 'Pen size'), h('input', { class: 'ctl small', type: 'number', min: 1, max: 40, value: inst.pen ?? 4, 'aria-label': 'Pen size', 'data-ab': 'prop:pen',
+          onchange: (e) => { inst.pen = Math.max(1, Math.min(40, Number(e.target.value) || 4)); hooks.commit(); } })),
+        h('label', { class: 'f wide' }, h('span', {}, 'Draw on'), bg),
+        h('p', { class: 'muted small' }, 'Users draw with a finger or the mouse. Add buttons with events to change the colour, undo or clear. Drawing.picture is the drawing, ready for an Image or a table.'));
+    }
+    if (obj.kind === 'photo') {
+      extra.push(
+        h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: !!S.project.allowCamera, 'data-ab': 'allow-camera',
+          onchange: (e) => { S.project.allowCamera = e.target.checked; hooks.commit(); } }),
+          h('span', {}, 'Allow camera in this app (off by default; the browser also asks the user, and some school devices block cameras)')),
+        h('p', { class: 'muted small' }, 'The camera starts only when the user taps the Photo. Add a button that takes the photo; Photo.picture is the photo, ready for an Image or a table. Photos stay in this browser.'));
+    }
     if (obj.kind === 'list') {
       const lists = S.project.variables.filter(isList).map((v) => v.name);
       const sel = h('select', { class: 'ctl', 'aria-label': 'Shows list', onchange: (e) => { inst.source = e.target.value; hooks.commit(); } },

@@ -54,6 +54,11 @@ export const CONDITIONS = {
     category: 'Object', label: 'Enter is pressed in {target}', trigger: 'submitted', object: 'target',
     params: [obj({ kinds: ['input'] })],
   },
+  onDrawn: {
+    category: 'Object', label: '{target} is drawn on', trigger: 'changed', object: 'target',
+    params: [obj({ kinds: ['drawing'] })],
+    help: 'Runs each time the user finishes a line. Drawing.lines is how many lines there are.',
+  },
   onKey: {
     category: 'Keyboard', label: 'Key {key} is pressed', trigger: 'keyDown', keyed: true,
     params: [{ name: 'key', type: 'key' }],
@@ -177,6 +182,54 @@ export const ACTIONS = {
     category: 'Object', label: 'Set {target} picture to {image}',
     params: [obj({ kinds: ['image'] }), { name: 'image', type: 'picture' }],
     run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.setProp(inst, 'image', p.image)),
+  },
+  setImageFrom: {
+    category: 'Object', label: 'Set {target} picture to the one in {value}',
+    params: [obj({ kinds: ['image'] }), expr('value', 'ClickedItem.picture')],
+    help: 'Worked out when the app runs: a picture someone made (Drawing.picture, Photo.picture), a table field that holds one (ClickedItem.picture), or the name of a picture.',
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => rt.setProp(inst, 'image', rt.pictureValue(rt.evalExpr(p.value, c)))),
+  },
+  clearDrawing: {
+    category: 'Object', label: 'Clear {target}',
+    params: [obj({ kinds: ['drawing'] })],
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.drawing(inst, 'clear')),
+  },
+  undoDrawing: {
+    category: 'Object', label: 'Undo the last line on {target}',
+    params: [obj({ kinds: ['drawing'] })],
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.drawing(inst, 'undo')),
+  },
+  setPenColour: {
+    category: 'Object', label: 'Set {target} pen colour to {value}',
+    params: [obj({ kinds: ['drawing'] }), expr('value', '"red"')],
+    help: 'A colour name in quotes, like "red" or "blue", or a code like "#2f6fdd". Lines already drawn keep their colour.',
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => rt.setProp(inst, 'color', fmt(rt.evalExpr(p.value, c)).trim())),
+  },
+  setPenSize: {
+    category: 'Object', label: 'Set {target} pen size to {value}',
+    params: [obj({ kinds: ['drawing'] }), expr('value', '8')],
+    help: 'How thick the next lines are, in pixels: 1 to 40.',
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => {
+      const n = Number(rt.evalExpr(p.value, c));
+      if (!Number.isFinite(n)) throw new ExprError('The pen size must be a number, like 8');
+      rt.setProp(inst, 'pen', Math.max(1, Math.min(40, n)));
+    }),
+  },
+  setDrawingBackground: {
+    category: 'Object', label: 'Set {target} background to the picture in {value}',
+    params: [obj({ kinds: ['drawing'] }), expr('value', 'Photo.picture')],
+    help: 'A picture to draw on top of, such as a photo to label. Drawing.picture then includes it. Use "" for none.',
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => {
+      const v = rt.evalExpr(p.value, c);
+      rt.setProp(inst, 'background', v === '' ? '' : rt.pictureValue(v));
+      rt.drawing(inst, 'changed');
+    }),
+  },
+  takePhoto: {
+    category: 'Object', label: 'Take a photo with {target}',
+    params: [obj({ kinds: ['photo'] })],
+    help: 'Photo.picture is then the photo, ready to show in an Image or keep in a table. The camera must be on first: the user taps the Photo to start it.',
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.takePhoto(inst)),
   },
   playSound: {
     category: 'Object', label: 'Play {target}',

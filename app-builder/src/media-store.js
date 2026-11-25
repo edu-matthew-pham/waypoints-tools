@@ -21,9 +21,9 @@ function db() {
     try {
       const req = indexedDB.open(DB, 1);
       req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: 'id' });
-      req.onsuccess = () => ok(req.result);
-      req.onerror = req.onblocked = () => ok(null);
-    } catch { ok(null); }
+      req.onsuccess = () => { storeOk = true; ok(req.result); };
+      req.onerror = req.onblocked = () => { storeOk = false; ok(null); };
+    } catch { storeOk = false; ok(null); }
   });
   return dbp;
 }
@@ -79,6 +79,21 @@ export async function keepBlob(blob) {
   checkRoom();
   return ref;
 }
+// Keep a picture made while the app runs, and give its reference straight away (the runtime can't wait): the file
+// shows from memory now and is written to the store in the background. With no store, the data: URL itself.
+export function keepNow(dataUrl) {
+  const blob = toBlob(dataUrl);
+  const ref = newRef(hasMediaUrl);
+  setMediaUrl(ref, URL.createObjectURL(blob));
+  db().then(async (d) => {
+    if (!d) return;
+    persist();
+    try { await tx(d, 'readwrite', (s) => s.put({ id: ref, blob, type: blob.type, size: blob.size, added: Date.now() })); checkRoom(); }
+    catch (e) { notify(e?.name === 'QuotaExceededError' ? 'There is no room left in this browser to keep that picture. Save your project, then delete pictures you no longer need.' : 'Could not keep that picture in this browser.'); }
+  });
+  return storeOk === false ? dataUrl : ref;
+}
+let storeOk; // known once the store has opened
 const toBlob = (dataUrl) => { const { type, bytes } = dataUrlToBytes(dataUrl); return new Blob([bytes], { type }); };
 
 // An upload, as { data, size }: data is a reference when the store kept it, or the data: URL as before when it couldn't.

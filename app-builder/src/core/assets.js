@@ -1,7 +1,7 @@
 // Pictures. A project keeps its uploads in project.assets = [{ name, data, size? }]: data is a media reference
 // (media:7f3a09c2, the file is in the browser's media store, see core/media.js) or, in older projects and saved
 // files, a data: URL. Built-in pictures are always available and need no upload.
-import { isRef, mediaSrc } from './media.js';
+import { isRef, isDataUrl, mediaSrc } from './media.js';
 const svgUrl = (body, fill) => 'data:image/svg+xml,' + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><g fill="${fill}" stroke="none">${body}</g></svg>`);
 
@@ -20,6 +20,7 @@ export const imageNames = (project) => [...Object.keys(BUILTIN_IMAGES), ...(proj
 // name (or a media reference, e.g. a picture a user drew) -> something an <img> can show
 export function imageData(project, name) {
   if (isRef(name)) return mediaSrc(name);
+  if (isDataUrl(name)) return name; // a picture made where there was nowhere to keep files
   const up = (project.assets || []).find((a) => a.name === name);
   return up ? mediaSrc(up.data) : BUILTIN_IMAGES[name] ?? '';
 }

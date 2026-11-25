@@ -3,7 +3,9 @@
 // Used by the Events tab (compact preview) and the Run tab (full size).
 import { Player, localStore } from './player.js';
 import { h } from './ui/dom.js';
+import { isRef, isDataUrl, mediaSrc } from './core/media.js';
 import { S } from './state.js';
+import { keepNow } from './media-store.js';
 
 // "Remember between visits": values kept in this browser, one entry per variable, under this App Builder's own key
 // (so each lesson step keeps its own).
@@ -13,6 +15,7 @@ export class Runner extends Player {
   constructor(stageHost, { problems, flash, onScreen } = {}) {
     super(stageHost, {
       store: () => rememberStore(), // the key is read at each start
+      keepMedia: keepNow, // drawings and photos go to the media store; a reference straight away
       onEventRan: (id) => flash?.(id),
       onScreen,
       onDraw: (rt) => this.#show(rt),
@@ -60,7 +63,8 @@ export function liveTable(name, w = lastNow) {
     h('table', { class: 'live' },
       h('thead', {}, h('tr', {}, h('th', { class: 'rn' }, '#'), fields.map((f) => h('th', {}, f)))),
       h('tbody', {}, rows.length ? rows.map((r, i) => h('tr', {}, h('td', { class: 'rn' }, String(i + 1)),
-        fields.map((f) => h('td', { class: before && before[i]?.[f] !== r?.[f] ? 'chg' : null }, r?.[f] === undefined ? '' : String(r[f])))))
+        fields.map((f) => h('td', { class: before && before[i]?.[f] !== r?.[f] ? 'chg' : null },
+        isRef(r?.[f]) || isDataUrl(r?.[f]) ? h('img', { class: 'cell-pic', src: mediaSrc(r[f]), alt: '' }) : r?.[f] === undefined ? '' : String(r[f])))))
         : [h('tr', {}, h('td', { colspan: String(fields.length + 1), class: 'muted' }, 'No rows'))])));
 }
 export function showNow(w) {
