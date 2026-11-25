@@ -179,6 +179,13 @@ For lessons, tests and (later) guided tutorials:
   Width and Height boxes, and events are reordered from their ⋯ menu.
 - Tests: `tools/embed-test.mjs` (also in `npm run test:ui`).
 
+## Considered, not planned
+
+- **Code snippets (HTML/CSS/JS inside App Builder)** *(25 Nov 2026)*: speculative, probably never. Teachers usually move a
+  class to text code at a unit boundary rather than mixing the two; "show as code" (a read-only JavaScript view of the
+  events) plus the App Builder → web bridge course is the link to text code. If ever revisited: Level 4+ only, run in a
+  Web Worker or sandboxed iframe that returns values only (no page access), and expect sheet-text checks not to see inside.
+
 ## Later ideas
 
 - **Guided tutorials as Markdown** (like MakeCode tutorials): `## Step` sections with text and hints, `@highlight <data-ab label>`
