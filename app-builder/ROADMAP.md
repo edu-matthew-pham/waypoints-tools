@@ -57,8 +57,8 @@ Time runs from the interpreter's tick counter, not the wall clock, so tests are 
 - **Lists** as a value type: `add / remove / clear / count / item N / for each`. "For each" works like picking: it narrows to one
   item, runs the actions, and sub-events inherit it. The expression language gets `list.count` and `list[1]` (no loops, no eval).
 - **Remember between visits** (localStorage-backed variables; fails safe when storage is blocked). *Built 25 Nov 2026.*
-- **Tables (records you can see)** *(proposed 24 Nov 2026; built 25 Nov 2026, see README › Tables. Not yet: paste rows
-  from a spreadsheet, a highlighted row on the Table object, the linked-table field type, the nested view)*: a list of records, each row with the same named fields. Construct's
+- **Tables (records you can see)** *(proposed 24 Nov 2026; built 25 Nov 2026, see README › Tables; paste rows, the highlighted
+  row, the linked-table field type and the nested view built the same day)*: a list of records, each row with the same named fields. Construct's
   Array, Dictionary and JSON are invisible until the debugger; here the data shape is always on screen.
   - Sidebar: edited like a small spreadsheet (columns are fields, rows are records).
   - While running: the table's live values show in the sidebar (as variables' values do), the row in use highlighted, so
@@ -70,11 +70,11 @@ Time runs from the interpreter's tick counter, not the wall clock, so tests are 
   - One record alone (a dictionary) shows as a two-column field/value table: no separate concept.
   - Saves as JSON with "Remember between visits". Sheet text gets `table Songs = [title, artist, length] 3 rows` for lesson checks.
   - Full spec and the Data apps course outline: tutorials Project doc `data-apps-and-tables-plan`.
-- **Linked tables** *(advanced option, proposed 25 Nov 2026)*: two tables joined by a shared value, such as Playlists (name)
+- **Linked tables** *(advanced option, proposed 25 Nov 2026; field type built 25 Nov 2026: Links to <table>, README › Tables)*: two tables joined by a shared value, such as Playlists (name)
   and Songs (title, artist, playlist). "Songs in this playlist" is For each + a condition, as students already know. Later, a
   field type that links to another table (a dropdown of its rows when editing). Relational thinking without nesting; leads
   towards SQL. Higher level only, so beginners never see it.
-- **Nested view of linked tables** *(later, advanced, proposed 25 Nov 2026)*: in the read-only JSON view, an option such as
+- **Nested view of linked tables** *(advanced, proposed and built 25 Nov 2026)*: in the read-only JSON view, an option such as
   "Show Songs grouped by playlist" builds the nested version from two linked tables, to look at and copy, never to edit or
   store. Shows "store flat, send nested". Tutorials use it to show the idea; writing that conversion in code stays a task
   for the Python and web courses. Only after linked tables.
@@ -95,7 +95,9 @@ tabs don't). Scroll areas clip and scroll. Design mode shows a tree in the sideb
 
 Play sound (built-in set), vibrate, show a toast message, copy text. Each is a small action; sound needs a user gesture first.
 
-- **Sound object** *(proposed 25 Nov 2026, next media addition)*: plays a sound by name, like the Image object shows a picture.
+- **Sound object** *(proposed and built 25 Nov 2026, README › Sound and Video. FreePD closed in 2025, so the built-in
+  pack is eight sounds made in code (CC0, `tools/make-sounds.mjs`); FreePD tracks can be added from a mirror by the
+  manual workflow once the mirror is checked)*: plays a sound by name, like the Image object shows a picture.
   - **Built-in starter pack:** about 6–8 short instrumental tracks (trimmed to about 30 s) from FreePD (CC0, no credit
     required; credit kept anyway: title and "FreePD, CC0" beside each), served by the site, so every school gets the same
     tracks with nothing to set up. Works offline, so clips and lesson checks can use it.
@@ -103,7 +105,7 @@ Play sound (built-in set), vibrate, show a toast message, copy text. Each is a s
     with a size cap per upload (project storage in the browser is about 5 MB in all; built-in tracks don't count).
   - Actions: play, stop; a "Sound is playing" condition and an "ended" trigger later. A table field can name a track, so a
     playlist row plays its sound when clicked (Data apps course).
-- **Video object** *(later option)*: link only, never uploaded (video is too big for project storage).
+- **Video object** *(built 25 Nov 2026, with Open link; Safari/iPad playback of Commons WebM still to check)*: link only, never uploaded (video is too big for project storage).
   - Default source: **Wikimedia Commons** (or any direct video file link, e.g. the Internet Archive or a school's own web
     storage), played in the browser's own player: no ads, no recommendations, no tracking, clear licences. Show the file's
     credit and licence (often CC BY-SA). Check Safari/iPad playback of Commons' WebM files before relying on it.

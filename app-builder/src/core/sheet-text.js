@@ -5,7 +5,7 @@
 //   screen Home
 //   variable Minutes = 0
 //   list Journal = ["a", "b"]
-//   table Songs = [title, artist, length] 3 rows          (any variable, list or table can end "(remembered)")
+//   table Songs = [title, artist, length] 3 rows    (a linked field: playlist (links to Playlists))          (any variable, list or table can end "(remembered)")
 //   object SaveButton (button) text "Save"                 (a sound adds  sound calm, a video  link "https://…")
 //   event: when SaveButton is clicked | do: Add 15 to variable Minutes; Set TotalText text to "You've " & Minutes
 //   event: when SaveButton is clicked > when TotalText text = "x" | do: ...      (a sub-event repeats its parents)
@@ -35,7 +35,7 @@ export function sheetText(project) {
   const out = [];
   const val = (v) => JSON.stringify(v);
   for (const v of project.variables || []) {
-    const line = v.table ? `table ${v.name} = [${(v.table.fields || []).map((f) => f.name).join(', ')}] ${v.value.length} row${v.value.length === 1 ? '' : 's'}`
+    const line = v.table ? `table ${v.name} = [${(v.table.fields || []).map((f) => (f.type === 'link' ? `${f.name} (links to ${f.to})` : f.name)).join(', ')}] ${v.value.length} row${v.value.length === 1 ? '' : 's'}`
       : Array.isArray(v.value) ? `list ${v.name} = ${val(v.value)}` : `variable ${v.name} = ${val(v.value)}`;
     out.push(line + (v.remember ? ' (remembered)' : ''));
   }

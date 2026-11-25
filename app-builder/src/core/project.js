@@ -76,6 +76,40 @@ export const isList = (v) => Array.isArray(v?.value) && !v.table;
 export const tableFields = (v) => (v?.table?.fields || []).map((f) => f.name);
 export const FIELD_TYPES = [['text', 'Text'], ['number', 'Number']];
 
+// Linked tables (advanced): a field of type 'link' holds the first field's value (the key) of a row in another
+// table, such as a song's playlist naming a row of Playlists. It is text underneath, so For each + a condition
+// finds "the songs in this playlist"; the sidebar shows a dropdown of that table's keys and marks broken links.
+export const linkKeys = (project, tableName) => {
+  const t = project.variables.find((v) => v.name === tableName && v.table);
+  const key = t?.table.fields[0]?.name;
+  return key ? t.value.map((r) => String(r[key] ?? '')) : [];
+};
+// tables that link to this one: [{ table, field }]
+export const linksTo = (project, tableName) => project.variables.filter(isTable)
+  .flatMap((v) => v.table.fields.filter((f) => f.type === 'link' && f.to === tableName).map((f) => ({ table: v, field: f })));
+// a key changed in the sidebar: rows that linked to the old key follow it
+export function renameKey(project, tableName, from, to) {
+  if (from === to || from === '') return 0;
+  let n = 0;
+  for (const { table, field } of linksTo(project, tableName)) for (const r of table.value) if (r[field.name] === from) { r[field.name] = to; n++; }
+  return n;
+}
+// The nested view (read only): each row of a table with, inside it, the rows of a table that link to it, e.g.
+// Playlists with their Songs. "Store flat, send nested": built to look at and copy, never stored or edited.
+export function nestedView(project, parentName, childName, fieldName) {
+  const parent = project.variables.find((v) => v.name === parentName && v.table);
+  const child = project.variables.find((v) => v.name === childName && v.table);
+  const key = parent?.table.fields[0]?.name;
+  if (!parent || !child || !key) return [];
+  return parent.value.map((r) => ({ ...r, [childName]: child.value.filter((c) => c[fieldName] === r[key])
+    .map((c) => Object.fromEntries(Object.entries(c).filter(([k]) => k !== fieldName))) }));
+}
+
+// a table is deleted: fields that linked to it become plain text (their values stay)
+export function unlinkTable(project, tableName) {
+  for (const { field } of linksTo(project, tableName)) { field.type = 'text'; delete field.to; }
+}
+
 // What a Table object shows: its chosen columns (blank = every field, in order) of the table it shows.
 export function tableColumns(project, inst) {
   const v = project.variables.find((x) => x.name === inst.source && x.table);
@@ -128,7 +162,7 @@ export function pasteRows(table, text, { row = 1, field } = {}) {
   const fields = table.table.fields;
   let cells = parseCells(text);
   let col = Math.max(0, fields.findIndex((f) => f.name === field));
-  if (cells.length && cells[0].length > 1 && cells[0].every((c, i) => fields[col + i] && c.toLowerCase() === fields[col + i].name.toLowerCase())) cells = cells.slice(1);
+  if (cells.length > 1 && cells[0].every((c, i) => fields[col + i] && c.toLowerCase() === fields[col + i].name.toLowerCase())) cells = cells.slice(1);
   if (!cells.length) return { rows: 0, skipped: 0 };
   let skipped = 0;
   const writes = [];
@@ -196,6 +230,7 @@ export function checkProject(p) {
   if (!p || typeof p !== 'object' || !Array.isArray(p.screens) || !p.screens.length) throw new Error('This file is not an app project.');
   p.variables ||= [];
   for (const v of p.variables) if (v.table) { v.table.fields ||= []; if (!Array.isArray(v.value)) v.value = []; }
+  for (const v of p.variables) for (const f of v.table?.fields || []) if (f.type === 'link' && !p.variables.some((t) => t.table && t.name === f.to && t !== v)) { f.type = 'text'; delete f.to; }
   p.assets ||= [];
   p.sounds ||= [];
   p.device ||= 'phone'; // projects from before the Web page option were phone-sized

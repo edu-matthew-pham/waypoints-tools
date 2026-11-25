@@ -207,3 +207,33 @@ test('paste rows from a spreadsheet: header skipped, numbers checked, rows added
   r = pasteRows(t, 'Zed\nYo', { row: 1, field: 'artist' });
   assert.deepEqual([t.value[0].artist, t.value[1].artist], ['Zed', 'Yo']);
 });
+
+test('linked tables: keys, renaming a key or a table, deleting a table, the nested view', async () => {
+  const { linkKeys, renameKey, unlinkTable, nestedView } = await import('../src/core/project.js');
+  const p = newProject('Linked');
+  p.features = { level: 4 };
+  p.variables.push(
+    { name: 'Playlists', table: { fields: [{ name: 'name', type: 'text' }] }, value: [{ name: 'Study' }, { name: 'Gym' }] },
+    { name: 'Songs', table: { fields: [{ name: 'title', type: 'text' }, { name: 'playlist', type: 'link', to: 'Playlists' }] },
+      value: [{ title: 'Calm', playlist: 'Study' }, { title: 'Run', playlist: 'Gym' }, { title: 'Read', playlist: 'Study' }] },
+  );
+  assert.deepEqual(linkKeys(p, 'Playlists'), ['Study', 'Gym']);
+  assert.match(sheetText(p), /table Songs = \[title, playlist \(links to Playlists\)\] 3 rows/);
+  assert.deepEqual(nestedView(p, 'Playlists', 'Songs', 'playlist'), [
+    { name: 'Study', Songs: [{ title: 'Calm' }, { title: 'Read' }] },
+    { name: 'Gym', Songs: [{ title: 'Run' }] },
+  ]);
+  p.variables[0].value[0].name = 'Focus';
+  assert.equal(renameKey(p, 'Playlists', 'Study', 'Focus'), 2);
+  assert.deepEqual(p.variables[1].value.map((r) => r.playlist), ['Focus', 'Gym', 'Focus']);
+  renameVariable(p, 'Playlists', 'Lists');
+  assert.equal(p.variables[1].table.fields[1].to, 'Lists');
+  // a linked field is text to the app: For each + a condition finds a playlist's songs
+  const rt = new Runtime(p); rt.start();
+  assert.equal(rt.evalExpr('item(Songs, 1).playlist', { picked: new Map(), loop: [] }), 'Focus');
+  unlinkTable(p, 'Lists');
+  assert.equal(p.variables[1].table.fields[1].type, 'text');
+  // a project whose link points at a missing table loads with that field as text
+  const q = structuredClone(p); q.variables[1].table.fields[1] = { name: 'playlist', type: 'link', to: 'Gone' };
+  assert.equal(checkProject(q).variables[1].table.fields[1].type, 'text');
+});

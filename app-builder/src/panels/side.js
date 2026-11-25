@@ -1,7 +1,7 @@
 // Left panel: one project tree (screens > objects > copies) plus whole-app variables.
 import { h } from '../ui/dom.js';
 import { OBJECT_KINDS } from '../core/catalog.js';
-import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue, sizeOf, isList, isTable, newTable, fieldValue, FIELD_TYPES, pasteRows } from '../core/project.js';
+import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue, sizeOf, isList, isTable, newTable, fieldValue, FIELD_TYPES, pasteRows, linkKeys, linksTo, renameKey, unlinkTable, nestedView } from '../core/project.js';
 import { openMenu } from '../ui/menu.js';
 import { openObjectPicker } from '../ui/object-picker.js';
 import { renameInput } from '../ui/rename-input.js';
@@ -245,18 +245,41 @@ function tableSection() {
           ...FIELD_TYPES.map(([t, label]) => ({ label: (f.type === t ? '✓ ' : '') + label, disabled: f.type === t, fn: () => {
             const bad = v.value.filter((r) => fieldValue(t, r[f.name]).error).length;
             if (bad) { hooks.notify(`${bad} row${bad === 1 ? ' has' : 's have'} text in ${f.name} that isn't a number. Change ${bad === 1 ? 'it' : 'them'} first.`); return; }
-            f.type = t; for (const r of v.value) r[f.name] = fieldValue(t, r[f.name]).value; hooks.commit();
+            f.type = t; delete f.to; for (const r of v.value) r[f.name] = fieldValue(t, r[f.name]).value; hooks.commit();
           } })),
+          // advanced: link this field to another table's rows (by that table's first field)
+          ...(fi > 0 ? S.project.variables.filter((t) => isTable(t) && t !== v).map((t) => ({ label: (f.type === 'link' && f.to === t.name ? '✓ ' : '') + `Links to ${t.name}`, 'data-ab': `link-to:${t.name}`,
+            disabled: f.type === 'link' && f.to === t.name, fn: () => {
+              f.type = 'link'; f.to = t.name; for (const r of v.value) r[f.name] = fieldValue('text', r[f.name]).value; hooks.commit();
+              hooks.notify(`${f.name} now names a row of ${t.name} (by its ${t.table.fields[0]?.name ?? 'first field'}).`);
+            } })) : []),
           fi > 0 ? { label: 'Move left', fn: () => { fields.splice(fi - 1, 0, fields.splice(fi, 1)[0]); hooks.commit(); } } : null,
           fields.length > 1 ? { label: 'Delete field', danger: true, fn: () => { fields.splice(fi, 1); for (const r of v.value) delete r[f.name]; hooks.commit(); } } : null,
-        ] }); } }, f.name, h('small', { class: 'ftype' }, f.type === 'number' ? ' 123' : ' abc')));
+        ] }); } }, f.name, h('small', { class: 'ftype' }, f.type === 'number' ? ' 123' : f.type === 'link' ? ` → ${f.to}` : ' abc')));
     };
-    const cellInput = (r, ri, f) => h('input', { class: 'cell' + (f.type === 'number' ? ' num' : ''), value: String(r[f.name] ?? ''), 'aria-label': `${v.name} row ${ri + 1} ${f.name}`, 'data-ab': `cell:${v.name}:${ri + 1}:${f.name}`,
+    const cellInput = (r, ri, f) => (f.type === 'link' ? linkCell(r, ri, f) : textCell(r, ri, f));
+    // a linked field: choose one of the other table's keys (a value that isn't one shows as broken)
+    const linkCell = (r, ri, f) => {
+      const keys = linkKeys(S.project, f.to), cur = String(r[f.name] ?? '');
+      const broken = cur !== '' && !keys.includes(cur);
+      return h('select', { class: 'cell link' + (broken ? ' broken' : ''), 'aria-label': `${v.name} row ${ri + 1} ${f.name}`, 'data-ab': `cell:${v.name}:${ri + 1}:${f.name}`,
+        title: broken ? `No row of ${f.to} is called "${cur}"` : `A row of ${f.to}`,
+        onchange: (e) => { r[f.name] = e.target.value; commitKeepFocus(e.target); } },
+        h('option', { value: '' }, '—'),
+        broken ? h('option', { value: cur, selected: true }, `${cur} (missing)`) : null,
+        keys.filter((k, i) => k !== '' && keys.indexOf(k) === i).map((k) => h('option', { value: k, selected: k === cur }, k)));
+    };
+    const textCell = (r, ri, f) => h('input', { class: 'cell' + (f.type === 'number' ? ' num' : ''), value: String(r[f.name] ?? ''), 'aria-label': `${v.name} row ${ri + 1} ${f.name}`, 'data-ab': `cell:${v.name}:${ri + 1}:${f.name}`,
       inputmode: f.type === 'number' ? 'decimal' : null,
       onchange: (e) => {
         const res = fieldValue(f.type, e.target.value);
         if (res.error) { hooks.notify(`${f.name} holds numbers: ${res.error}.`); e.target.value = String(r[f.name] ?? ''); return; }
-        r[f.name] = res.value; commitKeepFocus(e.target);
+        const before = r[f.name];
+        r[f.name] = res.value;
+        // a key (first field) that other tables link to: their rows follow the new name
+        const moved = f === fields[0] && typeof before === 'string' && !v.value.some((x) => x !== r && x[f.name] === before) ? renameKey(S.project, v.name, before, String(res.value)) : 0;
+        commitKeepFocus(e.target);
+        if (moved) hooks.notify(`${moved} linked row${moved === 1 ? '' : 's'} now say${moved === 1 ? 's' : ''} "${res.value}".`);
       },
       // pasting cells from a spreadsheet (more than one cell) fills the table from here, adding rows as needed
       onpaste: (e) => {
@@ -283,7 +306,7 @@ function tableSection() {
       queueMicrotask(() => document.querySelector(`[data-ab="cell:${v.name}:${v.value.length}:${fields[0]?.name}"]`)?.focus());
     } }, '+ Row');
     const pasteBtn = h('button', { class: 'btn small', type: 'button', 'data-ab': `paste-rows:${v.name}`, title: 'Paste rows copied from a spreadsheet',
-      onclick: () => pasteDialog(v) }, '📋 Paste rows');
+      onclick: () => pasteDialog(v) }, 'Paste rows');
     const jsonBtn = h('button', { class: 'btn small', type: 'button', 'aria-pressed': String(jsonOpen.has(v.name)), 'data-ab': `json:${v.name}`, title: 'See the table as JSON: a list of records, the shape JavaScript and Python use',
       onclick: () => { if (jsonOpen.has(v.name)) jsonOpen.delete(v.name); else jsonOpen.add(v.name); hooks.refresh(); } }, '{ } JSON');
     return h('div', { class: 'table-var' },
@@ -296,10 +319,15 @@ function tableSection() {
         h('span', { class: 'muted start-count' }, `${v.value.length} row${v.value.length === 1 ? '' : 's'} at start`),
         h('span', { class: 'now', 'data-now': v.name }, nowText(v.name)),
         rememberBtn(v),
-        h('button', { class: 'icon danger', title: 'Delete table', onclick: () => { S.project.variables = S.project.variables.filter((x) => x !== v); hooks.commit(); } }, '×')),
+        h('button', { class: 'icon danger', title: 'Delete table', onclick: () => {
+          const links = linksTo(S.project, v.name).filter((l) => l.table !== v);
+          unlinkTable(S.project, v.name);
+          S.project.variables = S.project.variables.filter((x) => x !== v); hooks.commit();
+          if (links.length) hooks.notify(`${links.map((l) => `${l.table.name}.${l.field.name}`).join(', ')} no longer link${links.length === 1 ? 's' : ''} anywhere (now plain text).`);
+        } }, '×')),
       grid,
       h('div', { class: 'tbl-tools' }, addRowBtn, pasteBtn, jsonBtn),
-      jsonOpen.has(v.name) ? h('pre', { class: 'json', 'data-ab': `json-view:${v.name}`, 'aria-label': `${v.name} as JSON` }, JSON.stringify(v.value, null, 2)) : null,
+      jsonOpen.has(v.name) ? jsonView(v) : null,
       h('div', { class: 'tbl-live', 'data-now-table': v.name }, liveTable(v.name)));
   });
   return [
@@ -314,6 +342,28 @@ function tableSection() {
 }
 
 // Commit, then put the cursor back where the user tabbed or clicked to (the sidebar is redrawn on commit).
+// The JSON view of a table: the rows as a list of records. When another table links to this one, it can also show
+// the nested version (each row with its linked rows inside), built from the flat tables to look at and copy.
+const nestedOpen = new Map(); // table name -> 'Child.field' shown nested, or ''
+function jsonView(v) {
+  const links = linksTo(S.project, v.name).filter((l) => l.table !== v);
+  const pick = nestedOpen.get(v.name) || '';
+  const [child, field] = pick.split('.');
+  const nested = pick && links.some((l) => l.table.name === child && l.field.name === field);
+  const text = JSON.stringify(nested ? nestedView(S.project, v.name, child, field) : v.value, null, 2);
+  const copy = h('button', { class: 'btn small', type: 'button', 'data-ab': `json-copy:${v.name}`, onclick: () => {
+    navigator.clipboard?.writeText(text).then(() => hooks.notify('Copied.'), () => hooks.notify('Could not copy here: select the text and copy it.'));
+  } }, 'Copy');
+  return h('div', { class: 'json-wrap' },
+    links.length ? h('label', { class: 'json-nest' }, h('span', {}, 'Show '),
+      h('select', { class: 'ctl', 'data-ab': `json-nest:${v.name}`, 'aria-label': `Show ${v.name} as`, onchange: (e) => { nestedOpen.set(v.name, e.target.value); hooks.refresh(); } },
+        h('option', { value: '' }, `${v.name} only (as stored)`),
+        links.map((l) => h('option', { value: `${l.table.name}.${l.field.name}`, selected: pick === `${l.table.name}.${l.field.name}` }, `${l.table.name} grouped by ${l.field.name} (nested)`)))) : null,
+    nested ? h('p', { class: 'muted small' }, `Each row of ${v.name} with its ${child} inside. Built from the two flat tables to look at or copy: the app still keeps them flat, so changing a ${child} row changes one place.`) : null,
+    h('pre', { class: 'json', 'data-ab': `json-view:${v.name}`, 'aria-label': `${v.name} as JSON` }, text),
+    copy);
+}
+
 // Paste rows: a box to paste cells copied from a spreadsheet (one row per line). They are added after the last row,
 // in field order; a first line with the field names is skipped.
 function pasteDialog(v) {

@@ -41,6 +41,7 @@ export function renameVariable(project, from, to) {
   const v = project.variables.find((x) => x.name === from);
   if (!v) return;
   v.name = to;
+  for (const t of project.variables) for (const f of t.table?.fields || []) if (f.type === 'link' && f.to === from) f.to = to;
   for (const s of project.screens) {
     for (const o of s.objects) for (const i of o.instances) if (i.source === from) i.source = to; // List and Table components showing it
     eachItem(s.events, (item, entry) => {

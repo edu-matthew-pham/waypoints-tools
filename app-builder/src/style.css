@@ -460,7 +460,7 @@ select.ctl { padding-right: 6px; }
 .tbl-edit td .icon.danger { opacity: .35; }
 .tbl-edit tr:hover .icon.danger, .tbl-edit tr:focus-within .icon.danger { opacity: 1; }
 .tbl-edit .addf { width: 1.8em; }
-.tbl-tools { display: flex; gap: 6px; margin: 6px 0; }
+.tbl-tools { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
 .btn.small { padding: 3px 9px; font-size: 13px; }
 pre.json { max-height: 220px; overflow: auto; background: #f6f7fb; border: 1px solid #dfe3ec; border-radius: 8px; padding: 8px; font-size: 12px; margin: 6px 0; }
 .tbl-live { display: none; }
@@ -507,3 +507,10 @@ table.live td.chg { animation: nowbump .8s ease-out; background: var(--accent-so
 .vid-ph { flex: 1; display: grid; place-content: center; text-align: center; gap: 6px; color: #cfd4de; font-size: 13px; padding: 10px; }
 .vid-big { font-size: 34px; }
 p.small, .muted.small { font-size: 12px; }
+
+/* linked fields and the nested view */
+.tbl-edit select.cell.link { width: 100%; font: inherit; font-size: 13px; border: 1px solid transparent; background: #f6f8fd; border-radius: 4px; padding: 2px; }
+.tbl-edit select.cell.link.broken { background: #fdecec; color: #b3261e; border-color: #f0b4b0; }
+.json-nest { display: flex; align-items: center; gap: 6px; font-size: 13px; margin: 6px 0; }
+.json-nest select { flex: 1; min-width: 0; font-size: 13px; }
+.json-wrap > .btn { margin-top: 4px; }

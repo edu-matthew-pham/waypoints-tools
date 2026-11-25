@@ -124,3 +124,31 @@ Level 4 (or a lesson allow-list that names a table action). Plan: tutorials Proj
 - **Sheet text:** `table Songs = [title, artist, length] 3 rows (remembered)`; Add a row reads
   `Add a row to table Songs: title = Title.text, length = int(Length.text)`.
 - Tests: `tests/tables.test.js`.
+- **Paste rows:** paste cells copied from a spreadsheet into any cell (fills from there, adding rows) or use
+  **Paste rows** (adds them after the last row). A first row repeating the field names is skipped; a number field given
+  text stops the paste and says where.
+- **The clicked row** of a Table (or List) object stays highlighted until the data it shows changes.
+- **Linked tables (advanced):** a field's menu offers **Links to <table>** (not on the first field). The field then holds
+  the other table's first-field value (its key) and is edited with a dropdown; a value that matches no row shows as
+  missing. Renaming a key in the sidebar updates the rows that link to it; renaming the table updates the link; deleting it
+  turns the field back into text. To the app it is text, so "the songs in this playlist" is For each + a condition.
+  Sheet text: `table Songs = [title, playlist (links to Playlists)] 3 rows`.
+- **Nested view (read only):** the JSON view of a table that others link to can show it nested ("Songs grouped by
+  playlist"): each row with its linked rows inside, to look at and copy. The app still stores the tables flat.
+
+## Sound and Video (25 Nov 2026)
+
+- **Sound object** (Media, level 2+): a play button with the sound's title and credit. Properties: the sound, Listen,
+  + Upload sound (up to about 1 MB, kept in the project). Built-in sounds are files in `sounds/` beside App Builder:
+  eight of App Builder's own (chime, pop, win, oops, beat, calm, upbeat, sleepy), made by `tools/make-sounds.mjs` and
+  released CC0, plus any listed in `sounds/extra.json` (`[{ name, file, title, credit }]`), which App Builder reads at
+  start. The manual workflow **App Builder: add FreePD sounds** downloads FreePD tracks (CC0; FreePD closed in 2025,
+  so from a mirror you have checked), trims them to 30 s and lists them there.
+- **Video object** (Media, level 2+): a link, never an upload. A Wikimedia Commons file page (or any `.webm`/`.mp4`
+  link) plays in the browser's own player with a credit link to its page. YouTube (youtube-nocookie) plays only when the
+  app's **Allow YouTube links** box is ticked (off by default).
+- **Events:** Play (from the start), Stop, Set sound to (a picker), "is playing", "finishes playing"; at level 3,
+  Set sound to the one named (an expression, so a table field can name each row's sound: `ClickedItem.sound`); Set video
+  to (a link expression); Open link in a new tab. A browser plays sound only after the user has clicked something.
+- Sheet text: `object Music (sound) text "" sound calm`, `object Clip (video) text "" link "https://…"`.
+- Tests: `tests/media.test.js`.
