@@ -203,13 +203,13 @@ export const RENDER = {
       const el = h('div', { class: 'pho' }), v = h('video', { playsinline: '', muted: '', autoplay: '' }), msg = h('div', { class: 'pho-msg' });
       v.muted = true;
       el.append(v, msg);
-      Object.assign(el, { _v: v, _msg: msg });
+      Object.assign(el, { _v: v, _msg: msg, _design: design });
       msg.textContent = design ? '📷 Camera: the user taps here to start it when the app runs' : '📷 Tap to start the camera';
       if (design) return el;
       el.addEventListener('click', () => { if (!el._stream) startCamera(el); });
       return el;
     },
-    write: (el) => { if (!el._stream && !el._starting && !media.camera()) el._msg.textContent = '📷 The camera is off for this app. To use it, tick Allow camera in the Photo\u2019s properties (Design).'; else if (!el._stream && !el._starting && !el._failed) el._msg.textContent = '📷 Tap to start the camera'; },
+    write: (el) => { if (el._design) return; if (!el._stream && !el._starting && !media.camera()) el._msg.textContent = '📷 The camera is off for this app. To use it, tick Allow camera in the Photo\u2019s properties (Design).'; else if (!el._stream && !el._starting && !el._failed) el._msg.textContent = '📷 Tap to start the camera'; },
     read: (v) => !!v.srcObject?.active,
     snapshot: (el) => {
       const v = el._v;
@@ -256,7 +256,7 @@ export const RENDER = {
       return el;
     },
     write: (el) => {
-      if (el._mr || el._failed || el._audio?.getAttribute('src')) return;
+      if (!el._audio || el._mr || el._failed || el._audio.getAttribute('src')) return; // no audio: in Design, keep its note
       el._msg.textContent = media.mic() ? '🎙 Tap ● to record' : '🎙 The microphone is off for this app. To use it, tick Allow microphone in the Recorder\u2019s properties (Design).';
     },
     // what the stage reports: a finished recording, the recording starting, or the trim handles moved

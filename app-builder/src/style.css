@@ -721,3 +721,5 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
 @media (max-width: 1500px) { .top .tag:not(.lvl) { display: none; } }
 .top select.ctl { max-width: 170px; }
 @media (max-width: 1200px) { .top select.ctl { max-width: 130px; } .top .btn:not(.primary):not(.icon-only) svg { display: none; } }
+
+.rec-trim[hidden] { display: none; }
