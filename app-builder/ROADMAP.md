@@ -266,6 +266,19 @@ object + shared events). Now, objects reset when you go to a screen; whole-app v
 most needs, so this waits. Check then: how it shows in Design (edited once, not per screen), a screen that hides it, and
 names (it would clash with a same-named object on a screen).
 
+## 12. An everyday tool, like Word or Sites *(idea, 26 Nov 2026, Matthew; not planned in detail)*
+
+Taught in Year 7, then used by any student in any subject, the way they use Word, Excel or Google Sites: a science data
+logger, a revision quiz, a budget, a timeline. No accounts, so school approval is easier. Gaps, biggest first:
+1. **Share by link.** A link that opens just the working app (the standalone player, `src/player.js`). Most apps fit in
+   the link itself, compressed after `#`, so no server; apps with photos or recordings need the file (or 2).
+2. **Work in one browser.** Projects live on one device unless saved; saving to Google Drive or OneDrive would close the
+   gap without App Builder running accounts.
+3. **Easy layout and good-looking defaults** (§5; and the visual refresh before v1).
+4. **Templates:** a gallery of starting points (quiz, tracker, photo log), fed by the samples plan.
+5. **Teacher confidence:** a "for teachers" page (what it is, privacy, collecting work) and time being reliable in class.
+6. **iPad and phone,** at least for running apps.
+
 ## Suggested order
 
 Done (24–25 Nov 2026): toggle, slider, keys, timers, image and assets, lists, tables, linked tables, nested view, paste
