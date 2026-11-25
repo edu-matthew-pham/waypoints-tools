@@ -234,7 +234,7 @@ export function creatureStats() {
     screens: [{
       id: 'main', name: 'Creatures',
       objects: [
-        obj('Title', 'text', [inst('k0', 24, 20, 342, 34, 'Click a creature')]),
+        obj('Title', 'text', [inst('t0', 24, 20, 342, 34, 'Click a creature')]),
         obj('Creature', 'image', stats.map(([n, p, s, d, a, pic], i) => ({ ...inst('k' + i, 30 + i * 115, 70, 100, 100, n, { name: n, power: p, speed: s, defence: d, ability: a }), image: pic })),
           [{ name: 'name', value: '' }, { name: 'power', value: 0 }, { name: 'speed', value: 0 }, { name: 'defence', value: 0 }, { name: 'ability', value: '' }]),
         obj('NameText', 'text', [inst('k10', 24, 200, 342, 34, '')]),

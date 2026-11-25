@@ -191,7 +191,7 @@ export class EventSheet extends HTMLElement {
   }
 
   _editItem(kind, ev, list, idx, entry) {
-    this._sel = ev.id;
+    if (this._sel !== ev.id) { this._sel = ev.id; this.render(); } // changing a condition or action selects its event too
     openItemDialog(this, {
       kind, entry, draft: structuredClone(list[idx]), isNew: false,
       onDone: (d) => { list[idx] = d; this._changed(); },

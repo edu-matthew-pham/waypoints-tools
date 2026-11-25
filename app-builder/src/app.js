@@ -221,3 +221,18 @@ embed.start({
   reset: (p) => loadProject(p),
   get: () => S.project,
 });
+
+// Several copies of App Builder can share one project (a lesson's build steps pass the same ?store=). When another
+// copy saves it, take its version, so moving to the next step carries on from the same app.
+window.addEventListener('storage', (e) => {
+  if (e.key !== STORE_KEY || !e.newValue || e.newValue === JSON.stringify(S.project)) return;
+  try {
+    const p = checkProject(JSON.parse(e.newValue)); applyParams(p);
+    const tab = S.tab;
+    setProject(p); // keeps the open screen when it still exists
+    S.selId = null;
+    refresh();
+    setTab(tab); // restarts the open view's preview on the new project
+    embed.report(S.project);
+  } catch { /* a broken copy elsewhere: keep ours */ }
+});

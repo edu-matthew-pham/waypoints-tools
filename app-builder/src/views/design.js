@@ -63,7 +63,7 @@ export function initDesign(root) {
             onDone: () => { renamingIvar = null; renderProps(); },
             onSave: (nv) => { renameInstVar(screen(), obj.name, v.name, nv); renamingIvar = null; hooks.commit(); } })
           : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingIvar = obj.name + '.' + v.name; renderProps(); } }, v.name),
-        h('input', { class: 'ctl small', value: String(cur), 'aria-label': `${v.name} for this copy`, onchange: (e) => { inst.vars[v.name] = parseValue(e.target.value); hooks.commit(); } }),
+        h('input', { class: 'ctl small', value: String(cur), 'data-ab': 'objvar:' + v.name, 'aria-label': `${v.name} for this copy`, onchange: (e) => { inst.vars[v.name] = parseValue(e.target.value); hooks.commit(); } }),
         h('button', { class: 'icon danger', title: `Remove ${v.name} from every ${obj.name}`, onclick: () => {
           obj.instanceVars = obj.instanceVars.filter((x) => x !== v);
           obj.instances.forEach((i) => delete i.vars[v.name]);
@@ -71,8 +71,8 @@ export function initDesign(root) {
         } }, '×'));
     });
     const addVar = (() => {
-      const name = h('input', { class: 'ctl', placeholder: 'Variable name', 'aria-label': 'Variable name' });
-      const val = h('input', { class: 'ctl small', placeholder: 'start', value: '0', 'aria-label': 'Starting value' });
+      const name = h('input', { class: 'ctl', placeholder: 'Variable name', 'aria-label': 'Variable name', 'data-ab': 'new-objvar-name' });
+      const val = h('input', { class: 'ctl small', placeholder: 'start', value: '0', 'aria-label': 'Starting value', 'data-ab': 'new-objvar-value' });
       const go = () => {
         const nm = name.value.trim();
         if (!nm) return;
@@ -82,7 +82,8 @@ export function initDesign(root) {
         hooks.commit();
       };
       name.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
-      return h('div', { class: 'add-row' }, name, val, h('button', { class: 'btn', onclick: go, title: 'Add' }, '+'));
+      val.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      return h('div', { class: 'add-row' }, name, val, h('button', { class: 'btn', onclick: go, title: 'Add', 'data-ab': 'new-objvar-add' }, '+'));
     })();
 
     // extra fields for components that have more than text and size

@@ -112,9 +112,14 @@ export function checkProject(p) {
   p.assets ||= [];
   p.device ||= 'phone'; // projects from before the Web page option were phone-sized
   p.features ||= { level: 4 }; // older projects: nothing hidden
+  const seen = new Set();
   for (const s of p.screens) {
     s.objects ||= []; s.events ||= [];
-    for (const o of s.objects) { o.instanceVars ||= []; o.instances ||= []; }
+    for (const o of s.objects) {
+      o.instanceVars ||= []; o.instances ||= [];
+      // every copy needs its own id (selecting, dragging and picking go by id): rename any repeat
+      for (const i of o.instances) { let id = String(i.id ?? ''); if (!id || seen.has(id)) { let n = 1; while (seen.has(`${id || 'i'}-${n}`)) n++; id = `${id || 'i'}-${n}`; } i.id = id; seen.add(id); }
+    }
   }
   return p;
 }
