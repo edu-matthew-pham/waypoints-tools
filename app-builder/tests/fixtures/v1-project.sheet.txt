@@ -1,0 +1,54 @@
+variable Chosen = ""
+list Journal = []
+variable Saved = 0 (remembered)
+list People = ["Ana","Ben"] (remembered)
+table Kinds = [kind] 2 rows
+table Clips = [note, n, picture, sound, kind (links to Kinds)] 1 row (remembered)
+all screens
+event: when HomeBtn is clicked | do: Call Bump with by = 1; Go to screen Choose
+function Bump(by)
+event: always | do: Add by to variable Saved
+screen Choose
+object Title (text) text "Values journal"
+object Prompt (text) text "Which value did you show today?"
+object KindnessPicture (image) text "Kindness"
+object KindnessButton (button) text "Kindness"
+object CouragePicture (image) text "Courage"
+object CourageButton (button) text "Courage"
+object HonestyPicture (image) text "Honesty"
+object HonestyButton (button) text "Honesty"
+object RespectPicture (image) text "Respect"
+object RespectButton (button) text "Respect"
+event: when KindnessButton is clicked | do: Set variable Chosen to "Kindness"; Go to screen Describe
+event: when CourageButton is clicked | do: Set variable Chosen to "Courage"; Go to screen Describe
+event: when HonestyButton is clicked | do: Set variable Chosen to "Honesty"; Go to screen Describe
+event: when RespectButton is clicked | do: Set variable Chosen to "Respect"; Go to screen Describe
+screen Describe
+object Question (text) text ""
+object TextInput (text input) text ""
+object AddButton (button) text "Add to my journal"
+event: when On start of screen | do: Set Question text to "What did you do to show " & Chosen & "?"
+event: when AddButton is clicked | do: Add uppercase(Chosen) & ": " & TextInput.text to the end of list Journal; Go to screen Journal
+screen Journal
+object Heading (text) text "My values in action"
+object Count (text) text ""
+object List (list) text "" shows Journal
+object AnotherButton (button) text "Add another"
+event: when On start of screen | do: Set Count text to "Entries: " & count(Journal)
+event: when AnotherButton is clicked | do: Go to screen Choose
+screen Media
+object Pad (drawing) text ""
+object Cam (photo) text ""
+object Mic (recorder) text ""
+object Player (sound) text "" sound calm
+object Clip (video) text "" link "https://commons.wikimedia.org/wiki/File:Example.webm"
+object Show (image) text ""
+object KeepBtn (button) text "Button"
+object HomeBtn (button) text "Button"
+object Msg (text) text "Text"
+object Gallery (table) text "" shows Clips
+object Names (list) text "" shows People
+event: when Pad is drawn on | do: Set Msg text to "lines: " & Pad.lines
+event: when KeepBtn is clicked | do: Add a row to table Clips: note = "drawn", n = Saved, picture = Pad.picture, kind = "drawing"; Set Show picture to the one in Pad.picture; Clear Pad
+event: when A photo is taken with Cam | do: Add a row to table Clips: note = "photo", n = 0, picture = Cam.picture, kind = "photo"
+event: when Mic finishes a recording | do: Set Player sound to the one named Mic.sound; Play Player

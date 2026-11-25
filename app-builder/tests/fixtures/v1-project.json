@@ -1,0 +1,928 @@
+{
+  "version": 1,
+  "name": "v1 everything",
+  "features": {
+    "level": 4
+  },
+  "variables": [
+    {
+      "name": "Chosen",
+      "value": ""
+    },
+    {
+      "name": "Journal",
+      "value": []
+    },
+    {
+      "name": "Saved",
+      "value": 0,
+      "remember": true
+    },
+    {
+      "name": "People",
+      "value": [
+        "Ana",
+        "Ben"
+      ],
+      "remember": true
+    },
+    {
+      "name": "Kinds",
+      "table": {
+        "fields": [
+          {
+            "name": "kind",
+            "type": "text"
+          }
+        ]
+      },
+      "value": [
+        {
+          "kind": "drawing"
+        },
+        {
+          "kind": "photo"
+        }
+      ]
+    },
+    {
+      "name": "Clips",
+      "remember": true,
+      "table": {
+        "fields": [
+          {
+            "name": "note",
+            "type": "text"
+          },
+          {
+            "name": "n",
+            "type": "number"
+          },
+          {
+            "name": "picture",
+            "type": "picture"
+          },
+          {
+            "name": "sound",
+            "type": "sound"
+          },
+          {
+            "name": "kind",
+            "type": "link",
+            "to": "Kinds"
+          }
+        ]
+      },
+      "value": [
+        {
+          "note": "start",
+          "n": 1,
+          "picture": "star",
+          "sound": "calm",
+          "kind": "drawing"
+        }
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "id": "choose",
+      "name": "Choose",
+      "objects": [
+        {
+          "name": "Title",
+          "kind": "text",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "j1",
+              "x": 24,
+              "y": 30,
+              "w": 342,
+              "h": 36,
+              "text": "Values journal",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "Prompt",
+          "kind": "text",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "j2",
+              "x": 24,
+              "y": 74,
+              "w": 342,
+              "h": 40,
+              "text": "Which value did you show today?",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "KindnessPicture",
+          "kind": "image",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "v0p",
+              "x": 58,
+              "y": 140,
+              "w": 100,
+              "h": 100,
+              "text": "Kindness",
+              "visible": true,
+              "vars": {},
+              "image": "heart"
+            }
+          ]
+        },
+        {
+          "name": "KindnessButton",
+          "kind": "button",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "v0b",
+              "x": 24,
+              "y": 250,
+              "w": 165,
+              "h": 46,
+              "text": "Kindness",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "CouragePicture",
+          "kind": "image",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "v1p",
+              "x": 235,
+              "y": 140,
+              "w": 100,
+              "h": 100,
+              "text": "Courage",
+              "visible": true,
+              "vars": {},
+              "image": "star"
+            }
+          ]
+        },
+        {
+          "name": "CourageButton",
+          "kind": "button",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "v1b",
+              "x": 201,
+              "y": 250,
+              "w": 165,
+              "h": 46,
+              "text": "Courage",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "HonestyPicture",
+          "kind": "image",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "v2p",
+              "x": 58,
+              "y": 340,
+              "w": 100,
+              "h": 100,
+              "text": "Honesty",
+              "visible": true,
+              "vars": {},
+              "image": "tick"
+            }
+          ]
+        },
+        {
+          "name": "HonestyButton",
+          "kind": "button",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "v2b",
+              "x": 24,
+              "y": 450,
+              "w": 165,
+              "h": 46,
+              "text": "Honesty",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "RespectPicture",
+          "kind": "image",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "v3p",
+              "x": 235,
+              "y": 340,
+              "w": 100,
+              "h": 100,
+              "text": "Respect",
+              "visible": true,
+              "vars": {},
+              "image": "smile"
+            }
+          ]
+        },
+        {
+          "name": "RespectButton",
+          "kind": "button",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "v3b",
+              "x": 201,
+              "y": 450,
+              "w": 165,
+              "h": 46,
+              "text": "Respect",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "id": "jv0",
+          "else": false,
+          "conds": [
+            {
+              "type": "onClicked",
+              "target": "KindnessButton"
+            }
+          ],
+          "actions": [
+            {
+              "type": "setVar",
+              "var": "Chosen",
+              "value": "\"Kindness\""
+            },
+            {
+              "type": "goToScreen",
+              "screen": "describe"
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "jv1",
+          "else": false,
+          "conds": [
+            {
+              "type": "onClicked",
+              "target": "CourageButton"
+            }
+          ],
+          "actions": [
+            {
+              "type": "setVar",
+              "var": "Chosen",
+              "value": "\"Courage\""
+            },
+            {
+              "type": "goToScreen",
+              "screen": "describe"
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "jv2",
+          "else": false,
+          "conds": [
+            {
+              "type": "onClicked",
+              "target": "HonestyButton"
+            }
+          ],
+          "actions": [
+            {
+              "type": "setVar",
+              "var": "Chosen",
+              "value": "\"Honesty\""
+            },
+            {
+              "type": "goToScreen",
+              "screen": "describe"
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "jv3",
+          "else": false,
+          "conds": [
+            {
+              "type": "onClicked",
+              "target": "RespectButton"
+            }
+          ],
+          "actions": [
+            {
+              "type": "setVar",
+              "var": "Chosen",
+              "value": "\"Respect\""
+            },
+            {
+              "type": "goToScreen",
+              "screen": "describe"
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "describe",
+      "name": "Describe",
+      "objects": [
+        {
+          "name": "Question",
+          "kind": "text",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "j3",
+              "x": 24,
+              "y": 40,
+              "w": 342,
+              "h": 64,
+              "text": "",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "TextInput",
+          "kind": "input",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "j4",
+              "x": 24,
+              "y": 120,
+              "w": 342,
+              "h": 46,
+              "text": "",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "AddButton",
+          "kind": "button",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "j5",
+              "x": 24,
+              "y": 184,
+              "w": 342,
+              "h": 48,
+              "text": "Add to my journal",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "id": "jd1",
+          "else": false,
+          "conds": [
+            {
+              "type": "onStart"
+            }
+          ],
+          "actions": [
+            {
+              "type": "setText",
+              "target": "Question",
+              "value": "\"What did you do to show \" & Chosen & \"?\""
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "jd2",
+          "else": false,
+          "conds": [
+            {
+              "type": "onClicked",
+              "target": "AddButton"
+            }
+          ],
+          "actions": [
+            {
+              "type": "listAdd",
+              "value": "uppercase(Chosen) & \": \" & TextInput.text",
+              "list": "Journal"
+            },
+            {
+              "type": "goToScreen",
+              "screen": "journal"
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "journal",
+      "name": "Journal",
+      "objects": [
+        {
+          "name": "Heading",
+          "kind": "text",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "j6",
+              "x": 24,
+              "y": 30,
+              "w": 342,
+              "h": 36,
+              "text": "My values in action",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "Count",
+          "kind": "text",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "j7",
+              "x": 24,
+              "y": 72,
+              "w": 342,
+              "h": 30,
+              "text": "",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "List",
+          "kind": "list",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "j8",
+              "x": 24,
+              "y": 110,
+              "w": 342,
+              "h": 360,
+              "text": "",
+              "visible": true,
+              "vars": {},
+              "source": "Journal"
+            }
+          ]
+        },
+        {
+          "name": "AnotherButton",
+          "kind": "button",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "j9",
+              "x": 24,
+              "y": 490,
+              "w": 342,
+              "h": 48,
+              "text": "Add another",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "id": "jj1",
+          "else": false,
+          "conds": [
+            {
+              "type": "onStart"
+            }
+          ],
+          "actions": [
+            {
+              "type": "setText",
+              "target": "Count",
+              "value": "\"Entries: \" & count(Journal)"
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "jj2",
+          "else": false,
+          "conds": [
+            {
+              "type": "onClicked",
+              "target": "AnotherButton"
+            }
+          ],
+          "actions": [
+            {
+              "type": "goToScreen",
+              "screen": "choose"
+            }
+          ],
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": "so15btl",
+      "name": "Media",
+      "objects": [
+        {
+          "name": "Pad",
+          "kind": "drawing",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "iqijij4",
+              "x": 250,
+              "y": 24,
+              "w": 300,
+              "h": 300,
+              "text": "",
+              "visible": true,
+              "vars": {},
+              "color": "#222222",
+              "pen": 4,
+              "background": ""
+            }
+          ]
+        },
+        {
+          "name": "Cam",
+          "kind": "photo",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "i1ghbxo",
+              "x": 250,
+              "y": 340,
+              "w": 300,
+              "h": 225,
+              "text": "",
+              "visible": true,
+              "vars": {},
+              "shutter": true
+            }
+          ]
+        },
+        {
+          "name": "Mic",
+          "kind": "recorder",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "ik5xkcz",
+              "x": 250,
+              "y": 488,
+              "w": 300,
+              "h": 104,
+              "text": "",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "Player",
+          "kind": "sound",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "igvzdwj",
+              "x": 270,
+              "y": 540,
+              "w": 260,
+              "h": 52,
+              "text": "",
+              "visible": true,
+              "vars": {},
+              "sound": "calm"
+            }
+          ]
+        },
+        {
+          "name": "Clip",
+          "kind": "video",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "idarxz1",
+              "x": 240,
+              "y": 392,
+              "w": 320,
+              "h": 200,
+              "text": "",
+              "visible": true,
+              "vars": {},
+              "link": "https://commons.wikimedia.org/wiki/File:Example.webm"
+            }
+          ]
+        },
+        {
+          "name": "Show",
+          "kind": "image",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "ivh2que",
+              "x": 340,
+              "y": 472,
+              "w": 120,
+              "h": 120,
+              "text": "",
+              "visible": true,
+              "vars": {},
+              "image": "star"
+            }
+          ]
+        },
+        {
+          "name": "KeepBtn",
+          "kind": "button",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "ibuizmt",
+              "x": 325,
+              "y": 546,
+              "w": 150,
+              "h": 46,
+              "text": "Button",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "HomeBtn",
+          "kind": "button",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "ipejq9q",
+              "x": 325,
+              "y": 546,
+              "w": 150,
+              "h": 46,
+              "text": "Button",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "Msg",
+          "kind": "text",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "i8ezv9p",
+              "x": 290,
+              "y": 560,
+              "w": 220,
+              "h": 32,
+              "text": "Text",
+              "visible": true,
+              "vars": {}
+            }
+          ]
+        },
+        {
+          "name": "Gallery",
+          "kind": "table",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "i99pgjt",
+              "x": 170,
+              "y": 352,
+              "w": 460,
+              "h": 240,
+              "text": "",
+              "visible": true,
+              "vars": {},
+              "source": "Clips",
+              "columns": ""
+            }
+          ]
+        },
+        {
+          "name": "Names",
+          "kind": "list",
+          "instanceVars": [],
+          "instances": [
+            {
+              "id": "io31fqn",
+              "x": 229,
+              "y": 372,
+              "w": 342,
+              "h": 220,
+              "text": "",
+              "visible": true,
+              "vars": {},
+              "source": "People"
+            }
+          ]
+        }
+      ],
+      "events": [
+        {
+          "id": "ejx3mvy",
+          "else": false,
+          "conds": [
+            {
+              "type": "onDrawn",
+              "target": "Pad"
+            }
+          ],
+          "actions": [
+            {
+              "type": "setText",
+              "target": "Msg",
+              "value": "\"lines: \" & Pad.lines"
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "erbdytp",
+          "else": false,
+          "conds": [
+            {
+              "type": "onClicked",
+              "target": "KeepBtn"
+            }
+          ],
+          "actions": [
+            {
+              "type": "tableAdd",
+              "table": "Clips",
+              "values": {
+                "note": "\"drawn\"",
+                "n": "Saved",
+                "picture": "Pad.picture",
+                "sound": "",
+                "kind": "\"drawing\""
+              }
+            },
+            {
+              "type": "setImageFrom",
+              "target": "Show",
+              "value": "Pad.picture"
+            },
+            {
+              "type": "clearDrawing",
+              "target": "Pad"
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "eobqg9i",
+          "else": false,
+          "conds": [
+            {
+              "type": "onPhotoTaken",
+              "target": "Cam"
+            }
+          ],
+          "actions": [
+            {
+              "type": "tableAdd",
+              "table": "Clips",
+              "values": {
+                "note": "\"photo\"",
+                "n": "0",
+                "picture": "Cam.picture",
+                "sound": "",
+                "kind": "\"photo\""
+              }
+            }
+          ],
+          "children": []
+        },
+        {
+          "id": "e0g58aa",
+          "else": false,
+          "conds": [
+            {
+              "type": "onRecorded",
+              "target": "Mic"
+            }
+          ],
+          "actions": [
+            {
+              "type": "setSoundNamed",
+              "target": "Player",
+              "name": "Mic.sound"
+            },
+            {
+              "type": "playSound",
+              "target": "Player"
+            }
+          ],
+          "children": []
+        }
+      ]
+    }
+  ],
+  "allScreens": {
+    "events": [
+      {
+        "id": "ezuscq3",
+        "else": false,
+        "conds": [
+          {
+            "type": "onClicked",
+            "target": "HomeBtn"
+          }
+        ],
+        "actions": [
+          {
+            "type": "callFunction",
+            "fn": "Bump",
+            "args": {
+              "by": "1"
+            }
+          },
+          {
+            "type": "goToScreen",
+            "screen": "choose"
+          }
+        ],
+        "children": []
+      }
+    ]
+  },
+  "functions": [
+    {
+      "id": "f2cn4h1",
+      "name": "Bump",
+      "params": [
+        "by"
+      ],
+      "events": [
+        {
+          "id": "e8nwne2",
+          "else": false,
+          "conds": [],
+          "actions": [
+            {
+              "type": "addTo",
+              "var": "Saved",
+              "value": "by"
+            }
+          ],
+          "children": []
+        }
+      ]
+    }
+  ],
+  "assets": [],
+  "sounds": [],
+  "device": "phone",
+  "allowCamera": true,
+  "allowMic": true,
+  "allowYoutube": false
+}

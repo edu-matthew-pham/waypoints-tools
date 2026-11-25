@@ -9,6 +9,7 @@
 import { collectRefs, refFile, bytesToDataUrl } from './core/media.js';
 import { makeZip, readZip, isZip } from './core/zip.js';
 import { getFile, keepAs, available } from './media-store.js';
+import { VERSION } from './version.js';
 
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
   'audio/mpeg': 'mp3', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
@@ -18,7 +19,7 @@ const fileName = (name, ext) => (name || 'app').replace(/[^\w-]+/g, '-') + ext;
 
 // -> { filename, data (string or Uint8Array), type, missing }
 export async function buildSave(project, remembered = null) {
-  const out = structuredClone(project);
+  const out = { appBuilder: VERSION, ...structuredClone(project) }; // which version saved it, for later upgrades
   if (remembered && Object.keys(remembered).length) out.remembered = remembered;
   const refs = [...collectRefs(out)];
   if (!refs.length) return { filename: fileName(project.name, '.app.json'), data: JSON.stringify(out, null, 2), type: 'application/json', missing: 0 };
@@ -68,7 +69,7 @@ export async function readProjectFile(file) {
 }
 function split(p, missing) {
   const remembered = p.remembered && typeof p.remembered === 'object' ? p.remembered : null;
-  delete p.remembered; delete p.mediaFiles;
+  delete p.remembered; delete p.mediaFiles; delete p.appBuilder;
   return { project: p, remembered, missing };
 }
 export { refFile };

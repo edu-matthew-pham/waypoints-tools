@@ -8,6 +8,7 @@ import { renameInput } from '../ui/rename-input.js';
 import { renameObject, renameVariable, renameField, nameProblem, renameFunction, functionNamesTaken } from '../core/rename.js';
 import { newFunction, functionUsers, paramNames, functionsOf } from '../core/functions.js';
 import { pickPicture, pickSound } from '../ui/upload.js';
+import { VERSION } from '../version.js';
 import { assetName, imageData, imageNames, soundNames, soundAssetName } from '../core/assets.js';
 import { uploadSize, isRef } from '../core/media.js';
 import { keep, usage, mb } from '../media-store.js';
@@ -191,7 +192,7 @@ export function renderSide(el) {
           S.project.sounds.push({ name, ...await keep(data), title: fileName.replace(/\.[^.]*$/, '') }); hooks.commit();
         }, hooks.notify), 'data-ab': 'side-upload-sound' }, '+ Upload sound'))] : []),
     ...(S.project.assets.length || S.project.sounds?.length ? [storageNote()] : []),
-    h('p', { class: 'muted legal' }, 'Free for education. Commercial use by permission only.'),
+    h('p', { class: 'muted legal' }, h('span', { 'data-ab': 'version' }, `App Builder ${VERSION}. `), 'Free for education. Commercial use by permission only.'),
   );
 }
 

@@ -290,3 +290,13 @@ Pictures made while the app runs. Like an upload, each one is a file in the medi
 While the app runs, the Run tab reads **■ Stop**; clicking it stops the app and goes back to the tab you came from.
 Restart (on the Run tab) starts it again from the beginning. Leaving the Run tab any other way also stops it.
 
+## Versions (26 Nov 2026)
+
+`src/version.js` holds the version, shown under the sidebar and written into saved files (`"appBuilder"` in
+`project.json`). **v1 (git tag `app-builder-v1`) is what the tutorials are built on**: they copy App Builder in from that
+tag once, and main keeps moving without touching lessons or clips. Fixes to v1 are 1.0.1, 1.0.2… (tag
+`app-builder-v1.0.1`…), taken into the tutorials only when a lesson needs them (each copy re-records every App Builder clip).
+New features are 1.1, 1.2…. Promise: projects saved in v1 keep opening in later versions. `tests/v1-compat.test.js` opens and
+runs a frozen v1 project (`tests/fixtures/v1-project.json`, made by `tools/make-v1-fixture.mjs`) and checks its sheet text,
+which the tutorials' lesson checks read. If it fails, add an upgrade step in `checkProject`; don't edit the fixture.
+
