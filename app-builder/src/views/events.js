@@ -5,7 +5,7 @@ import { h } from '../ui/dom.js';
 import { Runner } from '../run-engine.js';
 import { scopeFor, exprScopeFor } from '../core/project.js';
 import { allObjectsScreen, sharedEventsFor } from '../core/shared.js';
-import { showsAsList, givesValue } from '../core/functions.js';
+import { showsAsList, givesValue, missingObjectNotes } from '../core/functions.js';
 import { newEvent } from '../core/project.js';
 import { renameParam, addParam, removeParam, paramNamesTaken, nameProblem } from '../core/rename.js';
 import { renameInput } from '../ui/rename-input.js';
@@ -148,7 +148,8 @@ export function initEvents(root) {
         // what the add menus offer: functions once Level 4 has them or the project does
         const features = S.rf && { ...S.rf, functions: showFunctions() };
         sheet.setData({ events: fn ? fn.events : all ? S.project.allScreens.events : screen().events, scope: scopeFor(S.project, scr), exprScope: exprScopeFor(S.project, scr, fn),
-          mode: S.guided ? 'guided' : 'edit', canPick: true, features, where: fn ? 'function' : all ? 'all' : 'screen', sequence });
+          mode: S.guided ? 'guided' : 'edit', canPick: true, features, where: fn ? 'function' : all ? 'all' : 'screen', sequence,
+          notes: fn ? missingObjectNotes(S.project, fn) : [] });
       }
       if (active) later();
     },

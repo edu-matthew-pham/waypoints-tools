@@ -1,13 +1,14 @@
 // <event-sheet>: the reusable event editor / viewer.
 //
 //   const el = document.createElement('event-sheet');
-//   el.setData({ events, scope, exprScope, mode, canPick, features, where, sequence });
+//   el.setData({ events, scope, exprScope, mode, canPick, features, where, sequence, notes });
 //       mode: 'guided'   clean read view; click a condition/action to edit it in a dialog (beginners)
 //             'edit'     quick edit: dropdowns and boxes inline (confident users)
 //             'readonly' static (lesson pages, Run tab)
 //       features: resolved feature list (core/features.js), or null for everything
 //       where: 'screen' | 'all' | 'function' (a function's body: no triggers; Set return value is offered)
 //       sequence: show a function as one list of actions ("When called, do ..."), with no conditions or sub-events
+//       notes: extra warnings [{ id, message }] shown on events (e.g. a function using an object a calling screen lacks)
 //   el.addEventListener('sheetchange', ...)   // the events array was edited in place
 //   el.addEventListener('pickobject', e => e.detail.apply(name) / e.detail.cancel())
 //        // the host lets the user click an object on screen; only offered when canPick is true
@@ -39,7 +40,8 @@ export class EventSheet extends HTMLElement {
     this._timers = new Map();
   }
 
-  setData({ events, scope, exprScope, mode = 'edit', canPick = false, features = null, where = 'screen', sequence = false }) {
+  setData({ events, scope, exprScope, mode = 'edit', canPick = false, features = null, where = 'screen', sequence = false, notes = [] }) {
+    this._notes = notes;
     this._where = where;
     this._sequence = sequence;
     this._events = events;
@@ -82,7 +84,7 @@ export class EventSheet extends HTMLElement {
   // ---------- building ----------
   _build() {
     const issues = new Map();
-    for (const i of validateSheet(this._events, 0, [], false, this._where === 'function')) issues.set(i.id, [...(issues.get(i.id) || []), i.message]);
+    for (const i of [...validateSheet(this._events, 0, [], false, this._where === 'function'), ...(this._notes || [])]) issues.set(i.id, [...(issues.get(i.id) || []), i.message]);
     const root = h('div', { class: 'es' + (this.guided ? ' guided' : this.edit ? '' : ' ro') });
     if (this._sequence) { root.append(this._sequenceRow(issues)); return root; }
     if (!this._events.length) {

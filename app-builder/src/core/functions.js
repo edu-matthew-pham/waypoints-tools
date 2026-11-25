@@ -10,6 +10,8 @@
 // by name, like the All screens sheet: an action on an object the calling screen doesn't have is skipped there.
 // No DOM in here.
 import { newEvent, uid } from './project.js';
+import { sharedEventsFor, itemObjects, objectNames } from './shared.js';
+import { CONDITIONS, ACTIONS } from './catalog.js';
 
 export const functionsOf = (project) => project?.functions || [];
 export const findFunction = (project, name) => functionsOf(project).find((f) => f.name === name);
@@ -78,3 +80,45 @@ export function functionUsers(project, name) {
 export const usesReturn = (project) => functionsOf(project).some(givesValue);
 // every parameter name of every function (a whole-app variable can't take one)
 export const paramNames = (project) => functionsOf(project).flatMap((f) => f.params);
+
+// the functions a list of events calls, following calls inside functions too
+function reachable(project, events, out = new Set()) {
+  const names = new Set(functionsOf(project).map((f) => f.name));
+  for (const ev of allEvents(events)) {
+    for (const it of [...(ev.conds || []), ...(ev.actions || [])]) {
+      const called = it.type === 'callFunction' && it.fn ? [it.fn] : [];
+      for (const v of Object.values(it)) {
+        if (typeof v === 'string') called.push(...callsInExpr(v, names));
+        else if (v && typeof v === 'object') for (const x of Object.values(v)) if (typeof x === 'string') called.push(...callsInExpr(x, names));
+      }
+      for (const n of called) {
+        if (out.has(n)) continue;
+        out.add(n);
+        const f = findFunction(project, n);
+        if (f) reachable(project, f.events, out);
+      }
+    }
+  }
+  return out;
+}
+// the screens whose events (their own or All screens events that run there) call a function, directly or not
+export const screensCalling = (project, name) =>
+  (project.screens || []).filter((s) => reachable(project, [...sharedEventsFor(project, s), ...(s.events || [])]).has(name));
+
+// Warnings for a function's events: a part that mentions an object some calling screen doesn't have.
+// There (as in Construct) a check on it is false and an action on it does nothing. Returns [{ id, message }].
+export function missingObjectNotes(project, fn) {
+  const callers = screensCalling(project, fn.name);
+  const known = objectNames(project);
+  const out = [];
+  for (const ev of allEvents(fn.events)) {
+    const names = new Set();
+    for (const c of ev.conds || []) itemObjects(c, CONDITIONS[c.type], known, names);
+    for (const a of ev.actions || []) itemObjects(a, ACTIONS[a.type], known, names);
+    for (const n of names) {
+      const lacking = callers.filter((s) => !s.objects.some((o) => o.name === n)).map((s) => s.name);
+      if (lacking.length) out.push({ id: ev.id, message: `${lacking.join(', ')} ${lacking.length === 1 ? 'has' : 'have'} no ${n} but ${lacking.length === 1 ? 'calls' : 'call'} ${fn.name}: there, a check on ${n} counts as false and an action on it does nothing.` });
+    }
+  }
+  return out;
+}

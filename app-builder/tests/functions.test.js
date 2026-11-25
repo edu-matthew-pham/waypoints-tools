@@ -273,3 +273,21 @@ test('helpers: new functions get a free name; users list where a function is cal
   assert.deepEqual(functionUsers(p, 'MyFunction'), ['Home', 'All screens', 'MyFunction2']);
   assert.deepEqual(starterOf(p).functions, []);
 });
+
+test('a function warns where it uses an object that a screen calling it lacks', async () => {
+  const { missingObjectNotes, screensCalling } = await import('../src/core/functions.js');
+  const { p, home, other } = app();
+  const saved = { id: 'fSaved', name: 'Saved', params: [], events: [
+    newEvent({ conds: [{ type: 'compareText', target: 'Note', op: '=', value: '""' }], actions: [{ type: 'addTo', value: '100', var: 'total' }] }),
+    newEvent({ else: true, actions: [{ type: 'addTo', value: '10', var: 'total' }] }),
+  ] };
+  p.functions.push(saved, fn('Wrap', [], [call('Saved')]));
+  home.events.push(newEvent({ conds: [click('Save')], actions: [call('Saved')] }));
+  assert.deepEqual(missingObjectNotes(p, saved), []); // only Home calls it, and Home has a Note
+  other.events.push(newEvent({ conds: [click('Save')], actions: [call('Wrap')] })); // Other calls it through Wrap
+  assert.deepEqual(screensCalling(p, 'Saved').map((s) => s.name), ['Home', 'Other']);
+  const notes = missingObjectNotes(p, saved);
+  assert.equal(notes.length, 1);
+  assert.equal(notes[0].id, saved.events[0].id);
+  assert.match(notes[0].message, /^Other has no Note but calls Saved: there, a check on Note counts as false/);
+});

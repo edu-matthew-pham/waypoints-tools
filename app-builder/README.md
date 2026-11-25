@@ -96,8 +96,9 @@ guided dialog writes the `if()` from fill-in blanks.
 A function is a named list of actions any event can call, with parameters: **+ Function** under All screens in the
 side panel, then add parameters (`text`) and actions in the Events tab. An event runs it with **Call SaveEntry with
 text = Entry.text**; the function's actions run there and then, and the event carries on. Inside, a parameter is a
-plain name (`"Saved: " & text`). It works on any screen, with objects matched by name like the All screens sheet: an
-action on an object the screen doesn't have is skipped there (a condition on one is false).
+plain name (`"Saved: " & text`). It works on any screen, with objects matched by name, as in Construct: on a screen
+without an object, a check on it is false and an action on it does nothing. The function shows a warning on any part
+that uses an object a calling screen doesn't have.
 
 It starts as a plain list of actions. Small buttons on the function's name line open up more when a student needs it:
 
