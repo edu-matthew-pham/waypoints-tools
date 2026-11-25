@@ -118,7 +118,7 @@ export function initDesign(root) {
       const info = soundInfo(S.project, inst.sound);
       extra.push(h('label', { class: 'f wide' }, h('span', {}, 'Sound'), sel),
         h('div', { class: 'btn-row' }, listen,
-          h('button', { class: 'btn', type: 'button', 'data-ab': 'upload-sound', title: 'Upload your own sound (under about 1 MB)', onclick: () => pickSound(async ({ fileName, data }) => {
+          h('button', { class: 'btn', type: 'button', 'data-ab': 'upload-sound', title: 'Upload your own sound (under about 5 MB)', onclick: () => pickSound(async ({ fileName, data }) => {
             const name = soundAssetName(S.project, fileName);
             S.project.sounds.push({ name, ...await keep(data), title: fileName.replace(/\.[^.]*$/, '') });
             inst.sound = name; hooks.commit();

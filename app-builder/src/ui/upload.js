@@ -1,9 +1,17 @@
-// Pick a picture file and turn it into a data: URL small enough to keep inside the project file.
+// Pick a picture or sound file and turn it into a data: URL (the caller keeps it in the media store, media-store.js).
 // Photos are shrunk to at most 800 px; GIFs are kept as they are (so animations still play).
+// Size caps: with the media store (hundreds of MB) files can be bigger; without it uploads stay inside the project,
+// which has about 5 MB in all, so the old, smaller caps apply.
 import { h } from './dom.js';
+import { available } from '../media-store.js';
 
 const MAX_SIDE = 800;
-const MAX_BYTES = 1_500_000;
+const mbText = (n) => `${Math.round(n / 1e6)} MB`;
+// caps in bytes of the file itself: [with the media store, without it]
+const PICTURE_CAP = [5_000_000, 1_000_000];
+const SOUND_CAP = [5_000_000, 1_000_000];
+const cap = async ([big, small]) => ((await available()) ? big : small);
+const dataBytes = (url) => Math.round((url.length - url.indexOf(',') - 1) * 0.75);
 
 export function pickPicture(onReady, notify) {
   const input = h('input', { type: 'file', accept: 'image/png,image/jpeg,image/gif,image/webp' });
@@ -12,7 +20,8 @@ export function pickPicture(onReady, notify) {
     if (!file) return;
     try {
       const data = await toDataUrl(file);
-      if (data.length > MAX_BYTES) { notify('That picture is too big. Try a smaller one (under about 1 MB).'); return; }
+      const max = await cap(PICTURE_CAP);
+      if (dataBytes(data) > max) { notify(`That picture is too big. Try a smaller one (under about ${mbText(max)}).`); return; }
       onReady({ fileName: file.name, data });
     } catch {
       notify('Could not read that picture.');
@@ -39,17 +48,16 @@ async function toDataUrl(file) {
   return file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.85) : c.toDataURL('image/png');
 }
 
-// Pick a sound file and keep it as a data: URL in the project. Projects live in the browser (about 5 MB in all),
-// so each sound is capped: short clips and effects, not whole albums.
-const MAX_SOUND = 1_400_000; // data: URL length, about 1 MB of audio
+// Pick a sound file. Capped at about 5 MB (a few minutes of MP3), or about 1 MB with no media store.
 export function pickSound(onReady, notify) {
   const input = h('input', { type: 'file', accept: 'audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,.mp3,.m4a,.ogg,.wav' });
   input.addEventListener('change', async () => {
     const file = input.files[0];
     if (!file) return;
     try {
+      const max = await cap(SOUND_CAP);
+      if (file.size > max) { notify(`That sound is too big (keep it under about ${mbText(max)}: a shorter clip, or an MP3 at a lower quality).`); return; }
       const data = await readAsDataUrl(file);
-      if (data.length > MAX_SOUND) { notify('That sound is too big (keep it under about 1 MB: a short clip, or an MP3 at a lower quality).'); return; }
       onReady({ fileName: file.name, data });
     } catch {
       notify('Could not read that sound.');

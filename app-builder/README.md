@@ -181,7 +181,7 @@ Level 4 (or a lesson allow-list that names a table action). Plan: tutorials Proj
 ## Sound and Video (25 Nov 2026)
 
 - **Sound object** (Media, level 2+): a play button with the sound's title and credit. Properties: the sound, Listen,
-  + Upload sound (up to about 1 MB, kept in the media store, see below). Built-in sounds are files in `sounds/` beside App Builder:
+  + Upload sound (up to about 5 MB, kept in the media store, see below; about 1 MB in a browser without it). Built-in sounds are files in `sounds/` beside App Builder:
   eight of App Builder's own (chime, pop, win, oops, beat, calm, upbeat, sleepy), made by `tools/make-sounds.mjs` and
   released CC0, plus any listed in `sounds/extra.json` (`[{ name, file, title, credit }]`), which App Builder reads at
   start. The manual workflow **App Builder: add FreePD sounds** downloads FreePD tracks (CC0; FreePD closed in 2025,

@@ -271,7 +271,7 @@ rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever clas
 1. §8 Map view (built and live 26 Nov; snapshot still to do).
 2. §11 All screens sheet (built and live 26 Nov), then §11 Functions (built and live 26 Nov; agreed 26 Nov: smaller than media, help every app; media doesn't need
    them and they don't need media).
-3. §10 media store in IndexedDB (built 26 Nov; upload size caps of about 1 MB not yet raised).
+3. §10 media store in IndexedDB (built 26 Nov; upload caps raised from about 1 MB to about 5 MB for pictures and sounds).
 4. §10 Drawing and Photo, with the picture field and Set image to an expression.
 5. §10 Recorder and the sound field; zip Save and Open with the data made while running.
 6. §9 AI help, once how AI is used in class is decided.  7. Layout and tabs, yes/no fields, Grid.
