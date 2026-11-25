@@ -1,15 +1,16 @@
 // How each component looks: its picker icon and how it is drawn on the stage.
 // Keyed by the ids in core/components.js. Icons are tiny inline SVGs (trusted, static) that use currentColor.
 import { h } from './dom.js';
-import { isRef, isDataUrl } from '../core/media.js';
+import { isPictureValue, isSoundValue, refRange } from '../core/media.js';
 
 // name -> picture data; the app points this at the current project (uploads + built-ins)
 export const pictures = { lookup: () => '' };
 // name -> { src, title, credit } for sounds; link -> video source (core/assets.js videoSource). Set by the app.
-// camera: is the camera allowed for this app (project.allowCamera; off unless the teacher turns it on)
-export const media = { sound: () => null, video: () => ({ kind: 'none', why: 'No video link yet' }), camera: () => false };
-const isPicValue = (v) => isRef(v) || isDataUrl(v);
-const thumb = (v) => h('img', { class: 'cell-pic', src: pictures.lookup(v), alt: '' });
+// camera, mic: are they allowed for this app (project.allowCamera, allowMic; off unless the teacher turns them on)
+export const media = { sound: () => null, video: () => ({ kind: 'none', why: 'No video link yet' }), camera: () => false, mic: () => false };
+const isPicValue = isPictureValue;
+const thumb = (v) => (isSoundValue(v) ? h('span', { class: 'cell-snd' }, '🔊 Recording') : h('img', { class: 'cell-pic', src: pictures.lookup(v), alt: '' }));
+const startOf = (src) => refRange(src.replace(/^blob:[^#]*/, 'media:00000000'))?.[0] || 0;
 
 const svg = (body) => `<svg viewBox="0 0 48 48" width="44" height="44" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 
@@ -21,6 +22,7 @@ export const ICONS = {
   image:  svg('<rect x="7" y="9" width="34" height="30" rx="4"/><circle cx="17" cy="19" r="3.5"/><path d="M8 36l11-11 8 8 5-5 9 9"/>'),
   sound:  svg('<path d="M8 19h8l10-8v26l-10-8H8z"/><path d="M32 18a8 8 0 0 1 0 12M36 13a14 14 0 0 1 0 22"/>'),
   drawing: svg('<rect x="6" y="8" width="36" height="32" rx="4"/><path d="M13 31c4-9 8 2 12-6s6 2 10-4"/>'),
+  recorder: svg('<rect x="18" y="6" width="12" height="22" rx="6"/><path d="M11 22a13 13 0 0 0 26 0M24 35v7M17 42h14"/>'),
   photo:  svg('<path d="M6 16h8l3-5h14l3 5h8v22H6z"/><circle cx="24" cy="26" r="7"/>'),
   video:  svg('<rect x="5" y="11" width="38" height="26" rx="4"/><path d="M21 18v12l10-6z" fill="currentColor"/>'),
   list:   svg('<path d="M16 14h24M16 24h24M16 34h24"/><circle cx="9" cy="14" r="1.5" fill="currentColor"/><circle cx="9" cy="24" r="1.5" fill="currentColor"/><circle cx="9" cy="34" r="1.5" fill="currentColor"/>'),
@@ -63,7 +65,7 @@ export const RENDER = {
         const audio = h('audio', { preload: 'none' });
         el.append(audio);
         el._audio = audio;
-        el.querySelector('.snd-btn').addEventListener('click', () => { if (audio.paused) { audio.currentTime = 0; audio.play().catch(() => {}); } else audio.pause(); });
+        el.querySelector('.snd-btn').addEventListener('click', () => { if (audio.paused) { audio.currentTime = startOf(audio.getAttribute('src') || ''); audio.play().catch(() => {}); } else audio.pause(); });
       }
       return el;
     },
@@ -83,7 +85,7 @@ export const RENDER = {
       if (a.getAttribute('src') !== src) { a.pause(); if (src) a.setAttribute('src', src); else a.removeAttribute('src'); }
       if (el._seq !== (p.mediaSeq || 0)) {
         el._seq = p.mediaSeq || 0;
-        if (playing && src) { a.currentTime = 0; a.play().catch(() => a.dispatchEvent(new Event('pause'))); } else if (!playing) a.pause();
+        if (playing && src) { a.currentTime = startOf(src); a.play().catch(() => a.dispatchEvent(new Event('pause'))); } else if (!playing) a.pause();
       }
     },
   },
@@ -124,7 +126,7 @@ export const RENDER = {
       if (inner._key === key) return;
       inner._key = key;
       inner.replaceChildren(...(items.length
-        ? items.map((it, i) => h('div', { class: 'lst-row' + (p.selected === i + 1 ? ' sel' : ''), role: 'listitem', 'data-index': String(i + 1), 'aria-selected': p.selected === i + 1 ? 'true' : null }, isPicValue(it) ? thumb(it) : Array.isArray(it) ? it.join(', ') : String(it)))
+        ? items.map((it, i) => h('div', { class: 'lst-row' + (p.selected === i + 1 ? ' sel' : ''), role: 'listitem', 'data-index': String(i + 1), 'aria-selected': p.selected === i + 1 ? 'true' : null }, isPicValue(it) || isSoundValue(it) ? thumb(it) : Array.isArray(it) ? it.join(', ') : String(it)))
         : [h('div', { class: 'lst-empty' }, p.source ? 'Empty list' : 'Choose a list in Properties')]));
     },
   },
@@ -144,7 +146,7 @@ export const RENDER = {
         h('tbody', {}, rows.length
           ? rows.map((r, i) => h('tr', { class: 'lst-row tbl-row' + (p.selected === i + 1 ? ' sel' : ''), role: 'row', 'data-index': String(i + 1), 'aria-selected': p.selected === i + 1 ? 'true' : null }, fields.map((f) => {
             const v = r && f in r ? r[f] : '';
-            return (p.pictureFields?.includes(f) && v !== '') || isPicValue(v) ? h('td', { role: 'cell' }, thumb(v)) : cell('td', String(v));
+            return (p.pictureFields?.includes(f) && v !== '') || isPicValue(v) || isSoundValue(v) ? h('td', { role: 'cell' }, thumb(v)) : cell('td', String(v));
           })))
           : [h('tr', {}, h('td', { class: 'lst-empty', colspan: String(Math.max(1, fields.length)) }, 'No rows yet'))]))));
     },
@@ -221,6 +223,46 @@ export const RENDER = {
     },
     destroy: (el) => { el._stream?.getTracks().forEach((t) => t.stop()); el._stream = null; },
   },
+  // Records a short sound (up to 20 s) with the microphone, with its own Record/Stop and Play buttons, and two trim
+  // handles once there is a recording. The recording goes to the runtime as a file ({ blob, length }); the Player
+  // keeps it and passes on its reference. Trim moves only the play range (Recorder.sound gets #t=start,end).
+  recorder: {
+    make: (design) => {
+      const rec = h('button', { type: 'button', class: 'rec-btn', 'aria-label': 'Record', disabled: design ? true : null }, '●');
+      const play = h('button', { type: 'button', class: 'rec-play', 'aria-label': 'Play the recording', disabled: true }, '▶');
+      const msg = h('div', { class: 'rec-msg' }, design ? '🎙 Records when the app runs' : '🎙 Tap ● to record');
+      const from = h('input', { type: 'range', min: 0, max: 1, step: 0.1, value: 0, 'aria-label': 'Start' });
+      const to = h('input', { type: 'range', min: 0, max: 1, step: 0.1, value: 1, 'aria-label': 'End' });
+      const trim = h('div', { class: 'rec-trim', hidden: true }, h('span', {}, 'Trim'), from, to);
+      const el = h('div', { class: 'rec' }, h('div', { class: 'rec-row' }, rec, play, msg), trim);
+      Object.assign(el, { _rec: rec, _play: play, _msg: msg, _from: from, _to: to, _trim: trim, _len: 0 });
+      if (design) return el;
+      const audio = h('audio', { preload: 'auto' });
+      el.append(audio); el._audio = audio;
+      rec.addEventListener('click', () => (el._mr ? el._mr.stop() : startRecording(el)));
+      play.addEventListener('click', () => {
+        if (!audio.paused) { audio.pause(); return; }
+        audio.currentTime = Number(from.value); audio.play().catch(() => {});
+      });
+      audio.addEventListener('timeupdate', () => { if (audio.currentTime >= Number(to.value)) audio.pause(); });
+      audio.addEventListener('play', () => { play.textContent = '■'; });
+      audio.addEventListener('pause', () => { play.textContent = '▶'; });
+      const keepApart = (moved) => {
+        if (Number(to.value) - Number(from.value) < 0.3) { if (moved === from) from.value = Number(to.value) - 0.3; else to.value = Number(from.value) + 0.3; }
+        msg.textContent = trimText(el);
+      };
+      from.addEventListener('input', () => keepApart(from));
+      to.addEventListener('input', () => keepApart(to));
+      return el;
+    },
+    write: (el) => {
+      if (el._mr || el._failed || el._audio?.getAttribute('src')) return;
+      el._msg.textContent = media.mic() ? '🎙 Tap ● to record' : '🎙 The microphone is off for this app. To use it, tick Allow microphone in the Recorder\u2019s properties (Design).';
+    },
+    // what the stage reports: a finished recording, the recording starting, or the trim handles moved
+    read: (t) => { const el = t.closest('.rec'); return t === el ? el._value : { trim: [Number(el._from.value), Number(el._to.value)] }; },
+    destroy: (el) => { if (el._mr?.state === 'recording') { el._discard = true; el._mr.stop(); } el._stream?.getTracks().forEach((t) => t.stop()); },
+  },
   shape: {
     make: () => h('div', { class: 'box' }),
     write: (inner, p) => { if (inner.style.background !== p.color) inner.style.background = p.color; },
@@ -288,4 +330,57 @@ async function startCamera(el) {
       : e?.name === 'NotFoundError' || e?.name === 'OverconstrainedError' ? '📷 No camera was found on this device.'
         : '📷 The camera couldn\u2019t start. Is another app using it?');
   } finally { el._starting = false; }
+}
+
+// ---- recorder helpers ----
+const MAX_REC = 20; // seconds
+const trimText = (el) => `${Number(el._from.value).toFixed(1)}–${Number(el._to.value).toFixed(1)} s of ${el._len.toFixed(1)} s`;
+function report(el, value) { el._value = value; el.dispatchEvent(new Event('input', { bubbles: true })); }
+async function startRecording(el) {
+  const say = (t) => { el._msg.textContent = t; };
+  if (!media.mic()) return; // write() already says how to turn it on
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') { el._failed = true; say('🎙 This browser can\u2019t record here.'); return; }
+  el._failed = false;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  } catch (e) {
+    el._failed = true;
+    say(e?.name === 'NotAllowedError' || e?.name === 'SecurityError'
+      ? '🎙 The microphone is blocked: permission was refused, or this computer or browser doesn\u2019t allow it (some school devices block microphones).'
+      : e?.name === 'NotFoundError' ? '🎙 No microphone was found on this device.' : '🎙 The microphone couldn\u2019t start. Is another app using it?');
+    return;
+  }
+  if (!el.isConnected) { stream.getTracks().forEach((t) => t.stop()); return; }
+  const type = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'].find((t) => MediaRecorder.isTypeSupported?.(t)) || '';
+  const mr = new MediaRecorder(stream, type ? { mimeType: type } : undefined);
+  const chunks = [], t0 = performance.now();
+  Object.assign(el, { _mr: mr, _stream: stream, _discard: false });
+  el._rec.textContent = '■'; el._rec.setAttribute('aria-label', 'Stop recording'); el.classList.add('on');
+  el._audio.pause();
+  const tick = setInterval(() => {
+    const s = (performance.now() - t0) / 1000;
+    say(`Recording… ${Math.floor(s)} s (stops at ${MAX_REC} s)`);
+    if (s >= MAX_REC && mr.state === 'recording') mr.stop();
+  }, 200);
+  mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  mr.onstop = () => {
+    clearInterval(tick);
+    stream.getTracks().forEach((t) => t.stop());
+    el._mr = null; el._stream = null;
+    el._rec.textContent = '●'; el._rec.setAttribute('aria-label', 'Record again'); el.classList.remove('on');
+    if (el._discard || !chunks.length) return;
+    const len = Math.min(MAX_REC, (performance.now() - t0) / 1000);
+    const blob = new Blob(chunks, { type: mr.mimeType || type || 'audio/webm' });
+    el._len = len;
+    for (const r of [el._from, el._to]) r.max = len.toFixed(1);
+    el._from.value = 0; el._to.value = len.toFixed(1);
+    el._trim.hidden = false; el._play.disabled = false;
+    if (el._audio.src) URL.revokeObjectURL(el._audio.src);
+    el._audio.src = URL.createObjectURL(blob);
+    say(`Recorded ${len.toFixed(1)} s. Drag the handles to trim.`);
+    report(el, { blob, length: len });
+  };
+  mr.start(250);
+  report(el, { recording: true });
 }

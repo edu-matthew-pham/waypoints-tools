@@ -8,7 +8,7 @@ import { renameInput } from '../ui/rename-input.js';
 import { renameObject, renameVariable, renameField, nameProblem, renameFunction, functionNamesTaken } from '../core/rename.js';
 import { newFunction, functionUsers, paramNames, functionsOf } from '../core/functions.js';
 import { pickPicture } from '../ui/upload.js';
-import { assetName, imageData, imageNames } from '../core/assets.js';
+import { assetName, imageData, imageNames, soundNames } from '../core/assets.js';
 import { uploadSize, isRef } from '../core/media.js';
 import { keep, usage, mb } from '../media-store.js';
 import { S, screen, hooks, showAllScreens, showFunctions } from '../state.js';
@@ -280,6 +280,10 @@ function soundUsers(name) {
     for (const o of sc.objects) if (o.instances.some((i) => i.sound === name)) out.add(o.name);
   }
   eachEventWhere((ev, where) => { if (ev.actions.some((a) => a.type === 'setSound' && a.sound === name)) out.add(where); });
+  for (const t of S.project.variables.filter(isTable)) {
+    const sf = t.table.fields.filter((f) => f.type === 'sound');
+    if (t.value.some((r) => sf.some((f) => r[f.name] === name))) out.add('the table ' + t.name);
+  }
   return [...out];
 }
 
@@ -324,7 +328,7 @@ function tableSection() {
           onDone: () => { renamingField = null; hooks.refresh(); },
           onSave: (nv) => { renameField(S.project, v.name, f.name, nv); renamingField = null; hooks.commit(); } }));
       }
-      return h('th', {}, h('button', { class: 'link-name fld', type: 'button', 'data-ab': `field-menu:${v.name}.${f.name}`, title: `${f.name}: ${f.type === 'number' ? 'numbers' : f.type === 'picture' ? 'pictures' : 'text'}. Click for options`, 'aria-haspopup': 'menu',
+      return h('th', {}, h('button', { class: 'link-name fld', type: 'button', 'data-ab': `field-menu:${v.name}.${f.name}`, title: `${f.name}: ${f.type === 'number' ? 'numbers' : f.type === 'picture' ? 'pictures' : f.type === 'sound' ? 'sounds' : 'text'}. Click for options`, 'aria-haspopup': 'menu',
         onclick: (e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu({ x: r.left, y: r.bottom + 4, returnFocus: e.currentTarget, items: [
           { label: 'Rename', fn: () => { renamingField = `${v.name}.${f.name}`; hooks.refresh(); } },
           ...FIELD_TYPES.map(([t, label]) => ({ label: (f.type === t ? '✓ ' : '') + label, disabled: f.type === t, fn: () => {
@@ -340,9 +344,19 @@ function tableSection() {
             } })) : []),
           fi > 0 ? { label: 'Move left', fn: () => { fields.splice(fi - 1, 0, fields.splice(fi, 1)[0]); hooks.commit(); } } : null,
           fields.length > 1 ? { label: 'Delete field', danger: true, fn: () => { fields.splice(fi, 1); for (const r of v.value) delete r[f.name]; hooks.commit(); } } : null,
-        ] }); } }, f.name, h('small', { class: 'ftype' }, f.type === 'number' ? ' 123' : f.type === 'link' ? ` → ${f.to}` : f.type === 'picture' ? ' 🖼' : ' abc')));
+        ] }); } }, f.name, h('small', { class: 'ftype' }, f.type === 'number' ? ' 123' : f.type === 'link' ? ` → ${f.to}` : f.type === 'picture' ? ' 🖼' : f.type === 'sound' ? ' 🔊' : ' abc')));
     };
-    const cellInput = (r, ri, f) => (f.type === 'link' ? linkCell(r, ri, f) : f.type === 'picture' ? pictureCell(r, ri, f) : textCell(r, ri, f));
+    const cellInput = (r, ri, f) => (f.type === 'link' ? linkCell(r, ri, f) : f.type === 'picture' ? pictureCell(r, ri, f) : f.type === 'sound' ? soundCell(r, ri, f) : textCell(r, ri, f));
+    // a sound field: one of the app's sounds at the start (recordings made while the app runs fill it later)
+    const soundCell = (r, ri, f) => {
+      const cur = String(r[f.name] ?? ''), names = soundNames(S.project), made = isRef(cur) || cur.startsWith('data:');
+      return h('select', { class: 'cell', 'aria-label': `${v.name} row ${ri + 1} ${f.name}`, 'data-ab': `cell:${v.name}:${ri + 1}:${f.name}`,
+        onchange: (e) => { r[f.name] = e.target.value; commitKeepFocus(e.target); } },
+        h('option', { value: '' }, '—'),
+        made ? h('option', { value: cur, selected: true }, 'recorded in the app') : null,
+        cur && !made && !names.includes(cur) ? h('option', { value: cur, selected: true }, `${cur} (missing)`) : null,
+        names.map((n) => h('option', { value: n, selected: n === cur }, n)));
+    };
     // a picture field: one of the app's pictures at the start (pictures made while the app runs fill it later)
     const pictureCell = (r, ri, f) => {
       const cur = String(r[f.name] ?? ''), names = imageNames(S.project), made = isRef(cur) || cur.startsWith('data:');

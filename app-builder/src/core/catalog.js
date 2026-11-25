@@ -59,6 +59,11 @@ export const CONDITIONS = {
     params: [obj({ kinds: ['drawing'] })],
     help: 'Runs each time the user finishes a line. Drawing.lines is how many lines there are.',
   },
+  onRecorded: {
+    category: 'Object', label: '{target} finishes a recording', trigger: 'changed', object: 'target',
+    params: [obj({ kinds: ['recorder'] })],
+    help: 'Runs when the user stops recording (or it reaches 20 seconds). Recorder.sound is the recording, ready for a Sound or a table; Recorder.length is how long it is, in seconds.',
+  },
   onKey: {
     category: 'Keyboard', label: 'Key {key} is pressed', trigger: 'keyDown', keyed: true,
     params: [{ name: 'key', type: 'key' }],
@@ -250,7 +255,7 @@ export const ACTIONS = {
   setSoundNamed: {
     category: 'Object', label: 'Set {target} sound to the one named {name}',
     params: [obj({ kinds: ['sound'] }), expr('name', 'ClickedItem.sound')],
-    help: 'The name is worked out when the app runs, so a table can have a field naming each row\'s sound: ClickedItem.sound.',
+    help: 'Worked out when the app runs: a recording (Recorder.sound), a table field that holds one or names a sound (ClickedItem.sound), or a sound\'s name.',
     run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => {
       const name = fmt(rt.evalExpr(p.name, c));
       if (!rt.hasSound(name)) throw new ExprError(`There is no sound called "${name}"`);

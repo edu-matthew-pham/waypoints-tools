@@ -3,7 +3,7 @@
 // Used by the Events tab (compact preview) and the Run tab (full size).
 import { Player, localStore } from './player.js';
 import { h } from './ui/dom.js';
-import { isRef, isDataUrl, mediaSrc } from './core/media.js';
+import { isPictureValue, isSoundValue, mediaSrc } from './core/media.js';
 import { S } from './state.js';
 import { keepNow } from './media-store.js';
 
@@ -64,7 +64,7 @@ export function liveTable(name, w = lastNow) {
       h('thead', {}, h('tr', {}, h('th', { class: 'rn' }, '#'), fields.map((f) => h('th', {}, f)))),
       h('tbody', {}, rows.length ? rows.map((r, i) => h('tr', {}, h('td', { class: 'rn' }, String(i + 1)),
         fields.map((f) => h('td', { class: before && before[i]?.[f] !== r?.[f] ? 'chg' : null },
-        isRef(r?.[f]) || isDataUrl(r?.[f]) ? h('img', { class: 'cell-pic', src: mediaSrc(r[f]), alt: '' }) : r?.[f] === undefined ? '' : String(r[f])))))
+        isSoundValue(r?.[f]) ? '🔊 Recording' : isPictureValue(r?.[f]) ? h('img', { class: 'cell-pic', src: mediaSrc(r[f]), alt: '' }) : r?.[f] === undefined ? '' : String(r[f])))))
         : [h('tr', {}, h('td', { colspan: String(fields.length + 1), class: 'muted' }, 'No rows'))])));
 }
 export function showNow(w) {

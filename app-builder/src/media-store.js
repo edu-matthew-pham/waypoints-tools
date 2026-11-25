@@ -75,23 +75,23 @@ export async function keepBlob(blob) {
       : 'Could not keep that file in this browser.');
     return null;
   }
-  setMediaUrl(ref, URL.createObjectURL(blob));
+  setMediaUrl(ref, URL.createObjectURL(blob), blob.type);
   checkRoom();
   return ref;
 }
 // Keep a picture made while the app runs, and give its reference straight away (the runtime can't wait): the file
 // shows from memory now and is written to the store in the background. With no store, the data: URL itself.
-export function keepNow(dataUrl) {
-  const blob = toBlob(dataUrl);
+export function keepNow(data) {
+  const blob = data instanceof Blob ? data : toBlob(data);
   const ref = newRef(hasMediaUrl);
-  setMediaUrl(ref, URL.createObjectURL(blob));
+  setMediaUrl(ref, URL.createObjectURL(blob), blob.type);
   db().then(async (d) => {
     if (!d) return;
     persist();
     try { await tx(d, 'readwrite', (s) => s.put({ id: ref, blob, type: blob.type, size: blob.size, added: Date.now() })); checkRoom(); }
     catch (e) { notify(e?.name === 'QuotaExceededError' ? 'There is no room left in this browser to keep that picture. Save your project, then delete pictures you no longer need.' : 'Could not keep that picture in this browser.'); }
   });
-  return storeOk === false ? dataUrl : ref;
+  return storeOk === false && !(data instanceof Blob) ? data : ref; // a recording with no store lives in memory only
 }
 let storeOk; // known once the store has opened
 const toBlob = (dataUrl) => { const { type, bytes } = dataUrlToBytes(dataUrl); return new Blob([bytes], { type }); };
@@ -125,7 +125,7 @@ export async function load(value) {
   for (const ref of want) {
     try {
       const rec = await get(d, ref);
-      if (rec?.blob) setMediaUrl(ref, URL.createObjectURL(rec.blob)); else missing++;
+      if (rec?.blob) setMediaUrl(ref, URL.createObjectURL(rec.blob), rec.type || rec.blob.type); else missing++;
     } catch { missing++; }
   }
   return missing;

@@ -1,7 +1,7 @@
 // Pictures. A project keeps its uploads in project.assets = [{ name, data, size? }]: data is a media reference
 // (media:7f3a09c2, the file is in the browser's media store, see core/media.js) or, in older projects and saved
 // files, a data: URL. Built-in pictures are always available and need no upload.
-import { isRef, isDataUrl, mediaSrc } from './media.js';
+import { isRef, isDataUrl, mediaSrc, refRange } from './media.js';
 const svgUrl = (body, fill) => 'data:image/svg+xml,' + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><g fill="${fill}" stroke="none">${body}</g></svg>`);
 
@@ -60,6 +60,7 @@ export function addBuiltinSounds(list) {
 export const soundNames = (project) => [...Object.keys(BUILTIN_SOUNDS), ...(project.sounds || []).map((a) => a.name)];
 // { src, title, credit } for a sound name, or null
 export function soundInfo(project, name, base = sources.soundBase) {
+  if (isRef(name)) return { src: mediaSrc(name), title: 'Recording', credit: refRange(name) ? 'Trimmed' : '' };
   const up = (project.sounds || []).find((a) => a.name === name);
   if (up) return { src: mediaSrc(up.data), title: up.title || up.name, credit: 'Uploaded' };
   const b = BUILTIN_SOUNDS[name];

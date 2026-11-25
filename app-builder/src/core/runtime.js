@@ -17,7 +17,7 @@
 //    a condition that mentions it is false and an action that mentions it is skipped, quietly.
 
 import { soundNames, imageNames } from './assets.js';
-import { isRef, isDataUrl } from './media.js';
+import { isRef, isDataUrl, withRange } from './media.js';
 import { evaluate, parse, ExprError, fieldOf, isRecord, fmt } from './expr.js';
 import { CONDITIONS, ACTIONS, OBJECT_KINDS, normaliseKey } from './catalog.js';
 import { sharedEventsFor, objectNames, itemObjects } from './shared.js';
@@ -149,6 +149,19 @@ export class Runtime {
       // the user finished a line: value is how many lines there are now
       inst.props.lines = Math.max(0, Number(value) || 0);
       inst.drawn = true; // Drawing.picture is made afresh when next read
+    } else if (inst.kind === 'recorder') {
+      if (value?.recording !== undefined) { inst.props.recording = !!value.recording; this.#changed(); return; }
+      if (value?.trim) { // the user moved the trim handles: just the play range
+        const [s, e] = value.trim.map(Number);
+        inst.props.start = Math.max(0, Math.min(s, inst.props.length)); inst.props.end = Math.max(inst.props.start, Math.min(e, inst.props.length));
+        this.#changed();
+        return;
+      }
+      if (!value?.ref) return;
+      inst.props.recording = false;
+      inst.props.file = value.ref;
+      inst.props.length = Math.round((Number(value.length) || 0) * 10) / 10;
+      inst.props.start = 0; inst.props.end = inst.props.length;
     } else if (inst.kind === 'photo') {
       inst.props.ready = !!value; // the camera started (or stopped); not an event of its own
       this.#changed();
@@ -300,7 +313,7 @@ export class Runtime {
     if (isRef(s) || isDataUrl(s) || imageNames(this.project).includes(s)) return s;
     throw new ExprError(s === '' ? 'There is no picture yet (nothing has been drawn or taken)' : `There is no picture called "${s}"`);
   }
-  hasSound(name) { return soundNames(this.project).includes(name); }
+  hasSound(name) { return isRef(name) || name.startsWith('data:audio/') || soundNames(this.project).includes(name); }
   openLink(link) { this.hooks.openLink?.(link); }
   setProp(inst, name, value) {
     if (inst.props[name] !== value) { inst.props[name] = value; this.#changed(); }
@@ -350,6 +363,7 @@ export class Runtime {
         if (!inst) throw new ExprError(`There's no ${o} to read "${p}" from`);
         if (p in inst.vars) return inst.vars[p];
         if (p === 'picture' && (inst.kind === 'drawing' || inst.kind === 'photo')) return this.pictureOf(inst);
+        if (p === 'sound' && inst.kind === 'recorder') return isRef(inst.props.file) ? withRange(inst.props.file, inst.props.start, inst.props.end, inst.props.length) : inst.props.file || '';
         if (p in inst.props) return inst.props[p];
         throw new ExprError(`${o} has no property "${p}"`);
       },
@@ -441,6 +455,7 @@ export class Runtime {
         for (const [k, v] of Object.entries(kind.extra || {})) inst.props[k] = d[k] ?? v;
         if (kind.exposes?.includes('playing')) inst.props.playing = false;
         if (od.kind === 'drawing') { inst.props.lines = 0; inst.props.picture = ''; }
+        if (od.kind === 'recorder') Object.assign(inst.props, { file: '', length: 0, start: 0, end: 0, recording: false });
         if (od.kind === 'photo') { inst.props.ready = false; inst.props.picture = ''; }
         this.byId.set(inst.id, inst);
         return inst;

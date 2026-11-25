@@ -29,6 +29,7 @@ export const projectMedia = (getProject, { soundBase } = {}) => ({
   sound: (name) => soundInfo(getProject(), name, soundBase),
   video: (link) => videoSource(link, { allowYoutube: !!getProject().allowYoutube }),
   camera: () => !!getProject().allowCamera,
+  mic: () => !!getProject().allowMic,
 });
 
 // Point the stage at these lookups ({ picture, sound, video, camera }; any left out are kept).
@@ -37,6 +38,7 @@ export function useMedia(m) {
   if (m.sound) mediaLookups.sound = m.sound;
   if (m.video) mediaLookups.video = m.video;
   if (m.camera) mediaLookups.camera = m.camera;
+  if (m.mic) mediaLookups.mic = m.mic;
 }
 
 export class Player {
@@ -44,14 +46,15 @@ export class Player {
   // out to keep the lookups already set), keepMedia(dataUrl) -> what a made picture is kept as (default: the data: URL
   // itself; the editor keeps files in the media store and gives a reference), and hooks: onDraw(rt), onEventRan(id),
   // onScreen(screen, project), onStop(), openLink(link)
-  constructor(host, { store = null, media = null, keepMedia = (d) => d, onDraw, onEventRan, onScreen, onStop, openLink } = {}) {
+  constructor(host, { store = null, media = null, keepMedia = (d) => (d instanceof Blob ? URL.createObjectURL(d) : d), onDraw, onEventRan, onScreen, onStop, openLink } = {}) {
     if (media) useMedia(media);
     this.keepMedia = keepMedia;
     this.stage = new Stage(host, {
       on: {
         click: (id) => this.rt?.click(id),
         itemClick: (id, index) => this.rt?.itemClick(id, index),
-        input: (id, v) => this.rt?.userChange(id, v),
+        // a finished recording arrives as a file: keep it, and pass on its reference
+        input: (id, v) => this.rt?.userChange(id, v?.blob instanceof Blob ? { ref: this.keepMedia(v.blob), length: v.length } : v),
         press: (id) => this.rt?.press(id),
         release: (id) => this.rt?.release(id),
         submit: (id) => this.rt?.submit(id),

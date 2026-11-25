@@ -149,6 +149,13 @@ export function initDesign(root) {
         h('label', { class: 'f wide' }, h('span', {}, 'Draw on'), bg),
         h('p', { class: 'muted small' }, 'Users draw with a finger or the mouse. Add buttons with events to change the colour, undo or clear. Drawing.picture is the drawing, ready for an Image or a table.'));
     }
+    if (obj.kind === 'recorder') {
+      extra.push(
+        h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: !!S.project.allowMic, 'data-ab': 'allow-mic',
+          onchange: (e) => { S.project.allowMic = e.target.checked; hooks.commit(); } }),
+          h('span', {}, 'Allow microphone in this app (off by default; the browser also asks the user, and some school devices block microphones)')),
+        h('p', { class: 'muted small' }, 'Users tap ● to record and ■ to stop (up to 20 seconds), then can trim the start and end. Recorder.sound is the recording, ready for a Sound (Set sound to the one named) or a table. Recordings stay in this browser.'));
+    }
     if (obj.kind === 'photo') {
       extra.push(
         h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: !!S.project.allowCamera, 'data-ab': 'allow-camera',

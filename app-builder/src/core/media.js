@@ -5,8 +5,16 @@
 // While App Builder is open, each file it has loaded is reachable at an object URL (blob:...), registered here, so
 // pictures and sounds show instantly from ordinary, synchronous code (the runtime, the stage, the sidebar).
 
-export const REF_RE = /^media:[0-9a-f]{8}$/;
+// A reference can carry a play range, for a trimmed recording: media:7f3a09c2#t=1.2,4.5 (seconds). The file stays
+// whole; browsers play just that part (a "media fragment"). The file itself is the part before the #.
+export const REF_RE = /^media:[0-9a-f]{8}(#t=\d+(\.\d+)?,\d+(\.\d+)?)?$/;
 export const isRef = (v) => typeof v === 'string' && REF_RE.test(v);
+export const refFile = (ref) => ref.slice(0, 14);
+export const refRange = (ref) => { const m = /#t=([\d.]+),([\d.]+)$/.exec(ref); return m ? [Number(m[1]), Number(m[2])] : null; };
+const sec = (n) => String(Math.round(n * 10) / 10);
+// a file's reference playing only from start to end (whole file: no range)
+export const withRange = (ref, start, end, length) =>
+  (start > 0.05 || end < length - 0.05) ? `${refFile(ref)}#t=${sec(start)},${sec(end)}` : refFile(ref);
 export const isDataUrl = (v) => typeof v === 'string' && v.startsWith('data:');
 
 export function newRef(taken = () => false) {
@@ -19,25 +27,34 @@ export function newRef(taken = () => false) {
 
 // every media reference in a value (a project, a table's rows, a remembered list...), however deep
 export function collectRefs(value, into = new Set()) {
-  if (isRef(value)) into.add(value);
+  if (isRef(value)) into.add(refFile(value));
   else if (Array.isArray(value)) for (const v of value) collectRefs(v, into);
   else if (value && typeof value === 'object') for (const v of Object.values(value)) collectRefs(v, into);
   return into;
 }
 // the same, in JSON text kept somewhere (localStorage), without parsing it
 export function refsInText(text, into = new Set()) {
-  for (const m of String(text ?? '').matchAll(/"(media:[0-9a-f]{8})"/g)) into.add(m[1]);
+  for (const m of String(text ?? '').matchAll(/"(media:[0-9a-f]{8})(?:#t=[\d.,]+)?"/g)) into.add(m[1]);
   return into;
 }
 
-// ref -> object URL for files loaded while App Builder is open
-const urls = new Map();
-export const mediaUrl = (ref) => urls.get(ref) || '';
-export const hasMediaUrl = (ref) => urls.has(ref);
-export function setMediaUrl(ref, url) { urls.set(ref, url); }
-export function clearMediaUrls() { urls.clear(); }
-// a picture or sound value as something a page can show or play: a reference becomes its URL, anything else is kept
-export const mediaSrc = (v) => (isRef(v) ? mediaUrl(v) : v);
+// file reference -> object URL (and its type, e.g. image/png or audio/webm) for files loaded while App Builder is open
+const urls = new Map(), types = new Map();
+export const mediaUrl = (ref) => urls.get(refFile(ref)) || '';
+export const hasMediaUrl = (ref) => urls.has(refFile(ref));
+export const mediaType = (ref) => types.get(refFile(ref)) || '';
+export function setMediaUrl(ref, url, type = '') { urls.set(ref, url); if (type) types.set(ref, type); }
+export function clearMediaUrls() { urls.clear(); types.clear(); }
+// a picture or sound value as something a page can show or play: a reference becomes its URL (with its play range),
+// anything else is kept
+export const mediaSrc = (v) => {
+  if (!isRef(v)) return v;
+  const u = mediaUrl(v);
+  return u && v.length > 14 ? u + v.slice(14) : u;
+};
+// is this value a picture someone made or uploaded (a data: URL or reference to an image)? Recordings are references too.
+export const isPictureValue = (v) => (typeof v === 'string' && v.startsWith('data:image/')) || (isRef(v) && !mediaType(v).startsWith('audio/'));
+export const isSoundValue = (v) => (typeof v === 'string' && v.startsWith('data:audio/')) || (isRef(v) && mediaType(v).startsWith('audio/'));
 
 // Uploads kept in the project (project.assets and project.sounds: [{ name, data, ... }]). `data` is a reference when
 // the file is in the media store, or a data: URL (older projects, a saved file, or a browser with no media store).

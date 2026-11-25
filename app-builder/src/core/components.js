@@ -25,6 +25,7 @@ export const COMPONENTS = {
   // made while the app runs: picture is a media reference (core/media.js), '' until there is one
   drawing: { id: 'drawing', label: 'Drawing', category: 'Media', hint: 'A space to draw on with a finger or the mouse.', base: 'Drawing', props: { text: '', w: 300, h: 300 }, extra: { color: '#222222', pen: 4, background: '' }, exposes: ['picture', 'lines'] },
   photo:  { id: 'photo',  label: 'Photo',      category: 'Media', hint: 'The camera: take a photo of something (camera on for this app only).', base: 'Photo', props: { text: '', w: 300, h: 225 }, exposes: ['picture', 'ready'] },
+  recorder: { id: 'recorder', label: 'Recorder', category: 'Media', hint: 'Record a short sound with the microphone (mic on for this app only).', base: 'Recorder', props: { text: '', w: 300, h: 104 }, exposes: ['sound', 'length', 'recording'] },
   list:   { id: 'list',   label: 'List',       category: 'Data', hint: 'Shows the items of a list, one per row.', base: 'List', props: { text: '', w: 342, h: 220 }, extra: { source: '' } },
   table:  { id: 'table',  label: 'Table',      category: 'Data', hint: 'Shows a table: a row for each record, a column for each field.', base: 'Table', props: { text: '', w: 460, h: 240 }, extra: { source: '', columns: '' } },
   toggle: { id: 'toggle', label: 'Toggle',     category: 'Choices', hint: 'An on/off switch with a label.',        base: 'Toggle', props: { text: 'Switch', w: 180, h: 32 }, extra: { on: false }, exposes: ['on'] },

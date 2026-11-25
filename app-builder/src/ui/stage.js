@@ -65,7 +65,10 @@ export class Stage {
       // sounds and videos report what their players do (media events don't bubble, so listen while capturing)
       for (const type of ['play', 'pause', 'ended']) this.el.addEventListener(type, (e) => {
         const w = e.target.closest?.('.w');
-        if (!w || (type === 'pause' && e.target.ended)) return;
+        if (!w || (type === 'pause' && e.target.ended) || e.target.closest('.rec')) return; // the Recorder's own preview isn't an event
+        // a trimmed recording (…#t=start,end) pauses at its end instead of ending: report that as ended
+        const range = /#t=[\d.]+,([\d.]+)$/.exec(e.target.currentSrc || '');
+        if (type === 'pause' && range && e.target.currentTime >= Number(range[1]) - 0.15) { this.on.media?.(w.dataset.id, 'ended'); return; }
         this.on.media?.(w.dataset.id, type);
       }, true);
       this.el.addEventListener('input', (e) => {
