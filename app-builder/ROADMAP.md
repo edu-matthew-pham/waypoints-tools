@@ -183,7 +183,7 @@ Planned, lightest first:
 Not planned: built-in LLM calls (keys, costs, privacy for under-13s, upkeep). An in-browser model for option 1
 (Transformers.js, about 20–30 MB) only if plain phrase matching proves too weak.
 
-## 10. Make your own media *(proposed 26 Nov 2026, agreed with Matthew; steps 1–3 built 26 Nov: the media store, Drawing and Photo, Recorder with trim, zip Save and Open; README › Media store, › Drawing and Photo, › Recorder, › Saving and opening. Not built: recording video, see point 2)*
+## 10. Make your own media *(proposed 26 Nov 2026, agreed with Matthew; steps 1–3 built 26 Nov: the media store, Drawing and Photo, Recorder with trim, zip Save and Open; README › Media store, › Drawing and Photo, › Recorder, › Saving and opening. Recording video: not planned, see point 2)*
 
 Settled with Matthew (26 Nov 2026): load the media an app uses into memory when it opens and keep new media in the
 background (events stay instant); move uploads out of a project whenever it opens, keeping data: URLs readable; camera
@@ -209,8 +209,8 @@ a fair stepping stone to it.
    (`ClickedItem.picture`); then a **Recorder** object (record, stop, play back; a time cap of about 10–20 s) with a
    **sound** field type, played by Set sound to the one named (taking a reference too); video last, as it is several
    MB a minute. *(Built 26 Nov except video. The Recorder caps at 20 s and has a basic trim: a play range on the
-   reference, `media:7f3a09c2#t=1,4.5`, with no re-encoding. Recording video is not built: ask Matthew whether it is
-   wanted at all, given its size and that video editing is left to other tools.)*
+   reference, `media:7f3a09c2#t=1,4.5`, with no re-encoding. Recording video is not planned (Matthew, 26 Nov): other tools,
+   or perhaps a separate tool of its own one day; App Builder keeps video link-only.)*
 3. **Save and Open** (option 2: design plus the data made while running). Save writes one zip: `project.json` (rows
    say `picture = media/7f3a.png`) plus a `media/` folder; plain JSON as now when there is no media. A tick box chooses
    "include data made while running" or design only (a teacher sending out a starter). Open puts each file back into
@@ -328,6 +328,8 @@ Left, on purpose:
 - **Editing media** (Matthew, 26 Nov 2026): picture editing fits (drawing on a picture is built; simple edits such as crop
   or rotate could come later). Sound and video editing is left to tools made for it (Audacity, an online trimmer), then
   uploaded or linked: no point reinventing them. The one exception is a basic trim of recordings (§10 step 5).
+- **Recording video** (Matthew, 26 Nov 2026): left to other tools, or perhaps a separate tool of its own one day.
+  Video stays link-only in App Builder.
 
 - **Code snippets (HTML/CSS/JS inside App Builder)** *(25 Nov 2026)*: speculative, probably never. Teachers usually move a
   class to text code at a unit boundary rather than mixing the two; "show as code" (a read-only JavaScript view of the
