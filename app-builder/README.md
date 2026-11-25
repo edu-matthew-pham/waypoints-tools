@@ -60,7 +60,9 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
     src/core/shared.js      the All screens sheet: which shared events apply to a screen (objects matched by name)
     src/core/functions.js   functions: the model and helpers (where one is called, is it a plain list of actions)
     src/core/media.js       media references (media:7f3a09c2): finding them, ref -> loaded URL, data: URL <-> bytes
-    src/media-store.js      the media store in IndexedDB: keep, load on start, move old uploads, Save copy, tidy
+    src/media-store.js      the media store in IndexedDB: keep, load on start, move old uploads, tidy, forget
+    src/project-file.js     Save and Open: .json, or a .zip with project.json + media/
+    src/core/zip.js         small zip writer (stored) and reader (stored or deflated)
     src/ui/screen-items.js  what the stage draws for one screen (shared by Design and Map)
     src/app.js              shell: top bar, tabs, save/open, wiring
     src/samples.js          Practice tracker, Daily chores
@@ -248,7 +250,38 @@ Pictures made while the app runs. Like an upload, each one is a file in the medi
   the file shows from memory at once and is written to the store in the background, `media-store.js keepNow`). The
   player alone (no store) keeps made pictures as data: URLs. Clear and Undo reach the page as counters (`clearSeq`,
   `undoSeq`), like Play and Stop do for sounds.
-- Not yet: Save puts only uploads into the file; pictures made while running go in the zip with step 3. Forget saved data
-  leaves their files to the tidy-up (unused for a day). Browser check used: a one-off Playwright script with Chrome's fake
+- Save keeps them in the zip when "what the app kept while running" is included (see Saving and opening). Forget saved
+  data deletes the files only those values used. Browser check used: a one-off Playwright script with Chrome's fake
   camera (draw, keep in a remembered table, photo, reload, camera off on leaving Run, camera not allowed).
+
+## Recorder (ROADMAP §10, step 3, 26 Nov 2026; Level 3)
+
+- Off unless **Allow microphone** is ticked (project setting, in the Recorder's properties). The user taps ● to record
+  and ■ to stop; it stops by itself at 20 seconds. The browser asks first; a refused or missing microphone gets a plain
+  message on the object.
+- After a recording: ▶ plays it, and two handles **trim** the start and end. Trim doesn't change the file: the
+  reference gets a play range, `media:7f3a09c2#t=1.2,4.5`, which browsers play as just that part (a media fragment).
+  A row kept earlier keeps its own range. The stage reports the end of a trimmed part as the sound ending, so *ends*
+  triggers still run.
+- Trigger: *finishes a recording*. `Recorder.sound` is the recording (with its trim), `Recorder.length` its length in
+  seconds, `Recorder.recording` whether it is recording now.
+- A **sound** field type for tables; *Set sound to the one named* takes a recording too (`ClickedItem.sound`). Tables
+  and lists show a recording as "🔊 Recording" (the media store knows each file's type, so a recording isn't shown as a
+  picture).
+- Recordings are WebM/Opus where the browser can (MP4 on Safari). A file nothing uses any more is tidied as usual.
+
+## Saving and opening (ROADMAP §10, step 3, 26 Nov 2026)
+
+- **No pictures or recordings:** Save writes `name.app.json`, as before.
+- **With them:** `name.app.zip`, an ordinary zip: `project.json` (keeps its `media:` references, plus `mediaFiles`,
+  reference -> file and type) and `media/<id>.<ext>` for each file (`src/project-file.js`, `src/core/zip.js`).
+- **What the app kept while running** (Remember between visits values, and the drawings, photos and recordings in
+  them): when there is any, Save asks, ticked by default; untick it to save just the app (a starter to share). It goes
+  in `project.json` as `"remembered": { name: value }`, and Open puts it back for this App Builder.
+- **Open** reads `.json` (old ones with data: uploads too) and `.zip`, including a zip someone unzipped and zipped again
+  on Windows or macOS (compressed: read with the browser's own DecompressionStream). Each file goes back into the media
+  store under its reference; if this browser has a different file under that reference, it gets a new one and the
+  project is updated. With no media store, files go inside the project as data: URLs.
+- The zip code is hand-written (store-only writer, no dependency; Matthew, 26 Nov). If odd zips ever cause trouble, the
+  fallback is the fflate library. Tests: `tests/zip.test.js` (including a compressed zip and damage).
 

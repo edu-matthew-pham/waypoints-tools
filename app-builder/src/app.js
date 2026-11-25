@@ -22,6 +22,8 @@ useMedia(projectMedia(() => S.project));
 fetch(MEDIA_SOURCES.extraSounds, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : [])).then((list) => { addBuiltinSounds(list); hooks.refresh?.(); }).catch(() => {});
 import { SAMPLES, sampleById } from './samples.js';
 import * as mediaStore from './media-store.js';
+import { buildSave, readProjectFile } from './project-file.js';
+import { modal } from './ui/sheet-dialogs.js';
 
 // ?sample=water opens that lesson project. Each lesson link keeps its own saved work, so a student who
 // comes back (or refreshes) carries on where they were; "Start again" reloads the original.
@@ -171,29 +173,57 @@ async function loadProject(p) {
   refresh();
   embed.report(S.project);
 }
-async function saveFile() {
-  // uploads go back inside the file as data: URLs, so it opens anywhere (a zip with a media folder comes later)
-  const { project, missing } = await mediaStore.inline(S.project);
-  if (missing) notify(`${missing} picture${missing === 1 ? '' : 's'} or sound${missing === 1 ? '' : 's'} could not be found in this browser, so ${missing === 1 ? 'it is' : 'they are'} not in the file.`);
-  const json = JSON.stringify(project, null, 2);
-  const filename = (S.project.name || 'app').replace(/[^\w-]+/g, '-') + '.app.json';
+// Save: a .json, or a .zip with a media/ folder when the app has pictures or recordings (project-file.js). When
+// "Remember between visits" kept anything, ask whether to include it (ticked: the whole app as it is; unticked: just
+// the app, e.g. to share as a starting point).
+function rememberedNow() {
+  const out = {};
+  for (const v of S.project.variables) {
+    if (!v.remember) continue;
+    const t = store((ls) => ls.getItem(`${STORE_KEY}.remember.${v.name}`));
+    if (t == null) continue;
+    try { out[v.name] = JSON.parse(t); } catch { /* skip */ }
+  }
+  return out;
+}
+function saveFile() {
+  const kept = rememberedNow(), n = Object.keys(kept).length;
+  if (!n) { writeSave(null); return; }
+  const box = h('input', { type: 'checkbox', checked: true, 'data-ab': 'save-include-data' });
+  const { close } = modal('Save a copy',
+    h('div', {},
+      h('label', { class: 'f check wide' }, box,
+        h('span', {}, `Include what the app kept while running (${n === 1 ? '1 saved value' : n + ' saved values'}: rows, lists, and any drawings, photos or recordings in them)`)),
+      h('p', { class: 'muted small' }, 'Untick it to save just the app, for example to share it as a starting point. Saving is also the backup: things kept in this browser stay on this computer only.')),
+    [h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Cancel'),
+      h('button', { class: 'btn primary', type: 'button', 'data-ab': 'save-confirm', onclick: () => { close(); writeSave(box.checked ? kept : null); } }, 'Save')]);
+}
+async function writeSave(remembered) {
+  let file;
+  try { file = await buildSave(S.project, remembered); } catch (e) { notify('Could not save: ' + (e?.message || 'unknown problem')); return; }
+  if (file.missing) notify(`${file.missing} picture${file.missing === 1 ? '' : 's'} or recording${file.missing === 1 ? '' : 's'} could not be found in this browser, so ${file.missing === 1 ? 'it is' : 'they are'} not in the file.`);
   // Hosted pages can't start downloads themselves; use the page-download feature when it exists.
   try {
     const dl = await window.claude?.use?.('downloads');
-    if (dl) { await dl.save({ filename, data: json }); return; }
+    if (dl) { await dl.save({ filename: file.filename, data: file.data }); return; }
   } catch (e) {
     if (e?.code === 'declined') return;
-    notify('Could not save: ' + (e?.message || 'unknown problem'));
-    return;
+    if (typeof file.data === 'string') { notify('Could not save: ' + (e?.message || 'unknown problem')); return; }
+    // a zip the page-download feature wouldn't take: try an ordinary download below
   }
-  const a = h('a', { href: URL.createObjectURL(new Blob([json], { type: 'application/json' })), download: filename });
+  const a = h('a', { href: URL.createObjectURL(new Blob([file.data], { type: file.type })), download: file.filename });
   document.body.append(a); a.click(); a.remove();
 }
 function openFile() {
-  const input = h('input', { type: 'file', accept: '.json,application/json' });
+  const input = h('input', { type: 'file', accept: '.json,.zip,application/json,application/zip' });
   input.addEventListener('change', async () => {
-    try { loadProject(JSON.parse(await input.files[0].text())); }
-    catch (e) { notify('Could not open that file: ' + e.message); }
+    try {
+      const { project, remembered, missing } = await readProjectFile(input.files[0]);
+      // what the app kept while running goes back first, so its pictures and recordings load with the project
+      if (remembered) store((ls) => { for (const [k, v] of Object.entries(remembered)) ls.setItem(`${STORE_KEY}.remember.${k}`, JSON.stringify(v)); });
+      await loadProject(project);
+      if (missing) notify(`${missing} picture${missing === 1 ? '' : 's'} or recording${missing === 1 ? '' : 's'} weren’t in the file.`);
+    } catch (e) { notify('Could not open that file: ' + e.message); }
   });
   input.click();
 }

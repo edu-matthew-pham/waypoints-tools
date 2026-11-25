@@ -5,7 +5,7 @@
 // IndexedDB answers "later", but events need answers now, so: the files an app uses are loaded into memory (as
 // object URLs) when it opens, and new files are saved in the background. Fails safe: with no IndexedDB (blocked,
 // some private windows) uploads simply stay inside the project as data: URLs, as before.
-import { isRef, newRef, collectRefs, refsInText, hasMediaUrl, setMediaUrl, mediaUrl, uploads, uploadsToMove, dataUrlToBytes, bytesToDataUrl } from './core/media.js';
+import { isRef, refFile, newRef, collectRefs, refsInText, hasMediaUrl, setMediaUrl, mediaUrl, uploads, uploadsToMove, dataUrlToBytes, bytesToDataUrl } from './core/media.js';
 
 const DB = 'appbuilder-media';
 const STORE = 'media';
@@ -131,6 +131,30 @@ export async function load(value) {
   return missing;
 }
 
+// The kept file for a reference (a recording's play range is ignored), or null
+export async function getFile(ref) {
+  const d = await db();
+  if (!d) return null;
+  const rec = await get(d, refFile(ref)).catch(() => null);
+  return rec?.blob ? { blob: rec.blob, type: rec.type || rec.blob.type } : null;
+}
+// Keep a file from an opened project under its own reference when that's free, or when this browser already has the
+// same file there; otherwise under a new one. Returns the reference used, or null if it couldn't be kept.
+export async function keepAs(ref, blob) {
+  const d = await db();
+  if (!d) return null;
+  const same = await get(d, ref).catch(() => null);
+  if (same) {
+    if (same.size === blob.size && (same.type || '') === (blob.type || '')) { if (!hasMediaUrl(ref)) setMediaUrl(ref, URL.createObjectURL(same.blob), same.type); return ref; }
+    return keepBlob(blob); // a different file has that reference here
+  }
+  persist();
+  try { await tx(d, 'readwrite', (s) => s.put({ id: ref, blob, type: blob.type, size: blob.size, added: Date.now() })); }
+  catch { return null; }
+  setMediaUrl(ref, URL.createObjectURL(blob), blob.type);
+  return ref;
+}
+
 // A copy of the project with its uploads back inside it as data: URLs, so a saved .json file is complete on its own.
 export async function inline(project) {
   const p = structuredClone(project);
@@ -144,6 +168,23 @@ export async function inline(project) {
     delete a.size;
   }
   return { project: p, missing };
+}
+
+// Delete these files now, unless something kept in this browser still points to them (another lesson, the project).
+// Used by Forget saved data, so drawings, photos and recordings it kept don't wait for the tidy-up.
+export async function forget(refs, current) {
+  const d = await db();
+  if (!d || !refs.size) return 0;
+  const used = collectRefs(current);
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k?.startsWith('appbuilder.')) refsInText(localStorage.getItem(k), used);
+    }
+  } catch { return 0; }
+  const gone = [...refs].filter((r) => !used.has(r));
+  if (gone.length) await tx(d, 'readwrite', (s) => { for (const r of gone) s.delete(r); }).catch(() => {});
+  return gone.length;
 }
 
 // Tidy up media nothing points to any more: not this project, nor any App Builder project or remembered value kept

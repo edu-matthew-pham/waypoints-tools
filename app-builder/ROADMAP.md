@@ -183,7 +183,7 @@ Planned, lightest first:
 Not planned: built-in LLM calls (keys, costs, privacy for under-13s, upkeep). An in-browser model for option 1
 (Transformers.js, about 20–30 MB) only if plain phrase matching proves too weak.
 
-## 10. Make your own media *(proposed 26 Nov 2026, agreed with Matthew; step 1, the media store, built 26 Nov: README › Media store; step 2, Drawing and Photo, built 26 Nov: README › Drawing and Photo)*
+## 10. Make your own media *(proposed 26 Nov 2026, agreed with Matthew; steps 1–3 built 26 Nov: the media store, Drawing and Photo, Recorder with trim, zip Save and Open; README › Media store, › Drawing and Photo, › Recorder, › Saving and opening. Not built: recording video, see point 2)*
 
 Settled with Matthew (26 Nov 2026): load the media an app uses into memory when it opens and keep new media in the
 background (events stay instant); move uploads out of a project whenever it opens, keeping data: URLs readable; camera
@@ -208,12 +208,15 @@ a fair stepping stone to it.
    object (camera snapshot, shrunk to a small JPEG) with a **picture** field type and **Set image to** an expression
    (`ClickedItem.picture`); then a **Recorder** object (record, stop, play back; a time cap of about 10–20 s) with a
    **sound** field type, played by Set sound to the one named (taking a reference too); video last, as it is several
-   MB a minute.
+   MB a minute. *(Built 26 Nov except video. The Recorder caps at 20 s and has a basic trim: a play range on the
+   reference, `media:7f3a09c2#t=1,4.5`, with no re-encoding. Recording video is not built: ask Matthew whether it is
+   wanted at all, given its size and that video editing is left to other tools.)*
 3. **Save and Open** (option 2: design plus the data made while running). Save writes one zip: `project.json` (rows
    say `picture = media/7f3a.png`) plus a `media/` folder; plain JSON as now when there is no media. A tick box chooses
    "include data made while running" or design only (a teacher sending out a starter). Open puts each file back into
    IndexedDB, giving it a new id (and updating the rows) if that id is taken. A student hands in one file with the app
-   and what they made with it.
+   and what they made with it. *(Built 26 Nov: Save asks only when something was kept; Open also reads zips
+   re-compressed on a computer.)*
 4. **Privacy and school rules.** Camera and mic are off unless the teacher turns them on for the app (like Allow YouTube
    links); the browser asks permission and some school devices block it, so say so plainly when it does. Media stays in
    that browser; Forget saved data clears it. Lessons use photos of objects and made-up recordings, not students' faces
@@ -273,7 +276,7 @@ rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever clas
    them and they don't need media).
 3. §10 media store in IndexedDB (built 26 Nov; upload caps raised from about 1 MB to about 5 MB for pictures and sounds).
 4. §10 Drawing and Photo, with the picture field and Set image to an expression (built 26 Nov; Level 3).
-5. §10 Recorder and the sound field (with a basic trim: start and end marks, no re-encoding; Matthew 26 Nov: useful if cheap); zip Save and Open with the data made while running.
+5. §10 Recorder and the sound field (with a basic trim: start and end marks, no re-encoding; Matthew 26 Nov: useful if cheap); zip Save and Open with the data made while running (built 26 Nov).
 6. §9 AI help, once how AI is used in class is decided.  7. Layout and tabs, yes/no fields, Grid.
 Alongside: Data apps tried with a class; its feedback can reorder this.
 

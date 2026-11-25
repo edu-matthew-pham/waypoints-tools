@@ -5,7 +5,8 @@ import { Player, localStore } from './player.js';
 import { h } from './ui/dom.js';
 import { isPictureValue, isSoundValue, mediaSrc } from './core/media.js';
 import { S } from './state.js';
-import { keepNow } from './media-store.js';
+import { keepNow, forget as forgetMedia } from './media-store.js';
+import { collectRefs } from './core/media.js';
 
 // "Remember between visits": values kept in this browser, one entry per variable, under this App Builder's own key
 // (so each lesson step keeps its own).
@@ -25,7 +26,12 @@ export class Runner extends Player {
   }
 
   // Forget the remembered values, so the next start is like a first visit.
-  forget(project) { const st = rememberStore(); for (const v of project.variables) if (v.remember) st.save(v.name, undefined); }
+  // Pictures and recordings only those values used are deleted too (privacy: Forget means forget).
+  forget(project) {
+    const st = rememberStore(), refs = new Set();
+    for (const v of project.variables) if (v.remember) { collectRefs(st.load(v.name), refs); st.save(v.name, undefined); }
+    forgetMedia(refs, project).catch(() => {});
+  }
 
   #show(rt) {
     showNow(rt.watch());
