@@ -358,6 +358,9 @@ Left, on purpose:
 - **Guided tutorials as Markdown** (like MakeCode tutorials): `## Step` sections with text and hints, `@highlight <data-ab label>`
   to point at a control, and a `wait for:` line matched against the sheet text so the step ticks itself. A generator could draft one
   from any finished project (one step per object, then per event), for a teacher to edit.
+  *(26 Nov 2026, Matthew: wait for class feedback before building it. Construct's own guided tours are only a light entry
+  point, and the tutorials site does the guiding for now. Off unless a tutorial link opens it, so adding it later
+  changes nothing the lesson clips show.)*
 - **From Thunkable:** open the app being built on a phone (QR code beside the link, never instead of it), share a finished app as a
   play-only link, and screen templates for prototype lessons. Not native device APIs, app stores or a block editor.
 - **Code snippets (HTML/CSS/JS inside App Builder): speculative, probably never** (25 Nov 2026). Classes usually move to
