@@ -209,12 +209,13 @@ a fair stepping stone to it.
 ## Suggested order
 
 Done (24–25 Nov 2026): toggle, slider, keys, timers, image and assets, lists, tables, linked tables, nested view, paste
-rows, Sound and Video. Next (26 Nov 2026, Matthew: media unlocks new kinds of app, so it comes first):
+rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever classes say; map view first as the smaller job):
 
-1. §10 media store in IndexedDB (also fixes uploads filling the ~5 MB a project has now).
-2. §10 Drawing and Photo, with the picture field and Set image to an expression.
-3. §10 Recorder and the sound field; zip Save and Open with the data made while running.
-4. §8 Map view.  5. §9 AI help, once how AI is used in class is decided.  6. Layout and tabs, yes/no fields, Grid.
+1. §8 Map view.
+2. §10 media store in IndexedDB (also fixes uploads filling the ~5 MB a project has now).
+3. §10 Drawing and Photo, with the picture field and Set image to an expression.
+4. §10 Recorder and the sound field; zip Save and Open with the data made while running.
+5. §9 AI help, once how AI is used in class is decided.  6. Layout and tabs, yes/no fields, Grid.
 Alongside: Data apps tried with a class; its feedback can reorder this.
 
 ## Automation hooks *(done, 24 Nov 2026)*
