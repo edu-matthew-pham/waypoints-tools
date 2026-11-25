@@ -91,9 +91,24 @@ Objects get an optional `children` array and a layout mode on containers (stack 
 stack layout ignores x/y and uses gap, padding, alignment. Tabs hold named panels and **keep state** when switching (screens reset;
 tabs don't). Scroll areas clip and scroll. Design mode shows a tree in the sidebar for nesting.
 
-## 6. Sound, notifications, output (later)
+## 6. Sound, video, notifications, output (later)
 
 Play sound (built-in set), vibrate, show a toast message, copy text. Each is a small action; sound needs a user gesture first.
+
+- **Sound object** *(proposed 25 Nov 2026, next media addition)*: plays a sound by name, like the Image object shows a picture.
+  - **Built-in starter pack:** about 6–8 short instrumental tracks (trimmed to about 30 s) from FreePD (CC0, no credit
+    required; credit kept anyway: title and "FreePD, CC0" beside each), served by the site, so every school gets the same
+    tracks with nothing to set up. Works offline, so clips and lesson checks can use it.
+  - **Uploads:** a teacher's or student's own audio (a school band, a composition), stored in the project like pictures,
+    with a size cap per upload (project storage in the browser is about 5 MB in all; built-in tracks don't count).
+  - Actions: play, stop; a "Sound is playing" condition and an "ended" trigger later. A table field can name a track, so a
+    playlist row plays its sound when clicked (Data apps course).
+- **Video object** *(later option)*: link only, never uploaded (video is too big for project storage).
+  - Default source: **Wikimedia Commons** (or any direct video file link, e.g. the Internet Archive or a school's own web
+    storage), played in the browser's own player: no ads, no recommendations, no tracking, clear licences. Show the file's
+    credit and licence (often CC BY-SA). Check Safari/iPad playback of Commons' WebM files before relying on it.
+  - **YouTube** (youtube-nocookie) as an opt-in setting, off by default: a school that is happy with YouTube turns it on.
+  - An **Open link** action (new tab) as a fallback that works anywhere.
 
 ## 7. Teaching and checking
 
