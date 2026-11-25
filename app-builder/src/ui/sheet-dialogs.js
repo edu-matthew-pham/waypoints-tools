@@ -2,11 +2,11 @@
 // fill-in-the-blanks form for one condition or action. Native <dialog>: focus trap, Esc, backdrop.
 import { h } from './dom.js';
 import { CONDITIONS, ACTIONS } from '../core/catalog.js';
-import { check, OPERATORS, highlight, FUNCTION_HELP, OPERATOR_HELP, parse, evaluate, fmt, ExprError } from '../core/expr.js';
+import { check, OPERATORS, highlight, FUNCTION_HELP, OPERATOR_HELP, parse, evaluate, fmt, ExprError, fieldOf } from '../core/expr.js';
 import { COMPONENTS } from '../core/components.js';
 import { ICONS, FALLBACK_ICON } from './component-ui.js';
 
-const CATEGORIES = ['Screen', 'Object', 'Keyboard', 'Variables', 'Lists', 'System'];
+const CATEGORIES = ['Screen', 'Object', 'Keyboard', 'Variables', 'Lists', 'Tables', 'System'];
 const plain = (label) => label.replace(/\{\w+\}/g, '\u2026');
 
 export function modal(title, body, foot) {
@@ -32,6 +32,7 @@ const GROUPS = [
   { id: 'Keyboard', label: 'Keyboard', icon: 'keyboard' },
   { id: 'Variables', label: 'Variables', icon: 'variables' },
   { id: 'Lists', label: 'Lists', icon: 'list' },
+  { id: 'Tables', label: 'Tables', icon: 'table' },
 ];
 const objParam = (e) => e.params.find((p) => p.type === 'object');
 const fitsObject = (e, o) => { const p = objParam(e); return !!p && (!p.kinds || p.kinds.includes(o.kind)); };
@@ -130,19 +131,20 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
   function showPreview(input, msg) {
     const wrap = input.closest('.hl') || input;
     let line = wrap._preview;
-    if (!line) { line = wrap._preview = h('p', { class: 'es-preview', 'aria-live': 'polite' }); helps.after(line); }
+    if (!line) { line = wrap._preview = h('p', { class: 'es-preview', 'aria-live': 'polite' }); (helps._last?.isConnected ? helps._last : helps).after(line); helps._last = line; }
     const start = sheet._exprScope.start;
-    if (msg || !start || !input.value.trim()) { line.hidden = true; return; }
+    if (msg || !start || !input.value.trim() || /\b(Loop|Clicked)(Item|Index)\b/.test(input.value)) { line.hidden = true; return; } // those only have values while the app runs
     line.hidden = false;
     try {
       const v = evaluate(parse(input.value), {
         random: () => 0,
         getVar: (n) => start.vars[n],
-        getProp: (o, p) => start.objects[o]?.[p],
+        getProp: (o, p) => (start.objects[o] ? start.objects[o][p] : fieldOf(start.vars[o], p, o)),
       });
       const uses = /random\(/.test(input.value) ? ' (random picks vary)' : '';
       line.className = 'es-preview';
-      line.replaceChildren(h('span', { class: 'muted' }, 'With starting values this gives: '),
+      const field = input.dataset.ab?.startsWith('value:') ? input.dataset.ab.slice(6) + ': ' : '';
+      line.replaceChildren(h('span', { class: 'muted' }, field + 'With starting values this gives: '),
         h('code', {}, typeof v === 'string' ? v || '(empty text)' : fmt(v)), h('span', { class: 'muted' }, uses));
     } catch (e) {
       if (!(e instanceof ExprError)) throw e;
@@ -181,14 +183,14 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
       if (prm) sentence.append(sheet._control(prm, draft, entry, ctx));
     }
     exprs.forEach(colourBox);
-    const exprParams = entry.params.filter((p) => p.type === 'expr');
+    const exprParams = entry.params.filter((p) => p.type === 'expr' || p.type === 'fields');
     helps.replaceChildren(...exprParams.map((p) => h('p', { class: 'es-help' },
       exprParams.length > 1 ? h('strong', {}, (p.name === 'left' ? 'First value' : p.name === 'right' ? 'Second value' : 'Value') + ': ') : null, p.help || '')));
     chips.replaceChildren();
     if (exprParams.length) {
       chips.append(h('button', { class: 'btn find-btn', type: 'button', 'data-ab': 'find-expressions', onclick: () => openExpressionBrowser(sheet, insert) }, '\ud83d\udd0d Find expressions'));
     }
-    if (entry.params.some((p) => p.type === 'expr')) {
+    if (exprParams.length) {
       const sc = sheet._scope;
       const names = [
         ...sc.variables,
@@ -199,7 +201,7 @@ export function openItemDialog(sheet, { kind, entry, draft, isNew, onDone, onDel
           ...names.map((n) => h('button', { class: 'chip', type: 'button', 'data-ab': 'name:' + n, title: `Insert ${n}`, onclick: () => insert(n) }, n)));
       }
     }
-    if (entry.params.some((p) => p.type === 'expr') && sheet._ui('choice')) {
+    if (exprParams.length && sheet._ui('choice')) {
       chips.append(h('button', { class: 'btn choice-btn', type: 'button', title: 'Use one value or another depending on a test',
         'data-ab': 'choose-two', onclick: () => openChoiceBuilder(sheet, (code) => { insert(code); }) }, '\u21c4 Choose between two values'));
     }
@@ -310,6 +312,10 @@ export function openExpressionBrowser(sheet, insert) {
   const sections = [
     ['Variables', sc.variables.map((v) => ({ code: v, desc: 'whole-app variable' }))],
     ['Lists', (sc.lists || []).flatMap((l) => [{ code: `count(${l})`, desc: 'how many items' }, { code: `item(${l}, 1)`, desc: 'the first item' }, { code: `join(${l}, ", ")`, desc: 'all items as text' }])],
+    ['Tables', (sc.tables || []).flatMap((t) => [{ code: `count(${t})`, desc: 'how many rows' },
+      ...(sc.tableFields?.[t] || []).map((f) => ({ code: `item(${t}, 1).${f}`, desc: `the ${f} of the first row` })),
+      ...(sc.tableFields?.[t] || []).map((f) => ({ code: `LoopItem.${f}`, desc: `the ${f} of this row (inside For each row)` })),
+      ...(sc.tableFields?.[t] || []).map((f) => ({ code: `ClickedItem.${f}`, desc: `the ${f} of the clicked row`, extra: true }))])],
     ['Inside loops and list clicks', [{ code: 'LoopIndex', desc: 'which time round (1, 2, 3 ...)' }, { code: 'LoopItem', desc: 'the item this time round' }, { code: 'ClickedItem', desc: 'the list item that was clicked' }, { code: 'ClickedIndex', desc: 'its number' }]],
     ...sc.objects.map((o) => [o.name + ' (' + (COMPONENTS[o.kind]?.label || o.kind) + ')', [
       ...['text', ...(COMPONENTS[o.kind]?.exposes || [])].filter((p, i, a) => a.indexOf(p) === i).map((p) => ({ code: `${o.name}.${p}`, desc: PROP_HELP[p] })),

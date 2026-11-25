@@ -102,8 +102,13 @@ export const CONDITIONS = {
   },
   onItemClicked: {
     category: 'Object', label: 'An item in {target} is clicked', trigger: 'itemClicked', object: 'target',
-    params: [obj({ kinds: ['list'] })],
-    help: 'ClickedItem is the item that was clicked, and ClickedIndex is its number (from 1).',
+    params: [obj({ kinds: ['list', 'table'] })],
+    help: 'ClickedItem is the item (or row) that was clicked, and ClickedIndex is its number (from 1). For a table, ClickedItem.title is one field of that row.',
+  },
+  forEachRow: {
+    category: 'Tables', label: 'For each row in table {table}', loop: 'each',
+    params: [{ name: 'table', type: 'table' }],
+    help: 'Runs the event once for every row. Inside it, LoopItem is the row (LoopItem.title is one field) and LoopIndex is its number (from 1).',
   },
   forEach: {
     category: 'Lists', label: 'For each item in list {list}', loop: 'each',
@@ -232,6 +237,50 @@ export const ACTIONS = {
     params: [{ name: 'list', type: 'list' }],
     run: (rt, ctx, p) => rt.listChange(p.list, (l) => { l.length = 0; }),
   },
+  tableAdd: {
+    category: 'Tables', label: 'Add a row to table {table}: {values}',
+    params: [{ name: 'table', type: 'table' }, { name: 'values', type: 'fields' }],
+    run: (rt, ctx, p) => {
+      const row = {};
+      for (const f of rt.fieldsOf(p.table)) {
+        const src = p.values?.[f.name];
+        row[f.name] = rt.toField(p.table, f.name, src == null || String(src).trim() === '' ? (f.type === 'number' ? 0 : '') : rt.evalExpr(src, ctx));
+      }
+      rt.tableChange(p.table, (t) => t.push(row));
+    },
+  },
+  tableSet: {
+    category: 'Tables', label: 'Set {field} of row {index} in table {table} to {value}',
+    params: [{ name: 'field', type: 'field' }, expr('index', '1'), { name: 'table', type: 'table' }, expr()],
+    run: (rt, ctx, p) => {
+      const i = num(rt.evalExpr(p.index, ctx));
+      const v = rt.toField(p.table, p.field, rt.evalExpr(p.value, ctx));
+      rt.tableChange(p.table, (t) => { rt.checkRow(t, i, p.table); t[i - 1] = { ...t[i - 1], [p.field]: v }; });
+    },
+  },
+  tableRemove: {
+    category: 'Tables', label: 'Remove row {index} from table {table}',
+    params: [expr('index', '1'), { name: 'table', type: 'table' }],
+    run: (rt, ctx, p) => { const i = num(rt.evalExpr(p.index, ctx)); rt.tableChange(p.table, (t) => { rt.checkRow(t, i, p.table); t.splice(i - 1, 1); }); },
+  },
+  tableClear: {
+    category: 'Tables', label: 'Clear table {table}',
+    params: [{ name: 'table', type: 'table' }],
+    run: (rt, ctx, p) => rt.tableChange(p.table, (t) => { t.length = 0; }),
+  },
+  tableSort: {
+    category: 'Tables', label: 'Sort table {table} by {field} {dir}',
+    params: [{ name: 'table', type: 'table' }, { name: 'field', type: 'field' }, { name: 'dir', type: 'sortdir' }],
+    run: (rt, ctx, p) => {
+      const type = rt.fieldType(p.table, p.field);
+      const sign = p.dir === 'down' ? -1 : 1;
+      const key = (r) => r[p.field];
+      const cmp = type === 'number'
+        ? (a, b) => (Number(key(a)) || 0) - (Number(key(b)) || 0)
+        : (a, b) => String(key(a)).localeCompare(String(key(b)), undefined, { sensitivity: 'base', numeric: true });
+      rt.tableChange(p.table, (t) => { const sorted = [...t].sort((a, b) => sign * cmp(a, b)); t.splice(0, t.length, ...sorted); }); // stable: equal rows keep their order
+    },
+  },
   goToScreen: {
     category: 'Screen', label: 'Go to screen {screen}',
     params: [{ name: 'screen', type: 'screen' }],
@@ -262,6 +311,10 @@ export function defaultParams(entry, scope) {
       }
       case 'variable': out[prm.name] = scope.variables[0] ?? ''; break;
       case 'list': out[prm.name] = scope.lists?.[0] ?? ''; break;
+      case 'table': out[prm.name] = scope.tables?.[0] ?? ''; break;
+      case 'field': out[prm.name] = ''; break; // filled in below, once the table is known
+      case 'fields': out[prm.name] = {}; break;
+      case 'sortdir': out[prm.name] = 'up'; break;
       case 'instVar': {
         const t = entry.params.find((x) => x.type === 'object');
         const o = scope.objects.find((x) => x.name === out[t?.name]);
@@ -278,8 +331,12 @@ export function defaultParams(entry, scope) {
       default: out[prm.name] = prm.default ?? '';
     }
   }
+  const t = entry.params.find((p) => p.type === 'table');
+  for (const prm of entry.params.filter((p) => p.type === 'field')) out[prm.name] = scope.tableFields?.[out[t?.name]]?.[0] ?? '';
   return out;
 }
+
+export const SORT_DIRS = [['up', 'A to Z, smallest first'], ['down', 'Z to A, biggest first']];
 
 // Structural checks the editor shows as warnings. Returns [{ id, message }].
 export function validateSheet(events, depth = 0, out = [], underTrigger = false) {
@@ -322,6 +379,9 @@ const PARAM_HELP = {
   'listRemoveValue.value': 'The item to remove (the first one that matches).',
   'listSet.index': 'Which item: 1 is the first.',
   'listSet.value': 'The new value for that item.',
+  'tableSet.index': 'Which row: 1 is the first, LoopIndex inside For each, ClickedIndex when a row is clicked.',
+  'tableSet.value': 'The new value for that field: a number, "text in quotes", or something like Name.text.',
+  'tableRemove.index': 'Which row: 1 is the first, count(table) is the last, ClickedIndex is the clicked row.',
   'repeat.count': 'How many times: a number or a variable.',
   'setSize.value': 'A number of pixels, or a calculation like (water / goal) * 300.',
   'setText.value': 'The text to show. Put words in "quotes" and join pieces with &, e.g. "Total: " & minutes',
@@ -334,6 +394,7 @@ const PARAM_HELP = {
 };
 for (const table of [CONDITIONS, ACTIONS]) {
   for (const [id, e] of Object.entries(table)) {
+    for (const p of e.params) if (p.type === 'fields') p.help = 'One value for each field: "text in quotes", a number, or something like Title.text. An empty box gives empty text (or 0 for a number field).';
     for (const p of e.params) if (p.type === 'expr') p.help = PARAM_HELP[`${id}.${p.name}`] || 'A value: a number, "text in quotes", a variable, or a calculation.';
   }
 }

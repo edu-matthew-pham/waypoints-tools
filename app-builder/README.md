@@ -5,10 +5,14 @@ A small, no-event-cap tool for prototyping simple apps (Years 7-8). Apps are web
 each project can switch to Phone (390×700). The stage scales down to fit the window. Screens, buttons, text and
 inputs, driven by an event sheet: *when this happens, do that*. Runs in the browser, no accounts, no server.
 
-**Use it:** https://tools.learningwaypoints.com/app-builder/  (plain ES modules, no build step; Chrome, Edge, Firefox, Safari)
+**Use it:** https://tools.learningwaypoints.com/app-builder/  (one self-contained `index.html`; Chrome, Edge, Firefox, Safari)
 
     cd app-builder && npm test      # headless tests of the interpreter (node:test, no dependencies)
+    npm install && npm run build    # rebuilds index.html from src/ (esbuild bundles app.js, style.css is inlined)
     python3 -m http.server 8080     # run locally from the repo root, then open /app-builder/
+
+`src/` is the source; `index.html` is built from it (`tools/build.mjs`) and committed, so the site needs no build step.
+Rebuild and commit `index.html` with every change to `src/`.
 
 ## Lesson links
 
@@ -32,7 +36,7 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
 ## Layout
 
     src/core/expr.js        safe expression parser/evaluator (no eval) + static checker
-    src/core/components.js  component registry (data): Button, Text, Text input; categories, hints, defaults
+    src/core/components.js  component registry (data): Button, Text, Text input, List, Table ...; categories, hints, defaults
     src/ui/component-ui.js  icons and how each component is drawn
     src/ui/object-picker.js tile picker for "Add an object"
     src/core/catalog.js     every condition and action: label template, params, one small function
@@ -84,7 +88,7 @@ The editor menu, controls, validation and the interpreter pick it up with no UI 
 - Image object + small asset panel (upload, built-in icons)
 - Layout: stacks / flex, containers, Tabs component (keeps state; screens reset), scrolling, repeater bound to a list, gallery
 - Sandboxed Custom HTML/CSS/JS widget (iframe + postMessage); later a Run script action and a read-only Show as JavaScript view
-- Arrays/lists, remember-between-visits variables, screen stack with Back, standard widgets (toggle, slider, progress)
+- Screen stack with Back, a progress bar widget
 - Rename objects (and update references); expression autocomplete; condition invert
 - `eventsheet` task modes for lesson pages: trace a tick, Parsons ordering, find the bug
 - Headless project checks ("click 3 times; count should be 3") for the Waypoints pages
@@ -99,3 +103,24 @@ The editor menu, controls, validation and the interpreter pick it up with no UI 
 - Lessons and other written content (when published alongside this tool): CC BY-NC-SA 4.0
   (https://creativecommons.org/licenses/by-nc-sa/4.0/). 
 - This is a plain-language summary; the licence text is what applies.
+
+## Tables (25 Nov 2026)
+
+A table is a whole-app variable holding records: one row each, with the same named fields (text or number).
+Level 4 (or a lesson allow-list that names a table action). Plan: tutorials Project doc `data-apps-and-tables-plan`.
+
+- **Sidebar:** Tables section with a small spreadsheet per table (type into cells, Tab to move, `+ Row`, `+` for a field,
+  the field's menu to rename, change type, move or delete it). `{ } JSON` shows the rows as JSON (read-only).
+  While the app runs, the live rows show under it and changed cells flash.
+- **Table object** (Data): shows a table, a column per field (Properties: Shows table, Columns to show). Clicking a row
+  fires "An item in … is clicked": `ClickedIndex`, `ClickedItem.title`.
+- **Events:** For each row in table (LoopItem is the row, `LoopItem.title` one field); Add a row (one box per field);
+  Set a field of row N; Remove row N; Clear; Sort by a field (numbers by size, text A to Z ignoring capitals, stable).
+  No built-in filter: filtering is For each + a condition + Add a row to a results table.
+- **Expressions:** `item(Songs, 2).artist`, `count(Songs)`, `LoopItem.length`, `contains(text, part)`. A variable can
+  hold one row (`Set variable NowPlaying to item(Songs, ClickedIndex)`, then `NowPlaying.title`).
+- **Remember between visits:** the 💾 toggle on any variable, list or table (level 3+) keeps its value in this browser
+  (localStorage, under this copy's own key). Run has **Forget saved data**. Storage blocked: the app still runs.
+- **Sheet text:** `table Songs = [title, artist, length] 3 rows (remembered)`; Add a row reads
+  `Add a row to table Songs: title = Title.text, length = int(Length.text)`.
+- Tests: `tests/tables.test.js`.

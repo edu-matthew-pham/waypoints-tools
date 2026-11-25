@@ -13,7 +13,7 @@
 //
 // It only knows the catalog and plain JSON. Nothing here depends on the stage or runtime,
 // so the same element can sit in a lesson page or in the editor.
-import { OPERATORS, defaultParams, validateSheet, entryFor, CONDITIONS, KEYS } from '../core/catalog.js';
+import { OPERATORS, defaultParams, validateSheet, entryFor, CONDITIONS, KEYS, SORT_DIRS } from '../core/catalog.js';
 import { check } from '../core/expr.js';
 import { newEvent } from '../core/project.js';
 import { COMPONENTS } from '../core/components.js';
@@ -239,6 +239,12 @@ export class EventSheet extends HTMLElement {
       case 'onoff': return [['on', 'on'], ['off', 'off']];
       case 'key': return KEYS;
       case 'list': return (sc.lists || []).map((n) => [n, n]);
+      case 'table': return (sc.tables || []).map((n) => [n, n]);
+      case 'field': {
+        const t = entry.params.find((p) => p.type === 'table');
+        return (sc.tableFields?.[item[t?.name]] || []).map((f) => [f, f]);
+      }
+      case 'sortdir': return SORT_DIRS;
       case 'picture': return (sc.pictures || []).map((n) => [n, n]);
       case 'posSize': return [['w', 'width'], ['h', 'height'], ['x', 'x position'], ['y', 'y position']];
     }
@@ -252,6 +258,7 @@ export class EventSheet extends HTMLElement {
     const changed = ctx.changed ?? (() => this._changed());
     const cur = item[prm.name] ?? '';
     if (prm.type === 'expr') return this._exprControl(prm, item, interactive, ctx);
+    if (prm.type === 'fields') return this._fieldsControl(prm, item, entry, interactive, ctx);
     const options = this._options(prm, item, entry);
     const known = options.some(([v]) => v === cur);
     if (!interactive) {
@@ -260,9 +267,9 @@ export class EventSheet extends HTMLElement {
     }
     const apply = (value) => {
       item[prm.name] = value;
-      if (prm.type === 'object') {
-        // keep any variable picker of the same item pointing at something that exists
-        for (const other of entry.params.filter((p) => p.type === 'instVar')) {
+      if (prm.type === 'object' || prm.type === 'table') {
+        // keep any variable or field picker of the same item pointing at something that exists
+        for (const other of entry.params.filter((p) => p.type === 'instVar' || p.type === 'field')) {
           const opts = this._options(other, item, entry).map(([v]) => v);
           if (!opts.includes(item[other.name])) item[other.name] = opts[0] ?? '';
         }
@@ -284,10 +291,22 @@ export class EventSheet extends HTMLElement {
     return sel;
   }
 
+  // "Add a row": one value box per field of the chosen table, labelled with the field's name.
+  // The values live in item[prm.name] = { field: expression }.
+  _fieldsControl(prm, item, entry, interactive, ctx) {
+    const t = entry.params.find((p) => p.type === 'table');
+    const fields = this._scope.tableFields?.[item[t?.name]] || [];
+    const vals = (item[prm.name] && typeof item[prm.name] === 'object') ? item[prm.name] : (item[prm.name] = {});
+    if (!fields.length) return h('span', { class: 'val muted' }, item[t?.name] ? 'this table has no fields yet' : '…');
+    return h('span', { class: 'fields' }, fields.map((f) => h('span', { class: 'field-box' },
+      h('span', { class: 'lbl field-name' }, f + ' '),
+      this._exprControl({ ...prm, name: f, type: 'expr' }, vals, interactive, { ...ctx, dataAb: 'value:' + f }))));
+  }
+
   _exprControl(prm, item, interactive, ctx) {
     const val = String(item[prm.name] ?? '');
     if (!interactive) return h('span', { class: 'val expr' }, val || '…');
-    const input = h('input', { 'data-ab': 'param:' + prm.name, class: 'ctl expr', type: 'text', value: val, placeholder: 'value', spellcheck: 'false', autocomplete: 'off', size: Math.max(5, val.length + 1) });
+    const input = h('input', { 'data-ab': ctx.dataAb || 'param:' + prm.name, class: 'ctl expr', type: 'text', value: val, placeholder: 'value', spellcheck: 'false', autocomplete: 'off', size: Math.max(5, val.length + 1) });
     const validate = () => {
       const msg = check(input.value, this._exprScope);
       input.classList.toggle('bad', !!msg);
@@ -311,6 +330,7 @@ export class EventSheet extends HTMLElement {
       if (prm.type === 'object' && !sc.objects.some((o) => !prm.kinds || prm.kinds.includes(o.kind))) return prm.kinds ? `Add a ${(COMPONENTS[prm.kinds[0]]?.label || 'matching object').toLowerCase()} first` : 'Add an object first';
       if (prm.type === 'variable' && !sc.variables.length) return 'Add a variable first';
       if (prm.type === 'list' && !(sc.lists || []).length) return 'Add a list first (left side, under Lists)';
+      if (prm.type === 'table' && !(sc.tables || []).length) return 'Add a table first (left side, under Tables)';
       if (prm.type === 'instVar' && !sc.objects.some((o) => o.vars.length)) return 'Needs an object with a variable of its own';
     }
     return '';

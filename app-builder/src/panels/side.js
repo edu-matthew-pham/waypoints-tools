@@ -1,15 +1,15 @@
 // Left panel: one project tree (screens > objects > copies) plus whole-app variables.
 import { h } from '../ui/dom.js';
 import { OBJECT_KINDS } from '../core/catalog.js';
-import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue, sizeOf } from '../core/project.js';
+import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue, sizeOf, isList, isTable, newTable, fieldValue, FIELD_TYPES } from '../core/project.js';
 import { openMenu } from '../ui/menu.js';
 import { openObjectPicker } from '../ui/object-picker.js';
 import { renameInput } from '../ui/rename-input.js';
-import { renameObject, renameVariable } from '../core/rename.js';
+import { renameObject, renameVariable, renameField, nameProblem } from '../core/rename.js';
 import { pickPicture } from '../ui/upload.js';
 import { assetName } from '../core/assets.js';
 import { S, screen, hooks } from '../state.js';
-import { nowText } from '../run-engine.js';
+import { nowText, liveTable } from '../run-engine.js';
 
 function addRow(placeholder, onAdd, withValue) {
   const key = placeholder.toLowerCase().replace(/[^a-z]+/g, '-');
@@ -19,6 +19,14 @@ function addRow(placeholder, onAdd, withValue) {
   name.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   val?.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   return h('div', { class: 'add-row' }, name, val, h('button', { class: 'btn', onclick: go, title: 'Add', 'data-ab': key + '-add' }, '+'));
+}
+
+// "Remember between visits": a small toggle on a variable, list or table (level 3 and up)
+function rememberBtn(v) {
+  if (S.rf && !S.rf.remember) return null;
+  return h('button', { class: 'icon remember' + (v.remember ? ' on' : ''), type: 'button', 'aria-pressed': String(!!v.remember), 'data-ab': 'remember:' + v.name,
+    title: v.remember ? 'Remembered between visits (the app keeps its value in this browser). Click to stop.' : 'Remember between visits: keep its value in this browser when the app is closed and opened again',
+    onclick: () => { if (v.remember) delete v.remember; else v.remember = true; hooks.commit(); } }, '\u{1F4BE}');
 }
 
 const kindsAllowed = () => Object.entries(OBJECT_KINDS).filter(([k]) => !S.rf || S.rf.kinds.includes(k));
@@ -124,6 +132,7 @@ export function renderSide(el) {
       : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingVar = v.name; hooks.refresh(); } }, v.name),
     h('input', { class: 'ctl small', value: String(v.value), title: 'Starting value', 'aria-label': `Starting value of ${v.name}`, onchange: (e) => { v.value = parseValue(e.target.value); hooks.commit(); } }),
     h('span', { class: 'now', 'data-now': v.name }, nowText(v.name)),
+    rememberBtn(v),
     h('button', { class: 'icon danger', title: 'Delete variable', onclick: () => { S.project.variables.splice(i, 1); hooks.commit(); } }, '×')));
 
   el.replaceChildren(
@@ -142,6 +151,7 @@ export function renderSide(el) {
       S.project.variables.push({ name, value }); hooks.commit();
     }, true),
     ...(!S.rf || S.rf.lists ? listSection() : []),
+    ...(!S.rf || S.rf.tables || S.project.variables.some(isTable) ? tableSection() : []),
     ...(!S.rf || S.rf.kinds.includes('image') ? [
       h('h3', {}, 'Pictures (whole app)'),
       ...(S.project.assets.length ? [h('div', { class: 'pic-list' }, S.project.assets.map((a) => h('div', { class: 'var pic-row' },
@@ -170,7 +180,7 @@ function pictureUsers(name) {
 
 // Lists (whole app): name, starting items typed as  a, b, c
 function listSection() {
-  const rows = S.project.variables.filter((v) => Array.isArray(v.value)).map((v) => h('div', { class: 'list-var' },
+  const rows = S.project.variables.filter(isList).map((v) => h('div', { class: 'list-var' },
     h('div', { class: 'var' },
       renamingVar === v.name
         ? renameInput({ value: v.name, label: 'List name', notify: hooks.notify, taken: S.project.variables.map((x) => x.name),
@@ -179,6 +189,7 @@ function listSection() {
         : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingVar = v.name; hooks.refresh(); } }, v.name),
       h('span', { class: 'muted start-count' }, `${v.value.length} at start`),
       h('span', { class: 'now', 'data-now': v.name }, nowText(v.name)),
+      rememberBtn(v),
       h('button', { class: 'icon danger', title: 'Delete list', onclick: () => { S.project.variables = S.project.variables.filter((x) => x !== v); hooks.commit(); } }, '\u00d7')),
     h('input', { class: 'ctl list-start', value: v.value.join(', '), placeholder: 'Starting items, e.g. Milk, Eggs', 'aria-label': `Starting items of ${v.name}`,
       onchange: (e) => { v.value = e.target.value.split(',').map((x) => x.trim()).filter(Boolean).map(parseValue); hooks.commit(); } })));
@@ -191,4 +202,91 @@ function listSection() {
       S.project.variables.push({ name, value: [] }); hooks.commit();
     }),
   ];
+}
+
+// Tables (whole app): a small spreadsheet per table. Columns are fields (text or number), rows are records.
+// What is typed here is the table at the start; while the app runs, the live rows show underneath.
+let renamingField = null; // `${table}.${field}` being renamed
+const jsonOpen = new Set();  // tables whose JSON view is open
+
+function tableSection() {
+  const used = () => S.project.variables.map((x) => x.name);
+  const blocks = S.project.variables.filter(isTable).map((v) => {
+    const fields = v.table.fields;
+    const fieldHead = (f, fi) => {
+      if (renamingField === `${v.name}.${f.name}`) {
+        return h('th', {}, renameInput({ value: f.name, label: 'Field name', notify: hooks.notify, taken: fields.map((x) => x.name),
+          onDone: () => { renamingField = null; hooks.refresh(); },
+          onSave: (nv) => { renameField(S.project, v.name, f.name, nv); renamingField = null; hooks.commit(); } }));
+      }
+      return h('th', {}, h('button', { class: 'link-name fld', type: 'button', 'data-ab': `field-menu:${v.name}.${f.name}`, title: `${f.name}: ${f.type === 'number' ? 'numbers' : 'text'}. Click for options`, 'aria-haspopup': 'menu',
+        onclick: (e) => { const r = e.currentTarget.getBoundingClientRect(); openMenu({ x: r.left, y: r.bottom + 4, returnFocus: e.currentTarget, items: [
+          { label: 'Rename', fn: () => { renamingField = `${v.name}.${f.name}`; hooks.refresh(); } },
+          ...FIELD_TYPES.map(([t, label]) => ({ label: (f.type === t ? '✓ ' : '') + label, disabled: f.type === t, fn: () => {
+            const bad = v.value.filter((r) => fieldValue(t, r[f.name]).error).length;
+            if (bad) { hooks.notify(`${bad} row${bad === 1 ? ' has' : 's have'} text in ${f.name} that isn't a number. Change ${bad === 1 ? 'it' : 'them'} first.`); return; }
+            f.type = t; for (const r of v.value) r[f.name] = fieldValue(t, r[f.name]).value; hooks.commit();
+          } })),
+          fi > 0 ? { label: 'Move left', fn: () => { fields.splice(fi - 1, 0, fields.splice(fi, 1)[0]); hooks.commit(); } } : null,
+          fields.length > 1 ? { label: 'Delete field', danger: true, fn: () => { fields.splice(fi, 1); for (const r of v.value) delete r[f.name]; hooks.commit(); } } : null,
+        ] }); } }, f.name, h('small', { class: 'ftype' }, f.type === 'number' ? ' 123' : ' abc')));
+    };
+    const cellInput = (r, ri, f) => h('input', { class: 'cell' + (f.type === 'number' ? ' num' : ''), value: String(r[f.name] ?? ''), 'aria-label': `${v.name} row ${ri + 1} ${f.name}`, 'data-ab': `cell:${v.name}:${ri + 1}:${f.name}`,
+      inputmode: f.type === 'number' ? 'decimal' : null,
+      onchange: (e) => {
+        const res = fieldValue(f.type, e.target.value);
+        if (res.error) { hooks.notify(`${f.name} holds numbers: ${res.error}.`); e.target.value = String(r[f.name] ?? ''); return; }
+        r[f.name] = res.value; commitKeepFocus(e.target);
+      } });
+    const grid = h('div', { class: 'tbl-edit' }, h('table', {},
+      h('thead', {}, h('tr', {}, h('th', { class: 'rn' }, '#'), fields.map(fieldHead), h('th', { class: 'addf' },
+        h('button', { class: 'icon', type: 'button', title: 'Add a field (a column)', 'data-ab': `add-field:${v.name}`, onclick: () => {
+          let n = fields.length + 1; while (fields.some((x) => x.name === 'field' + n)) n++;
+          const name = 'field' + n; fields.push({ name, type: 'text' }); for (const r of v.value) r[name] = '';
+          renamingField = `${v.name}.${name}`; hooks.commit();
+        } }, '+')))),
+      h('tbody', {}, v.value.map((r, ri) => h('tr', {}, h('td', { class: 'rn' }, String(ri + 1)), fields.map((f) => h('td', {}, cellInput(r, ri, f))),
+        h('td', {}, h('button', { class: 'icon danger', type: 'button', title: `Delete row ${ri + 1}`, onclick: () => { v.value.splice(ri, 1); hooks.commit(); } }, '×')))))));
+    const addRowBtn = h('button', { class: 'btn small', type: 'button', 'data-ab': `add-row:${v.name}`, onclick: () => {
+      v.value.push(Object.fromEntries(fields.map((f) => [f.name, f.type === 'number' ? 0 : ''])));
+      hooks.commit();
+      queueMicrotask(() => document.querySelector(`[data-ab="cell:${v.name}:${v.value.length}:${fields[0]?.name}"]`)?.focus());
+    } }, '+ Row');
+    const jsonBtn = h('button', { class: 'btn small', type: 'button', 'aria-pressed': String(jsonOpen.has(v.name)), 'data-ab': `json:${v.name}`, title: 'See the table as JSON: a list of records, the shape JavaScript and Python use',
+      onclick: () => { if (jsonOpen.has(v.name)) jsonOpen.delete(v.name); else jsonOpen.add(v.name); hooks.refresh(); } }, '{ } JSON');
+    return h('div', { class: 'table-var' },
+      h('div', { class: 'var' },
+        renamingVar === v.name
+          ? renameInput({ value: v.name, label: 'Table name', notify: hooks.notify, taken: used(),
+            onDone: () => { renamingVar = null; hooks.refresh(); },
+            onSave: (nv) => { renameVariable(S.project, v.name, nv); renamingVar = null; hooks.commit(); } })
+          : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingVar = v.name; hooks.refresh(); } }, v.name),
+        h('span', { class: 'muted start-count' }, `${v.value.length} row${v.value.length === 1 ? '' : 's'} at start`),
+        h('span', { class: 'now', 'data-now': v.name }, nowText(v.name)),
+        rememberBtn(v),
+        h('button', { class: 'icon danger', title: 'Delete table', onclick: () => { S.project.variables = S.project.variables.filter((x) => x !== v); hooks.commit(); } }, '×')),
+      grid,
+      h('div', { class: 'tbl-tools' }, addRowBtn, jsonBtn),
+      jsonOpen.has(v.name) ? h('pre', { class: 'json', 'data-ab': `json-view:${v.name}`, 'aria-label': `${v.name} as JSON` }, JSON.stringify(v.value, null, 2)) : null,
+      h('div', { class: 'tbl-live', 'data-now-table': v.name }, liveTable(v.name)));
+  });
+  return [
+    h('h3', {}, 'Tables (whole app)'),
+    ...(blocks.length ? blocks : [h('p', { class: 'muted' }, 'None yet. A table keeps records: one row each, with the same fields (like title, artist, length).')]),
+    addRow('New table', (name) => {
+      const why = nameProblem(name, used());
+      if (why) { hooks.notify(why); return false; }
+      S.project.variables.push(newTable(name)); hooks.commit();
+    }),
+  ];
+}
+
+// Commit, then put the cursor back where the user tabbed or clicked to (the sidebar is redrawn on commit).
+function commitKeepFocus(input) {
+  const where = () => document.activeElement?.getAttribute?.('data-ab');
+  setTimeout(() => { // after focus has moved to the next cell
+    const next = document.activeElement !== input ? where() : input.getAttribute('data-ab');
+    hooks.commit();
+    if (next) document.querySelector(`[data-ab="${CSS.escape(next)}"]`)?.focus();
+  }, 0);
 }

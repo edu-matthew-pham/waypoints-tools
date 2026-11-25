@@ -24,6 +24,7 @@ const lessonId = QS.get('sample');
 const storeId = QS.get('store') || QS.get('id'); // ?id= is a Waypoints lesson step
 const STORE_KEY = storeId ? 'appbuilder.store.' + storeId : lessonId ? 'appbuilder.lesson.' + lessonId : 'appbuilder.prototype.v1';
 const store = (fn) => { try { return fn(localStorage); } catch { return null; } };
+S.storeKey = STORE_KEY;
 let history;
 
 // ?level=1&allow=onClicked,addTo&lock=1  (teachers link students into a lesson with exactly the blocks it needs)

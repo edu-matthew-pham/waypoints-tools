@@ -21,6 +21,7 @@ export const COMPONENTS = {
   shape:  { id: 'shape',  label: 'Box',        category: 'Basics', hint: 'A coloured rectangle: bars, backgrounds, dividers.', base: 'Box', props: { text: '', w: 200, h: 24 }, extra: { color: '#2f6fdd' } },
   image:  { id: 'image',  label: 'Image',      category: 'Media', hint: 'A picture: upload one or pick a built-in.', base: 'Image', props: { text: '', w: 120, h: 120 }, extra: { image: 'star' } },
   list:   { id: 'list',   label: 'List',       category: 'Data', hint: 'Shows the items of a list, one per row.', base: 'List', props: { text: '', w: 342, h: 220 }, extra: { source: '' } },
+  table:  { id: 'table',  label: 'Table',      category: 'Data', hint: 'Shows a table: a row for each record, a column for each field.', base: 'Table', props: { text: '', w: 460, h: 240 }, extra: { source: '', columns: '' } },
   toggle: { id: 'toggle', label: 'Toggle',     category: 'Choices', hint: 'An on/off switch with a label.',        base: 'Toggle', props: { text: 'Switch', w: 180, h: 32 }, extra: { on: false }, exposes: ['on'] },
   slider: { id: 'slider', label: 'Slider',     category: 'Choices', hint: 'Drag to pick a number.',                base: 'Slider', props: { text: '',       w: 240, h: 32 }, extra: { min: 0, max: 100, value: 50 }, exposes: ['value', 'min', 'max'] },
 };

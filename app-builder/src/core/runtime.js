@@ -10,7 +10,7 @@
 //  - Actions run before sub-events.
 //  - "Go to screen" happens after the current event finishes. Globals survive, copies reset.
 
-import { evaluate, parse, ExprError } from './expr.js';
+import { evaluate, parse, ExprError, fieldOf, isRecord } from './expr.js';
 import { CONDITIONS, ACTIONS, OBJECT_KINDS, normaliseKey } from './catalog.js';
 
 export const triggerOf = (ev) => (ev.conds || []).find((c) => CONDITIONS[c.type]?.trigger);
@@ -19,6 +19,7 @@ export class Runtime {
   constructor(project, opts = {}) {
     this.project = project;
     this.random = opts.random || Math.random;
+    this.store = opts.store || null; // { load(name) -> value | undefined, save(name, value) } for "Remember between visits"
     this.hooks = opts.hooks || {};
     this.globals = new Map();
     this.errors = [];
@@ -40,6 +41,13 @@ export class Runtime {
   // ---------- lifecycle ----------
   start(screenId) {
     this.globals = new Map(this.project.variables.map((v) => [v.name, structuredClone(v.value)])); // lists are copied, so a run never changes the project
+    this.tables = new Map(this.project.variables.filter((v) => v.table).map((v) => [v.name, v.table.fields || []]));
+    this.remembered = new Set(this.project.variables.filter((v) => v.remember).map((v) => v.name));
+    for (const name of this.remembered) {
+      let saved;
+      try { saved = this.store?.load(name); } catch { saved = undefined; }
+      if (saved !== undefined && Array.isArray(saved) === Array.isArray(this.globals.get(name))) this.globals.set(name, saved);
+    }
     this.errors = [];
     this.keysDown = new Set();
     this.time = 0;
@@ -162,15 +170,46 @@ export class Runtime {
   }
   setVar(name, value) {
     if (!this.globals.has(name)) throw new ExprError(`There's no variable called "${name}"`);
+    if (this.tables.has(name)) throw new ExprError(`${name} is a table: use the table actions (Add a row, Set a field ...)`);
     if (Array.isArray(this.globals.get(name))) throw new ExprError(`${name} is a list: use the list actions (Add to list, Clear list ...)`);
-    if (this.globals.get(name) !== value) { this.globals.set(name, value); this.#changed(); }
+    if (Array.isArray(value)) throw new ExprError(`A variable can't hold a whole list or table. Use one item, like item(${name}, 1)`);
+    if (this.globals.get(name) !== value) { this.globals.set(name, isRecord(value) ? { ...value } : value); this.#changed(name); }
   }
+  // a list or a table (both are lists of items; a table's items are rows)
   listOf(name) {
     const l = this.globals.get(name);
-    if (!Array.isArray(l)) throw new ExprError(`There's no list called "${name}"`);
+    if (!Array.isArray(l)) throw new ExprError(`There's no list or table called "${name}"`);
     return l;
   }
-  listChange(name, fn) { fn(this.listOf(name)); this.#changed(); }
+  listChange(name, fn) {
+    if (this.tables.has(name)) throw new ExprError(`${name} is a table: use the table actions (Add a row ...)`);
+    fn(this.listOf(name)); this.#changed(name);
+  }
+  // ---------- tables ----------
+  tableOf(name) {
+    if (!this.tables.has(name)) throw new ExprError(`There's no table called "${name}"`);
+    return this.globals.get(name);
+  }
+  fieldsOf(name) { this.tableOf(name); return this.tables.get(name); }
+  fieldType(table, field) {
+    const f = this.fieldsOf(table).find((x) => x.name === field);
+    if (!f) throw new ExprError(`${table} has no field "${field}". Its fields are ${this.fieldsOf(table).map((x) => x.name).join(', ') || 'none yet'}.`);
+    return f.type;
+  }
+  // a value going into a field, in the field's type (a number field won't take "abc")
+  toField(table, field, v) {
+    const type = this.fieldType(table, field);
+    if (type !== 'number') return typeof v === 'string' ? v : String(v ?? '');
+    if (typeof v === 'number') return v;
+    const t = String(v ?? '').trim();
+    const n = t === '' ? 0 : Number(t);
+    if (!Number.isFinite(n)) throw new ExprError(`${field} is a number field, but this is text: "${v}". Use int(...) to turn text into a number.`);
+    return n;
+  }
+  tableChange(name, fn) { fn(this.tableOf(name)); this.#changed(name); }
+  checkRow(t, i, name) {
+    if (!Number.isInteger(i) || i < 1 || i > t.length) throw new ExprError(`${name} has ${t.length} row${t.length === 1 ? '' : 's'}, so there is no row ${i}. Rows are numbered from 1.`);
+  }
   checkIndex(l, i) {
     if (!Number.isInteger(i) || i < 1 || i > l.length) throw new ExprError(`The list has ${l.length} item${l.length === 1 ? '' : 's'}, so there is no item ${i}. Items are numbered from 1.`);
   }
@@ -180,7 +219,7 @@ export class Runtime {
   }
   setInstVar(inst, name, value) {
     if (!(name in inst.vars)) throw new ExprError(`${inst.object} has no variable called "${name}"`);
-    if (inst.vars[name] !== value) { inst.vars[name] = value; this.#changed(); }
+    if (inst.vars[name] !== value) { inst.vars[name] = isRecord(value) ? { ...value } : value; this.#changed(); }
   }
   setProp(inst, name, value) {
     if (inst.props[name] !== value) { inst.props[name] = value; this.#changed(); }
@@ -205,7 +244,7 @@ export class Runtime {
     for (const inst of this.pickList(ctx, objName)) fn(inst, this.ctxWith(ctx, objName, inst));
   }
   evalExpr(src, ctx) {
-    return evaluate(parse(String(src ?? '')), {
+    const env = {
       random: this.random,
       getVar: (n) => {
         if (n === 'ClickedIndex' || n === 'ClickedItem') {
@@ -220,6 +259,9 @@ export class Runtime {
         return this.getVar(n);
       },
       getProp: (o, p) => {
+        if (!this.objects.has(o) && (this.globals.has(o) || /^(Loop|Clicked)(Item|Index)$/.test(o))) {
+          return fieldOf(evaluate({ k: 'var', name: o }, env), p, o); // LoopItem.artist, NowPlaying.title
+        }
         const list = this.pickList(ctx, o);
         const inst = list[0];
         if (!inst) throw new ExprError(`There's no ${o} to read "${p}" from`);
@@ -227,17 +269,24 @@ export class Runtime {
         if (p in inst.props) return inst.props[p];
         throw new ExprError(`${o} has no property "${p}"`);
       },
-    });
+    };
+    return evaluate(parse(String(src ?? '')), env);
   }
 
   watch() {
-    return { screen: this.screen?.name, vars: Object.fromEntries([...this.globals].map(([k, v]) => [k, Array.isArray(v) ? [...v] : v])) };
+    return { screen: this.screen?.name, tables: [...this.tables.keys()], fields: Object.fromEntries([...this.tables].map(([k, f]) => [k, f.map((x) => x.name)])), vars: Object.fromEntries([...this.globals].map(([k, v]) => [k, Array.isArray(v) ? v.map((x) => (isRecord(x) ? { ...x } : x)) : v])) };
   }
+  // Forget what "Remember between visits" kept, so the next start is a first visit.
+  forget() { for (const name of this.remembered) { try { this.store?.save(name, undefined); } catch { /* storage blocked */ } } }
 
   // ---------- internals ----------
   #ctx() { return { picked: new Map(), loop: [], clicked: null }; }
 
-  #changed() { this.version++; this.hooks.onChange?.(); }
+  #changed(name) {
+    this.version++;
+    if (name && this.remembered?.has(name)) { try { this.store?.save(name, this.globals.get(name)); } catch { /* storage blocked: the app still runs */ } }
+    this.hooks.onChange?.();
+  }
 
   #error(eventId, message) {
     const hit = this.errors.find((e) => e.eventId === eventId && e.message === message);
@@ -347,7 +396,7 @@ export class Runtime {
   #loopRounds(ev, c, ctx) {
     try {
       let items;
-      if (CONDITIONS[c.type].loop === 'each') items = [...this.listOf(c.list)];
+      if (CONDITIONS[c.type].loop === 'each') items = [...this.listOf(c.list ?? c.table)];
       else {
         const n = this.evalExpr(c.count, ctx);
         if (typeof n !== 'number' || n < 0) throw new ExprError('Repeat needs a number of times, like 3');

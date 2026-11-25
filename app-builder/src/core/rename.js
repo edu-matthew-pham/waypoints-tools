@@ -28,16 +28,24 @@ function eachItem(events, cb) {
   }
 }
 const exprParams = (entry) => (entry?.params || []).filter((p) => p.type === 'expr');
+// rewrite every value box of an item: expr params and the per-field boxes of "Add a row"
+function eachExpr(item, entry, fn) {
+  for (const p of exprParams(entry)) item[p.name] = fn(item[p.name]);
+  for (const p of (entry?.params || []).filter((x) => x.type === 'fields')) {
+    const vals = item[p.name] || {};
+    for (const k of Object.keys(vals)) vals[k] = fn(vals[k]);
+  }
+}
 
 export function renameVariable(project, from, to) {
   const v = project.variables.find((x) => x.name === from);
   if (!v) return;
   v.name = to;
   for (const s of project.screens) {
-    for (const o of s.objects) for (const i of o.instances) if (i.source === from) i.source = to; // List components showing it
+    for (const o of s.objects) for (const i of o.instances) if (i.source === from) i.source = to; // List and Table components showing it
     eachItem(s.events, (item, entry) => {
-      for (const p of entry?.params || []) if ((p.type === 'variable' || p.type === 'list') && item[p.name] === from) item[p.name] = to;
-      for (const p of exprParams(entry)) item[p.name] = rewrite(item[p.name], (t) => (t === from ? to : t));
+      for (const p of entry?.params || []) if (['variable', 'list', 'table'].includes(p.type) && item[p.name] === from) item[p.name] = to;
+      eachExpr(item, entry, (src) => rewrite(src, (t) => (t === from ? to : t.startsWith(from + '.') && !s.objects.some((o) => o.name === from) ? to + t.slice(from.length) : t)));
     });
   }
 }
@@ -48,7 +56,7 @@ export function renameObject(screen, from, to) {
   o.name = to;
   eachItem(screen.events, (item, entry) => {
     for (const p of entry?.params || []) if (p.type === 'object' && item[p.name] === from) item[p.name] = to;
-    for (const p of exprParams(entry)) item[p.name] = rewrite(item[p.name], (t) => (t.startsWith(from + '.') ? to + t.slice(from.length) : t));
+    eachExpr(item, entry, (src) => rewrite(src, (t) => (t.startsWith(from + '.') ? to + t.slice(from.length) : t)));
   });
 }
 
@@ -62,6 +70,41 @@ export function renameInstVar(screen, objName, from, to) {
   eachItem(screen.events, (item, entry) => {
     const objP = (entry?.params || []).find((p) => p.type === 'object');
     for (const p of entry?.params || []) if (p.type === 'instVar' && objP && item[objP.name] === objName && item[p.name] === from) item[p.name] = to;
-    for (const p of exprParams(entry)) item[p.name] = rewrite(item[p.name], (t) => (t === `${objName}.${from}` ? `${objName}.${to}` : t));
+    eachExpr(item, entry, (src) => rewrite(src, (t) => (t === `${objName}.${from}` ? `${objName}.${to}` : t)));
   });
+}
+
+// A field of a table. Its rows, the Table objects showing it, the actions that name it and every
+// ".field" in a value box are updated. A ".field" on a row is changed wherever the name before the dot isn't
+// an object (LoopItem.artist, ClickedItem.artist, item(Songs, 1).artist), so another table's field with the same
+// name changes too: rename fields that are only in one table, or check those boxes after.
+export function renameField(project, tableName, from, to) {
+  const v = project.variables.find((x) => x.name === tableName && x.table);
+  const f = v?.table.fields.find((x) => x.name === from);
+  if (!f) return;
+  f.name = to;
+  v.value = v.value.map((r) => Object.fromEntries(Object.entries(r).map(([k, x]) => [k === from ? to : k, x])));
+  for (const s of project.screens) {
+    const objects = new Set(s.objects.map((o) => o.name));
+    for (const o of s.objects) for (const i of o.instances) if (i.source === tableName && i.columns) i.columns = i.columns.split(',').map((c) => (c.trim() === from ? to : c.trim())).join(', ');
+    eachItem(s.events, (item, entry) => {
+      const t = (entry?.params || []).find((p) => p.type === 'table');
+      if (t && item[t.name] === tableName) {
+        for (const p of entry.params) {
+          if (p.type === 'field' && item[p.name] === from) item[p.name] = to;
+          if (p.type === 'fields' && item[p.name] && from in item[p.name]) { item[p.name][to] = item[p.name][from]; delete item[p.name][from]; }
+        }
+      }
+      eachExpr(item, entry, (src) => {
+        const toks = highlight(String(src ?? ''));
+        return toks.map(([k, tok], i) => {
+          if (k !== 'name') return tok;
+          const dot = tok.indexOf('.');
+          if (dot > 0 && tok.slice(dot + 1) === from && !objects.has(tok.slice(0, dot))) return tok.slice(0, dot + 1) + to;
+          if (dot < 0 && tok === from && toks[i - 1]?.[1] === '.') return to; // item(Songs, 1).artist
+          return tok;
+        }).join('');
+      });
+    });
+  }
 }

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolve, canUse, fromParams, LEVELS } from '../src/core/features.js';
+import { resolve, canUse, fromParams, LEVELS, L4_ONLY } from '../src/core/features.js';
 import { CONDITIONS, ACTIONS } from '../src/core/catalog.js';
 import { newProject, checkProject } from '../src/core/project.js';
 import { musicTracker, dailyChores } from '../src/samples.js';
@@ -58,9 +58,9 @@ test('URL params: level, allow (unknown ids dropped), lock', () => {
 });
 
 test('every catalog entry is assigned to a level, so new entries are not forgotten', () => {
-  const l3c = new Set(LEVELS[3].cond), l3a = new Set(LEVELS[3].act);
-  for (const id of Object.keys(CONDITIONS)) assert.ok(l3c.has(id), `condition ${id} is not in any level 1-3 (add it to features.js)`);
-  for (const id of Object.keys(ACTIONS)) assert.ok(l3a.has(id), `action ${id} is not in any level 1-3 (add it to features.js)`);
+  const l3c = new Set([...LEVELS[3].cond, ...L4_ONLY.cond]), l3a = new Set([...LEVELS[3].act, ...L4_ONLY.act]);
+  for (const id of Object.keys(CONDITIONS)) assert.ok(l3c.has(id), `condition ${id} is not in any level (add it to features.js, or to L4_ONLY)`);
+  for (const id of Object.keys(ACTIONS)) assert.ok(l3a.has(id), `action ${id} is not in any level (add it to features.js, or to L4_ONLY)`);
 });
 
 test('samples and new projects carry sensible levels', () => {
@@ -74,4 +74,12 @@ test('the choose-between-values builder is a level 3 feature (typed if() always 
   assert.equal(resolve({ level: 3 }).choice, true);
   assert.equal(resolve({ level: 1, ui: { choice: true } }).choice, true);
   assert.equal(resolve(undefined).choice, true);
+});
+
+test('tables are a level 4 feature; a lesson allow-list with table entries shows them', () => {
+  assert.equal(resolve({ level: 3 }).tables, false);
+  assert.equal(resolve({ level: 4 }).tables, true);
+  assert.equal(resolve({ level: 3 }).remember, true);
+  assert.equal(resolve({ level: 2 }).remember, false);
+  assert.equal(resolve({ level: 2, allow: { act: ['tableAdd'] } }).tables, true);
 });

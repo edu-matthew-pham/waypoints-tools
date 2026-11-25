@@ -2,7 +2,7 @@
 import { h } from '../ui/dom.js';
 import { Stage } from '../ui/stage.js';
 import { OBJECT_KINDS } from '../core/catalog.js';
-import { duplicateInstance, deleteInstance, findInstance, isIdentifier, parseValue, sizeOf } from '../core/project.js';
+import { duplicateInstance, deleteInstance, findInstance, isIdentifier, parseValue, sizeOf, tableColumns, isList, isTable, tableFields } from '../core/project.js';
 import { S, screen, hooks } from '../state.js';
 import { renameInput } from '../ui/rename-input.js';
 import { pickPicture } from '../ui/upload.js';
@@ -29,9 +29,9 @@ export function initDesign(root) {
 
   const listItems = (name) => S.project.variables.find((v) => v.name === name && Array.isArray(v.value))?.value;
   stage.fitTo(stageCol, () => innerHeight - 170);
-  const items = () => screen().objects.flatMap((o) => o.instances.map((i) => ({ id: i.id, name: o.name, kind: o.kind, props: o.kind === 'list' ? withItems(i) : i })));
+  const items = () => screen().objects.flatMap((o) => o.instances.map((i) => ({ id: i.id, name: o.name, kind: o.kind, props: o.kind === 'list' || o.kind === 'table' ? withItems(i) : i })));
   // a live view of the instance plus its list items, so dragging still moves the real instance
-  const withItems = (i) => new Proxy(i, { get: (t, k) => (k === 'items' ? listItems(t.source) : t[k]) });
+  const withItems = (i) => new Proxy(i, { get: (t, k) => (k === 'items' ? listItems(t.source) : k === 'fields' ? tableColumns(S.project, t) : t[k]) });
   function sync() { stage.sync(items()); stage.setSelected(S.selId); }
 
   function numField(label, key, inst, min = 0) {
@@ -104,11 +104,29 @@ export function initDesign(root) {
           }, hooks.notify) }, '+ Upload'))));
     }
     if (obj.kind === 'list') {
-      const lists = S.project.variables.filter((v) => Array.isArray(v.value)).map((v) => v.name);
+      const lists = S.project.variables.filter(isList).map((v) => v.name);
       const sel = h('select', { class: 'ctl', 'aria-label': 'Shows list', onchange: (e) => { inst.source = e.target.value; hooks.commit(); } },
         h('option', { value: '' }, lists.length ? '\u2014 choose \u2014' : 'Add a list on the left first'),
         lists.map((n) => h('option', { value: n, selected: inst.source === n }, n)));
       extra.push(h('label', { class: 'f wide' }, h('span', {}, 'Shows list'), sel));
+    }
+    if (obj.kind === 'table') {
+      const tables = S.project.variables.filter(isTable);
+      const sel = h('select', { class: 'ctl', 'aria-label': 'Shows table', 'data-ab': 'prop:source', onchange: (e) => { inst.source = e.target.value; inst.columns = ''; hooks.commit(); } },
+        h('option', { value: '' }, tables.length ? '\u2014 choose \u2014' : 'Add a table on the left first'),
+        tables.map((v) => h('option', { value: v.name, selected: inst.source === v.name }, v.name)));
+      extra.push(h('label', { class: 'f wide' }, h('span', {}, 'Shows table'), sel));
+      const all = tableFields(tables.find((v) => v.name === inst.source));
+      if (all.length) {
+        const shown = new Set(tableColumns(S.project, inst));
+        extra.push(h('fieldset', { class: 'f wide cols' }, h('legend', {}, 'Columns to show'),
+          all.map((f) => h('label', { class: 'check' }, h('input', { type: 'checkbox', checked: shown.has(f), 'data-ab': 'column:' + f, onchange: (e) => {
+            const next = all.filter((x) => (x === f ? e.target.checked : shown.has(x)));
+            inst.columns = next.length === all.length ? '' : next.join(', ');
+            if (!next.length) inst.columns = f; // keep at least one column
+            hooks.commit();
+          } }), h('span', {}, f)))));
+      }
     }
     if (obj.kind === 'shape') {
       extra.push(h('label', { class: 'f' }, h('span', {}, 'Colour'), h('input', { type: 'color', value: inst.color || '#2f6fdd', 'aria-label': 'Colour', oninput: (e) => { inst.color = e.target.value; sync(); }, onchange: () => hooks.commit() })));
@@ -126,7 +144,7 @@ export function initDesign(root) {
 
     props.replaceChildren(
       h('h3', {}, obj.name, h('small', {}, ` ${OBJECT_KINDS[obj.kind]?.label ?? obj.kind}${obj.instances.length > 1 ? ` · copy ${n} of ${obj.instances.length}` : ''}`)),
-      ...(['slider', 'shape', 'list'].includes(obj.kind) ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : obj.kind === 'image' ? 'Description (read aloud by screen readers)' : 'Text'), text)]),
+      ...(['slider', 'shape', 'list', 'table'].includes(obj.kind) ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : obj.kind === 'image' ? 'Description (read aloud by screen readers)' : 'Text'), text)]),
       h('div', { class: 'grid4' }, numField('X', 'x', inst), numField('Y', 'y', inst), numField('Width', 'w', inst, 24), numField('Height', 'h', inst, 20)),
       ...extra,
       h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: inst.visible !== false, onchange: (e) => { inst.visible = e.target.checked; hooks.commit(); } }), h('span', {}, 'Visible at start')),

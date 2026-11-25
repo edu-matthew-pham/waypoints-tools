@@ -56,8 +56,9 @@ Time runs from the interpreter's tick counter, not the wall clock, so tests are 
 
 - **Lists** as a value type: `add / remove / clear / count / item N / for each`. "For each" works like picking: it narrows to one
   item, runs the actions, and sub-events inherit it. The expression language gets `list.count` and `list[1]` (no loops, no eval).
-- **Remember between visits** (localStorage-backed variables; fails safe when storage is blocked).
-- **Tables (records you can see)** *(proposed 24 Nov 2026)*: a list of records, each row with the same named fields. Construct's
+- **Remember between visits** (localStorage-backed variables; fails safe when storage is blocked). *Built 25 Nov 2026.*
+- **Tables (records you can see)** *(proposed 24 Nov 2026; built 25 Nov 2026, see README › Tables. Not yet: paste rows
+  from a spreadsheet, a highlighted row on the Table object, the linked-table field type, the nested view)*: a list of records, each row with the same named fields. Construct's
   Array, Dictionary and JSON are invisible until the debugger; here the data shape is always on screen.
   - Sidebar: edited like a small spreadsheet (columns are fields, rows are records).
   - While running: the table's live values show in the sidebar (as variables' values do), the row in use highlighted, so

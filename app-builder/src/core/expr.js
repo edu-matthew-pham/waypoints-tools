@@ -125,7 +125,7 @@ export function parse(src) {
         const args = [];
         if (!isOp(')')) { do { args.push(concat()); } while (isOp(',') && ++p); }
         expect(')');
-        return { k: 'call', name: t.v, args };
+        return field({ k: 'call', name: t.v, args });
       }
       if (isOp('.')) {
         p++;
@@ -135,8 +135,16 @@ export function parse(src) {
       }
       return { k: 'var', name: t.v };
     }
-    if (t.t === 'op' && t.v === '(') { const e = concat(); expect(')'); return e; }
+    if (t.t === 'op' && t.v === '(') { const e = concat(); expect(')'); return field(e); }
     throw new ExprError(`Unexpected "${t.v}"`);
+  }
+  // item(Songs, 2).artist : a field of the record a call or brackets give
+  function field(e) {
+    if (!isOp('.')) return e;
+    p++;
+    const pr = toks[p++];
+    if (!pr || pr.t !== 'id') throw new ExprError('Expected a field name after "."');
+    return { k: 'field', e, name: pr.v };
   }
 
   const ast = concat();
@@ -145,8 +153,20 @@ export function parse(src) {
   return ast;
 }
 
+// a record is a row of a table: a plain object of field -> value
+export const isRecord = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+export function fieldOf(rec, name, what = 'This') {
+  if (!isRecord(rec)) throw new ExprError(`${what} isn't a row of a table, so it has no field "${name}"`);
+  if (!(name in rec)) {
+    const lower = Object.keys(rec).find((k) => k.toLowerCase() === name.toLowerCase());
+    throw new ExprError(lower ? `Use .${lower} (small letters), not .${name}` : `There's no field "${name}". The fields are ${Object.keys(rec).join(', ') || 'none yet'}.`);
+  }
+  return rec[name];
+}
+
 export function fmt(v) {
   if (Array.isArray(v)) return v.map(fmt).join(', ');
+  if (isRecord(v)) return Object.values(v).map(fmt).join(', ');
   if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(Math.round(v * 1e6) / 1e6);
   return String(v);
 }
@@ -179,6 +199,7 @@ FUNCS.item = { n: 2, f: (l, i) => {
   if (i < 1 || i > l.length || !Number.isInteger(i)) throw new ExprError(`The list has ${l.length} item${l.length === 1 ? '' : 's'}, so there is no item ${fmt(i)}. Items are numbered from 1.`);
   return l[i - 1];
 } };
+FUNCS.contains = { n: 2, f: (t, part) => fmt(t).includes(fmt(part)) };
 FUNCS.join = { n: 2, f: (l, sep) => needList(l, 'join').map(fmt).join(fmt(sep)) };
 // Construct names, so code copied from a Construct tutorial still works
 FUNCS.uppercase = FUNCS.upper;
@@ -193,6 +214,7 @@ export function evaluate(n, env) {
     case 'num': case 'str': case 'bool': return n.v;
     case 'var': return env.getVar(n.name);
     case 'prop': return env.getProp(n.obj, n.prop);
+    case 'field': return fieldOf(ev(n.e), n.name);
     case 'neg': return -needNum(ev(n.e));
     case 'if': return compare(ev(n.cond.l), n.cond.op, ev(n.cond.r)) ? ev(n.yes) : ev(n.no); // only the chosen side is worked out
     case 'bin': {
@@ -225,6 +247,11 @@ export function evaluate(n, env) {
 // Static check for the editor: parse errors and unknown names, without running.
 // scope = { vars: Set<string>, objects: Map<string, Set<string>> }
 export function check(src, scope) {
+  const checkField = (name) => {
+    if (!scope.fields || scope.fields.has(name)) return;
+    const lower = [...scope.fields].find((f) => f.toLowerCase() === name.toLowerCase());
+    throw new ExprError(lower ? `Use .${lower} (small letters), not .${name}` : scope.fields.size ? `No table has a field called "${name}"` : `"${name}" would be a field of a table, but there are no tables yet`);
+  };
   try {
     const ast = parse(String(src ?? ''));
     (function walk(n) {
@@ -234,6 +261,7 @@ export function check(src, scope) {
           break;
         case 'prop': {
           const props = scope.objects.get(n.obj);
+          if (!props && (scope.vars.has(n.obj) || LOOP_NAMES.includes(n.obj))) { checkField(n.prop); break; } // a row of a table: LoopItem.artist
           if (!props) throw new ExprError(`There's no object called "${n.obj}" on this screen`);
           if (!props.has(n.prop)) {
             const lower = [...props].find((p) => p.toLowerCase() === n.prop.toLowerCase());
@@ -250,6 +278,7 @@ export function check(src, scope) {
           break;
         }
         case 'bin': walk(n.l); walk(n.r); break;
+        case 'field': walk(n.e); checkField(n.name); break;
         case 'call':
           if (!FUNCTION_NAMES().includes(n.name)) throw new ExprError(`There's no function called "${n.name}"`);
           n.args.forEach(walk);
@@ -278,10 +307,11 @@ export const FUNCTION_HELP = {
   str:    ['str(x)', 'Turns a number into text.', 'str(score)'],
   len:    ['len(text)', 'How many characters are in some text.', 'len(Name.text)'],
   upper:  ['upper(text)', 'Text in CAPITALS. (uppercase() also works.)', 'upper(Name.text)'],
-  count:  ['count(list)', 'How many items are in a list.', 'count(journal)'],
-  item:   ['item(list, n)', 'Item number n of a list (the first is 1).', 'item(journal, 1)'],
+  count:  ['count(list)', 'How many items are in a list, or rows in a table.', 'count(journal)'],
+  item:   ['item(list, n)', 'Item number n of a list (the first is 1). For a table, row n: add .field', 'item(Songs, 2).artist'],
   join:   ['join(list, between)', 'All the items as one piece of text.', 'join(chores, ", ")'],
   lower:  ['lower(text)', 'Text in lower case. (lowercase() also works.)', 'lower(Name.text)'],
+  contains: ['contains(text, part)', 'true if the text has the part in it (capitals count).', 'contains(lower(LoopItem.title), lower(Search.text))'],
   uppercase: ['uppercase(text)', 'Same as upper().', 'uppercase(Name.text)'],
   lowercase: ['lowercase(text)', 'Same as lower().', 'lowercase(Name.text)'],
 };

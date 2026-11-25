@@ -14,6 +14,7 @@ export const ICONS = {
   shape:  svg('<rect x="8" y="14" width="32" height="20" rx="3" fill="currentColor" fill-opacity=".25"/>'),
   image:  svg('<rect x="7" y="9" width="34" height="30" rx="4"/><circle cx="17" cy="19" r="3.5"/><path d="M8 36l11-11 8 8 5-5 9 9"/>'),
   list:   svg('<path d="M16 14h24M16 24h24M16 34h24"/><circle cx="9" cy="14" r="1.5" fill="currentColor"/><circle cx="9" cy="24" r="1.5" fill="currentColor"/><circle cx="9" cy="34" r="1.5" fill="currentColor"/>'),
+  table:  svg('<rect x="6" y="9" width="36" height="30" rx="3"/><path d="M6 18h36M6 28h36M20 9v30"/>'),
   toggle: svg('<rect x="6" y="15" width="36" height="18" rx="9"/><circle cx="33" cy="24" r="5"/>'),
   slider: svg('<path d="M8 24h32"/><circle cx="20" cy="24" r="5" fill="currentColor"/>'),
 };
@@ -50,6 +51,24 @@ export const RENDER = {
       inner.replaceChildren(...(items.length
         ? items.map((it, i) => h('div', { class: 'lst-row', role: 'listitem', 'data-index': String(i + 1) }, Array.isArray(it) ? it.join(', ') : String(it)))
         : [h('div', { class: 'lst-empty' }, p.source ? 'Empty list' : 'Choose a list in Properties')]));
+    },
+  },
+  // p.items = the rows (records), p.fields = the field names to show as columns
+  table: {
+    make: () => h('div', { class: 'tbl', role: 'table' }),
+    write: (inner, p) => {
+      const rows = Array.isArray(p.items) ? p.items : [];
+      const fields = Array.isArray(p.fields) ? p.fields : [];
+      const key = JSON.stringify([fields, rows]);
+      if (inner._key === key) return;
+      inner._key = key;
+      const cell = (tag, text, cls) => h(tag, { class: cls, role: tag === 'th' ? 'columnheader' : 'cell' }, text);
+      if (!p.source) { inner.replaceChildren(h('div', { class: 'lst-empty' }, 'Choose a table in Properties')); return; }
+      inner.replaceChildren(h('div', { class: 'tbl-scroll' }, h('table', {},
+        h('thead', {}, h('tr', { role: 'row' }, fields.map((f) => cell('th', f)))),
+        h('tbody', {}, rows.length
+          ? rows.map((r, i) => h('tr', { class: 'lst-row tbl-row', role: 'row', 'data-index': String(i + 1) }, fields.map((f) => cell('td', r && f in r ? String(r[f]) : ''))))
+          : [h('tr', {}, h('td', { class: 'lst-empty', colspan: String(Math.max(1, fields.length)) }, 'No rows yet'))]))));
     },
   },
   shape: {

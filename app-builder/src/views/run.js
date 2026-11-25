@@ -9,9 +9,10 @@ export function initRun(root) {
   const problems = h('div', { class: 'problems' });
   const sheet = document.createElement('event-sheet');
   const restartBtn = h('button', { class: 'btn', 'data-ab': 'restart' }, '↻ Restart');
+  const forgetBtn = h('button', { class: 'btn', 'data-ab': 'forget-saved', title: 'Forget what the app remembered between visits, and start again as if for the first time' }, 'Forget saved data');
   root.append(
     h('div', { class: 'stage-col' },
-      h('div', { class: 'run-bar' }, restartBtn, h('span', { class: 'muted' }, 'Starts on the screen you were editing. Click things like a user would. Values now show beside each variable on the left.'), h('span', { class: 'run-screen', 'data-now-screen': '' })),
+      h('div', { class: 'run-bar' }, restartBtn, forgetBtn, h('span', { class: 'muted' }, 'Starts on the screen you were editing. Click things like a user would. Values now show beside each variable on the left.'), h('span', { class: 'run-screen', 'data-now-screen': '' })),
       stageHost),
     h('div', { class: 'run-side' }, problems, h('h3', {}, 'Events on this screen'), sheet));
 
@@ -23,8 +24,9 @@ export function initRun(root) {
   runner.stage.fitTo(root.querySelector('.stage-col'), () => innerHeight - 170);
   const start = () => { runner.start(S.project, S.screenId); runner.focus(); }; // so keys work straight away
   restartBtn.addEventListener('click', start);
+  forgetBtn.addEventListener('click', () => { runner.stop(); runner.forget(S.project); start(); });
   return {
-    activate: () => { document.documentElement.classList.add('ab-runtab'); start(); },
+    activate: () => { document.documentElement.classList.add('ab-runtab'); forgetBtn.hidden = !S.project.variables.some((v) => v.remember); start(); },
     deactivate: () => { document.documentElement.classList.remove('ab-runtab'); runner.stop(); },
   };
 }

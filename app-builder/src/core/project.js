@@ -1,6 +1,9 @@
 // Project model helpers (plain JSON in, plain JSON out; no DOM).
 //
-// project = { version, name, features, variables:[{name,value}], screens:[screen] }   (features: see features.js)
+// project = { version, name, features, variables:[variable], screens:[screen] }   (features: see features.js)
+// variable= { name, value, remember? }              value: a number or text, an array (a list), or for a table
+//           { name, table:{ fields:[{name,type}] }, value:[record], remember? }   record = { field: value }
+//           type is 'text' or 'number'. remember: kept in the browser between visits (Run, not the project file)
 // screen  = { id, name, objects:[object], events:[event] }
 // object  = { name, kind, instanceVars:[{name,value}], instances:[instance] }
 // instance= { id, x, y, w, h, text, visible, vars:{} }
@@ -67,11 +70,40 @@ export function deleteInstance(screen, id) {
   if (!hit.obj.instances.length) screen.objects = screen.objects.filter((o) => o !== hit.obj);
 }
 
+// A table is a variable holding a list of records with named fields; a list is a plain array.
+export const isTable = (v) => !!v?.table;
+export const isList = (v) => Array.isArray(v?.value) && !v.table;
+export const tableFields = (v) => (v?.table?.fields || []).map((f) => f.name);
+export const FIELD_TYPES = [['text', 'Text'], ['number', 'Number']];
+
+// What a Table object shows: its chosen columns (blank = every field, in order) of the table it shows.
+export function tableColumns(project, inst) {
+  const v = project.variables.find((x) => x.name === inst.source && x.table);
+  const all = tableFields(v);
+  const want = String(inst.columns || '').split(',').map((x) => x.trim()).filter(Boolean);
+  return want.length ? want.filter((f) => all.includes(f)) : all;
+}
+
+export function newTable(name) { return { name, table: { fields: [{ name: 'name', type: 'text' }] }, value: [] }; }
+
+// A value typed into a table cell (or given by an action), turned into the field's type.
+// Returns { value } or { error } (a number field given text that isn't a number).
+export function fieldValue(type, v) {
+  if (type !== 'number') return { value: typeof v === 'string' ? v : v == null ? '' : String(v) };
+  if (typeof v === 'number') return { value: v };
+  const t = String(v ?? '').trim();
+  if (t === '') return { value: 0 };
+  const n = Number(t);
+  return Number.isFinite(n) ? { value: n } : { error: `"${v}" isn't a number` };
+}
+
 export function scopeFor(project, screen) {
   return {
     objects: (screen?.objects || []).map((o) => ({ name: o.name, kind: o.kind, vars: o.instanceVars.map((v) => v.name) })),
     variables: project.variables.filter((v) => !Array.isArray(v.value)).map((v) => v.name),
-    lists: project.variables.filter((v) => Array.isArray(v.value)).map((v) => v.name),
+    lists: project.variables.filter(isList).map((v) => v.name),
+    tables: project.variables.filter(isTable).map((v) => v.name),
+    tableFields: Object.fromEntries(project.variables.filter(isTable).map((v) => [v.name, tableFields(v)])),
     screens: project.screens.map((s) => ({ id: s.id, name: s.name })),
     pictures: imageNames(project),
   };
@@ -93,6 +125,7 @@ export function exprScopeFor(project, screen) {
   };
   return {
     start,
+    fields: new Set(project.variables.filter(isTable).flatMap(tableFields)),
     vars: new Set(project.variables.map((v) => v.name)),
     objects: new Map((screen?.objects || []).map((o) => [o.name, new Set([...PROP_NAMES, ...(OBJECT_KINDS[o.kind]?.exposes || []), ...o.instanceVars.map((v) => v.name)])])),
   };
@@ -109,6 +142,7 @@ export function parseValue(s) {
 export function checkProject(p) {
   if (!p || typeof p !== 'object' || !Array.isArray(p.screens) || !p.screens.length) throw new Error('This file is not an app project.');
   p.variables ||= [];
+  for (const v of p.variables) if (v.table) { v.table.fields ||= []; if (!Array.isArray(v.value)) v.value = []; }
   p.assets ||= [];
   p.device ||= 'phone'; // projects from before the Web page option were phone-sized
   p.features ||= { level: 4 }; // older projects: nothing hidden

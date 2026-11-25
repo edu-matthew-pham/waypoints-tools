@@ -1,1 +1,1 @@
-{ "private": true, "type": "module", "scripts": { "test": "node --test tests/*.test.js" } }
+{ "private": true, "type": "module", "scripts": { "test": "node --test tests/*.test.js", "build": "node tools/build.mjs" }, "devDependencies": { "esbuild": "^0.25.0" } }

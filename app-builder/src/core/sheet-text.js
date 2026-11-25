@@ -5,14 +5,15 @@
 //   screen Home
 //   variable Minutes = 0
 //   list Journal = ["a", "b"]
+//   table Songs = [title, artist, length] 3 rows          (any variable, list or table can end "(remembered)")
 //   object SaveButton (button) text "Save"
 //   event: when SaveButton is clicked | do: Add 15 to variable Minutes; Set TotalText text to "You've " & Minutes
 //   event: when SaveButton is clicked > when TotalText text = "x" | do: ...      (a sub-event repeats its parents)
 //   event: else | do: ...
-import { entryFor, KEYS } from './catalog.js';
+import { entryFor, KEYS, SORT_DIRS } from './catalog.js';
 import { COMPONENTS } from './components.js';
 
-const SHOW = { showhide: { show: 'Show', hide: 'Hide' }, onoff: { on: 'on', off: 'off' }, posSize: { w: 'width', h: 'height', x: 'x position', y: 'y position' } };
+const SHOW = { showhide: { show: 'Show', hide: 'Hide' }, onoff: { on: 'on', off: 'off' }, posSize: { w: 'width', h: 'height', x: 'x position', y: 'y position' }, sortdir: Object.fromEntries(SORT_DIRS) };
 const KEY_NAMES = Object.fromEntries(KEYS);
 
 function itemText(kind, item, screens) {
@@ -24,6 +25,7 @@ function itemText(kind, item, screens) {
     if (!prm) return m;
     if (prm.type === 'screen') return screens.find((s) => s.id === v)?.name ?? v;
     if (prm.type === 'key') return KEY_NAMES[v] ?? v;
+    if (prm.type === 'fields') return Object.entries(v || {}).filter(([, x]) => String(x).trim() !== '').map(([f, x]) => `${f} = ${x}`).join(', ');
     if (SHOW[prm.type]) return SHOW[prm.type][v] ?? v;
     return String(v);
   });
@@ -32,12 +34,16 @@ function itemText(kind, item, screens) {
 export function sheetText(project) {
   const out = [];
   const val = (v) => JSON.stringify(v);
-  for (const v of project.variables || []) out.push(Array.isArray(v.value) ? `list ${v.name} = ${val(v.value)}` : `variable ${v.name} = ${val(v.value)}`);
+  for (const v of project.variables || []) {
+    const line = v.table ? `table ${v.name} = [${(v.table.fields || []).map((f) => f.name).join(', ')}] ${v.value.length} row${v.value.length === 1 ? '' : 's'}`
+      : Array.isArray(v.value) ? `list ${v.name} = ${val(v.value)}` : `variable ${v.name} = ${val(v.value)}`;
+    out.push(line + (v.remember ? ' (remembered)' : ''));
+  }
   for (const s of project.screens || []) {
     out.push(`screen ${s.name}`);
     for (const o of s.objects || []) {
       const i = o.instances[0] || {};
-      out.push(`object ${o.name} (${COMPONENTS[o.kind]?.label.toLowerCase() ?? o.kind}) text ${val(i.text ?? '')}${o.kind === 'list' && i.source ? ` shows ${i.source}` : ''}${o.instances.length > 1 ? ` copies ${o.instances.length}` : ''}`);
+      out.push(`object ${o.name} (${COMPONENTS[o.kind]?.label.toLowerCase() ?? o.kind}) text ${val(i.text ?? '')}${(o.kind === 'list' || o.kind === 'table') && i.source ? ` shows ${i.source}` : ''}${o.instances.length > 1 ? ` copies ${o.instances.length}` : ''}`);
       for (const iv of o.instanceVars || []) out.push(`object variable ${o.name}.${iv.name} = ${val(iv.value)}`);
     }
     const walk = (events, path) => {
