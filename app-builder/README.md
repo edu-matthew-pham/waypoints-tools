@@ -29,7 +29,8 @@ Add these to `https://tools.learningwaypoints.com/app-builder/`:
 
 Combine with `&level=2` (blocks offered), `&allow=onClicked,addTo,setText` (a lesson's own block list) and `&lock=1`
 (hides the level switch and Samples menu). Example: `?sample=water-start&level=2&lock=1`.
-`&on=functionLogic,returnValues,copyPicked` turns on the parts of Functions that start switched off (see Functions below). Embedding, stable labels and project reports: ROADMAP.md › Automation hooks.
+With no lesson link (the plain address, or **New**) everything is offered (Level 4), like a MakeCode or Construct
+playground; a lesson link sets its own level. Embedding, stable labels and project reports: ROADMAP.md › Automation hooks.
 
 Each lesson link keeps its own saved work in the browser, so students carry on where they were; **Start again**
 (press twice) reloads the original. Save/Open still work for handing in a file.
@@ -98,15 +99,14 @@ text = Entry.text**; the function's actions run there and then, and the event ca
 plain name (`"Saved: " & text`). It works on any screen, with objects matched by name like the All screens sheet: an
 action on an object the screen doesn't have is skipped there (a condition on one is false).
 
-Three parts are built but start switched off, so a class meets the simple version first (`features.ui`, or
-`&on=...` on a link):
+It starts as a plain list of actions. Small buttons on the function's name line open up more when a student needs it:
 
-- `functionLogic`: conditions, sub-events and Else inside a function (until then it shows as "When called, do ...").
-- `returnValues`: **Set return value**, so a function can be used as a value: `Total(price, qty)`.
-- `copyPicked`: a tick box on the function; the function then works on the copies the calling event picked (only the
-  clicked Tile) instead of starting with every copy, as in Construct.
+- **+ Check**: conditions, sub-events and Otherwise inside the function (it becomes a small event sheet, and stays one).
+- **+ Give back a value**: adds **Set return value**, so the function can be used as a value: `Total(price, qty)`.
+- **Only the picked ones** (Copy picked): the function works on the copies the calling event picked (only the clicked
+  Tile) instead of starting with every copy, as in Construct.
 
-Anything a project already uses stays shown. Names are single words (they become real function names in code);
+Names are single words (they become real function names in code);
 a parameter can't share a name with a whole-app variable. A call stops after 50 calls inside calls (a function that
 calls itself without a way to stop). The Map follows calls; the sheet text has a `function Name(params)` line.
 
