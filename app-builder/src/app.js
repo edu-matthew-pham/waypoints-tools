@@ -10,10 +10,14 @@ import { initEvents } from './views/events.js';
 import { initRun } from './views/run.js';
 import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './core/features.js';
-import { pictures } from './ui/component-ui.js';
+import { pictures, media } from './ui/component-ui.js';
 import { embed } from './embed.js';
-import { imageData } from './core/assets.js';
+import { imageData, soundInfo, videoSource, addBuiltinSounds } from './core/assets.js';
 pictures.lookup = (name) => imageData(S.project, name);
+media.sound = (name) => soundInfo(S.project, name);
+media.video = (link) => videoSource(link, { allowYoutube: !!S.project.allowYoutube });
+// more built-in sounds (e.g. FreePD tracks) listed beside App Builder; none is fine
+fetch('sounds/extra.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : [])).then((list) => { addBuiltinSounds(list); hooks.refresh?.(); }).catch(() => {});
 import { SAMPLES, sampleById } from './samples.js';
 
 // ?sample=water opens that lesson project. Each lesson link keeps its own saved work, so a student who

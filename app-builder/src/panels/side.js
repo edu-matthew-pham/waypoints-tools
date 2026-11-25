@@ -1,7 +1,7 @@
 // Left panel: one project tree (screens > objects > copies) plus whole-app variables.
 import { h } from '../ui/dom.js';
 import { OBJECT_KINDS } from '../core/catalog.js';
-import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue, sizeOf, isList, isTable, newTable, fieldValue, FIELD_TYPES } from '../core/project.js';
+import { addObject, newScreen, duplicateInstance, deleteInstance, isIdentifier, parseValue, sizeOf, isList, isTable, newTable, fieldValue, FIELD_TYPES, pasteRows } from '../core/project.js';
 import { openMenu } from '../ui/menu.js';
 import { openObjectPicker } from '../ui/object-picker.js';
 import { renameInput } from '../ui/rename-input.js';
@@ -164,6 +164,16 @@ export function renderSide(el) {
       h('button', { class: 'btn add-screen', type: 'button', onclick: () => pickPicture(({ fileName, data }) => {
         S.project.assets.push({ name: assetName(S.project, fileName), data }); hooks.commit();
       }, hooks.notify), 'data-ab': 'upload-picture' }, '+ Upload picture')] : []),
+    ...(S.project.sounds?.length ? [
+      h('h3', {}, 'Sounds (whole app)'),
+      h('div', { class: 'pic-list' }, S.project.sounds.map((a) => h('div', { class: 'var' },
+        h('span', { class: 'vname' }, '🔊 ' + a.name),
+        h('span', { class: 'muted start-count' }, `${Math.round(a.data.length * 0.75 / 1024)} KB`),
+        h('button', { class: 'icon danger', title: 'Delete sound', onclick: () => {
+          const users = soundUsers(a.name);
+          if (users.length) { hooks.notify(`${a.name} is still used by ${users.join(', ')}. Change those first.`); return; }
+          S.project.sounds = S.project.sounds.filter((x) => x !== a); hooks.commit();
+        } }, '\u00d7'))))] : []),
     h('p', { class: 'muted legal' }, 'Free for education. Commercial use by permission only.'),
   );
 }
@@ -174,6 +184,16 @@ function pictureUsers(name) {
   for (const sc of S.project.screens) {
     for (const o of sc.objects) if (o.instances.some((i) => i.image === name)) out.add(o.name);
     (function walk(evs) { for (const ev of evs) { if (ev.actions.some((a) => a.type === 'setImage' && a.image === name)) out.add('an event on ' + sc.name); walk(ev.children || []); } })(sc.events);
+  }
+  return [...out];
+}
+
+// objects and events that use an uploaded sound
+function soundUsers(name) {
+  const out = new Set();
+  for (const sc of S.project.screens) {
+    for (const o of sc.objects) if (o.instances.some((i) => i.sound === name)) out.add(o.name);
+    (function walk(evs) { for (const ev of evs) { if (ev.actions.some((a) => a.type === 'setSound' && a.sound === name)) out.add('an event on ' + sc.name); walk(ev.children || []); } })(sc.events);
   }
   return [...out];
 }
@@ -237,6 +257,16 @@ function tableSection() {
         const res = fieldValue(f.type, e.target.value);
         if (res.error) { hooks.notify(`${f.name} holds numbers: ${res.error}.`); e.target.value = String(r[f.name] ?? ''); return; }
         r[f.name] = res.value; commitKeepFocus(e.target);
+      },
+      // pasting cells from a spreadsheet (more than one cell) fills the table from here, adding rows as needed
+      onpaste: (e) => {
+        const text = e.clipboardData?.getData('text/plain') ?? '';
+        if (!/[\t\n]/.test(text.replace(/\n+$/, ''))) return;
+        e.preventDefault();
+        const res = pasteRows(v, text, { row: ri + 1, field: f.name });
+        if (res.error) { hooks.notify(`Nothing pasted: ${res.error}.`); return; }
+        hooks.commit();
+        hooks.notify(`Pasted ${res.rows} row${res.rows === 1 ? '' : 's'}${res.skipped ? `; ${res.skipped} cell${res.skipped === 1 ? '' : 's'} past the last field left out (add a field first)` : ''}.`);
       } });
     const grid = h('div', { class: 'tbl-edit' }, h('table', {},
       h('thead', {}, h('tr', {}, h('th', { class: 'rn' }, '#'), fields.map(fieldHead), h('th', { class: 'addf' },
@@ -252,6 +282,8 @@ function tableSection() {
       hooks.commit();
       queueMicrotask(() => document.querySelector(`[data-ab="cell:${v.name}:${v.value.length}:${fields[0]?.name}"]`)?.focus());
     } }, '+ Row');
+    const pasteBtn = h('button', { class: 'btn small', type: 'button', 'data-ab': `paste-rows:${v.name}`, title: 'Paste rows copied from a spreadsheet',
+      onclick: () => pasteDialog(v) }, '📋 Paste rows');
     const jsonBtn = h('button', { class: 'btn small', type: 'button', 'aria-pressed': String(jsonOpen.has(v.name)), 'data-ab': `json:${v.name}`, title: 'See the table as JSON: a list of records, the shape JavaScript and Python use',
       onclick: () => { if (jsonOpen.has(v.name)) jsonOpen.delete(v.name); else jsonOpen.add(v.name); hooks.refresh(); } }, '{ } JSON');
     return h('div', { class: 'table-var' },
@@ -266,7 +298,7 @@ function tableSection() {
         rememberBtn(v),
         h('button', { class: 'icon danger', title: 'Delete table', onclick: () => { S.project.variables = S.project.variables.filter((x) => x !== v); hooks.commit(); } }, '×')),
       grid,
-      h('div', { class: 'tbl-tools' }, addRowBtn, jsonBtn),
+      h('div', { class: 'tbl-tools' }, addRowBtn, pasteBtn, jsonBtn),
       jsonOpen.has(v.name) ? h('pre', { class: 'json', 'data-ab': `json-view:${v.name}`, 'aria-label': `${v.name} as JSON` }, JSON.stringify(v.value, null, 2)) : null,
       h('div', { class: 'tbl-live', 'data-now-table': v.name }, liveTable(v.name)));
   });
@@ -282,6 +314,30 @@ function tableSection() {
 }
 
 // Commit, then put the cursor back where the user tabbed or clicked to (the sidebar is redrawn on commit).
+// Paste rows: a box to paste cells copied from a spreadsheet (one row per line). They are added after the last row,
+// in field order; a first line with the field names is skipped.
+function pasteDialog(v) {
+  const box = h('textarea', { class: 'ctl paste-box', rows: '8', spellcheck: 'false', 'aria-label': `Rows to add to ${v.name}`, 'data-ab': 'paste-text',
+    placeholder: v.table.fields.map((f) => f.name).join('\t') + '\n…' });
+  const dlg = h('dialog', { class: 'es-dlg', 'aria-label': `Paste rows into ${v.name}` },
+    h('div', { class: 'dlg-head' }, h('strong', {}, `Paste rows into ${v.name}`)),
+    h('div', { class: 'dlg-body' },
+      h('p', { class: 'muted' }, `Copy rows from a spreadsheet and paste them here, one row per line. Columns go into the fields in order (${v.table.fields.map((f) => f.name).join(', ')}) and are added after the last row.`),
+      box),
+    h('div', { class: 'dlg-foot' }, h('span', { class: 'spacer' }),
+      h('button', { class: 'btn', type: 'button', onclick: () => dlg.close() }, 'Cancel'),
+      h('button', { class: 'btn primary', type: 'button', 'data-ab': 'paste-add', onclick: () => {
+        const res = pasteRows(v, box.value, { row: v.value.length + 1 });
+        if (res.error) { hooks.notify(`Nothing added: ${res.error}.`); return; }
+        dlg.close(); hooks.commit();
+        hooks.notify(`Added ${res.rows} row${res.rows === 1 ? '' : 's'}${res.skipped ? `; ${res.skipped} cell${res.skipped === 1 ? '' : 's'} past the last field left out` : ''}.`);
+      } }, 'Add rows')));
+  dlg.addEventListener('close', () => dlg.remove());
+  document.body.append(dlg);
+  dlg.showModal();
+  box.focus();
+}
+
 function commitKeepFocus(input) {
   const where = () => document.activeElement?.getAttribute?.('data-ab');
   setTimeout(() => { // after focus has moved to the next cell

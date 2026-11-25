@@ -390,6 +390,7 @@ select.ctl { padding-right: 6px; }
 .lst-row { padding: 10px 12px; border-bottom: 1px solid #eef0f5; font-size: 15px; cursor: pointer; }
 .lst-row:last-child { border-bottom: 0; }
 .lst-row:hover { background: #f4f7fd; }
+.lst-row.sel, .lst-row.sel:hover { background: #dce8fd; box-shadow: inset 3px 0 0 #2f6fdd; }
 .lst-empty { padding: 12px; color: #98a0b0; font-size: 14px; }
 .list-var { margin: 6px 0 10px; }
 .list-start { width: 100%; font-size: 13px; }
@@ -484,3 +485,25 @@ table.live td.chg { animation: nowbump .8s ease-out; background: var(--accent-so
 .tbl td { padding: 8px 10px; border-bottom: 1px solid #eef0f5; }
 .tbl .tbl-row { cursor: pointer; }
 .tbl .tbl-row:hover td { background: #f4f7fd; }
+.tbl .tbl-row.sel td { background: #dce8fd; }
+.tbl .tbl-row.sel td:first-child { box-shadow: inset 3px 0 0 #2f6fdd; }
+
+.paste-box { width: 100%; font: 13px/1.4 ui-monospace, Menlo, monospace; resize: vertical; }
+
+/* Sound and Video objects */
+.w-sound { display: flex; }
+.snd { display: flex; align-items: center; gap: 10px; width: 100%; height: 100%; padding: 6px 10px; border: 1px solid #dfe3ec; border-radius: 12px; background: #fff; box-sizing: border-box; overflow: hidden; }
+.snd.on { border-color: #2f6fdd; background: #f2f6fe; }
+.snd-btn { flex: none; width: 36px; height: 36px; border-radius: 50%; border: 0; background: #2f6fdd; color: #fff; font-size: 15px; cursor: pointer; display: grid; place-items: center; }
+.snd-btn:disabled { cursor: default; opacity: .85; }
+.snd-txt { min-width: 0; }
+.snd-title { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.snd-credit { font-size: 11px; color: #7a8294; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.snd audio { display: none; }
+.vid { width: 100%; height: 100%; display: flex; flex-direction: column; background: #111; border-radius: 10px; overflow: hidden; }
+.vid video, .vid iframe { flex: 1; min-height: 0; width: 100%; border: 0; background: #000; }
+.vid-credit { font-size: 11px; color: #cfd4de; padding: 3px 8px; background: #1b1d22; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vid-credit a { color: #9cc0ff; }
+.vid-ph { flex: 1; display: grid; place-content: center; text-align: center; gap: 6px; color: #cfd4de; font-size: 13px; padding: 10px; }
+.vid-big { font-size: 34px; }
+p.small, .muted.small { font-size: 12px; }

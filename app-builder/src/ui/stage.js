@@ -62,6 +62,12 @@ export class Stage {
         const row = e.target.closest('.lst-row');
         if (w && row) this.on.itemClick?.(w.dataset.id, Number(row.dataset.index));
       });
+      // sounds and videos report what their players do (media events don't bubble, so listen while capturing)
+      for (const type of ['play', 'pause', 'ended']) this.el.addEventListener(type, (e) => {
+        const w = e.target.closest?.('.w');
+        if (!w || (type === 'pause' && e.target.ended)) return;
+        this.on.media?.(w.dataset.id, type);
+      }, true);
       this.el.addEventListener('input', (e) => {
         const w = e.target.closest('.w');
         if (!w) return;

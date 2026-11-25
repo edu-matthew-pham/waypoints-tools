@@ -87,6 +87,20 @@ export const CONDITIONS = {
       return keep.length > 0;
     },
   },
+  isPlaying: {
+    category: 'Object', label: '{target} is playing',
+    params: [obj({ kinds: ['sound', 'video'] })],
+    // Picking: keeps only the sounds (or videos) that are playing.
+    test: (rt, ctx, p) => {
+      const keep = rt.pickList(ctx, p.target).filter((inst) => !!inst.props.playing);
+      ctx.picked.set(p.target, keep);
+      return keep.length > 0;
+    },
+  },
+  onEnded: {
+    category: 'Object', label: '{target} finishes playing', trigger: 'ended', object: 'target',
+    params: [obj({ kinds: ['sound', 'video'] })],
+  },
   onEvery: {
     category: 'System', label: 'Every {seconds} seconds', trigger: 'timer', timer: 'every',
     params: [expr('seconds', '1')],
@@ -162,6 +176,48 @@ export const ACTIONS = {
     category: 'Object', label: 'Set {target} picture to {image}',
     params: [obj({ kinds: ['image'] }), { name: 'image', type: 'picture' }],
     run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.setProp(inst, 'image', p.image)),
+  },
+  playSound: {
+    category: 'Object', label: 'Play {target}',
+    params: [obj({ kinds: ['sound', 'video'] })],
+    help: 'Plays from the start. A browser only plays sound after the user has clicked or pressed something in the app.',
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.media(inst, 'play')),
+  },
+  stopSound: {
+    category: 'Object', label: 'Stop {target}',
+    params: [obj({ kinds: ['sound', 'video'] })],
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.media(inst, 'stop')),
+  },
+  setSound: {
+    category: 'Object', label: 'Set {target} sound to {sound}',
+    params: [obj({ kinds: ['sound'] }), { name: 'sound', type: 'sound' }],
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => { rt.media(inst, 'stop'); rt.setProp(inst, 'sound', p.sound); }),
+  },
+  setSoundNamed: {
+    category: 'Object', label: 'Set {target} sound to the one named {name}',
+    params: [obj({ kinds: ['sound'] }), expr('name', 'ClickedItem.sound')],
+    help: 'The name is worked out when the app runs, so a table can have a field naming each row\'s sound: ClickedItem.sound.',
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => {
+      const name = fmt(rt.evalExpr(p.name, c));
+      if (!rt.hasSound(name)) throw new ExprError(`There is no sound called "${name}"`);
+      rt.media(inst, 'stop'); rt.setProp(inst, 'sound', name);
+    }),
+  },
+  setVideo: {
+    category: 'Object', label: 'Set {target} video to {link}',
+    params: [obj({ kinds: ['video'] }), expr('link', 'ClickedItem.link')],
+    help: 'A link to a video file, such as one on Wikimedia Commons. The name is worked out when the app runs, so a table field can hold each row\'s link.',
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => { rt.media(inst, 'stop'); rt.setProp(inst, 'link', fmt(rt.evalExpr(p.link, c)).trim()); }),
+  },
+  openLink: {
+    category: 'System', label: 'Open link {link} in a new tab',
+    params: [expr('link', '"https://commons.wikimedia.org"')],
+    help: 'Opens a web page in a new browser tab (the app keeps running). Only http and https links open.',
+    run: (rt, ctx, p) => {
+      const link = fmt(rt.evalExpr(p.link, ctx)).trim();
+      if (!/^https?:\/\//i.test(link)) throw new ExprError(`"${link}" isn't a web link (it should start with https://)`);
+      rt.openLink(link);
+    },
   },
   setSize: {
     category: 'Object', label: 'Set {target} {prop} to {value}',
@@ -328,6 +384,7 @@ export function defaultParams(entry, scope) {
       case 'key': out[prm.name] = 'Enter'; break;
       case 'posSize': out[prm.name] = 'w'; break;
       case 'picture': out[prm.name] = scope.pictures?.[0] ?? 'star'; break;
+      case 'sound': out[prm.name] = scope.sounds?.[0] ?? 'chime'; break;
       default: out[prm.name] = prm.default ?? '';
     }
   }

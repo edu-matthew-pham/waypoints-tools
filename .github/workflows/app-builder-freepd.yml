@@ -1,0 +1,62 @@
+# Add FreePD tracks to App Builder's built-in sounds. Manual only (Actions > App Builder: add FreePD sounds > Run workflow).
+#
+# FreePD (freepd.com, CC0 1.0) closed in 2025; its tracks survive in mirrors. Check the mirror and the tracks first:
+# the workflow trusts what it downloads only as far as checking it is audio. Each track is trimmed to the first
+# 30 seconds (with a fade), made mono and small, saved as app-builder/sounds/<name>.mp3 and listed in
+# app-builder/sounds/extra.json, which App Builder reads when it starts (no rebuild needed). The credit
+# "FreePD, CC0" is shown beside each, though CC0 needs none.
+#
+# tracks: one per line,  name | title | path under the mirror
+#   rain_roof | Rain on the Roof | chill/Rain on the Roof.mp3
+name: "App Builder: add FreePD sounds"
+on:
+  workflow_dispatch:
+    inputs:
+      tracks:
+        description: "One per line: name | title | path under the mirror (e.g. chill/Rain on the Roof.mp3)"
+        required: true
+        type: string
+      mirror:
+        description: "Mirror of freepd.com's music folders"
+        default: "https://a.ocv.me/pub/stuff/music/freepd/"
+        type: string
+      seconds:
+        description: "Keep the first this many seconds"
+        default: "30"
+        type: string
+      dry_run:
+        description: "Only download and check; commit nothing"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: app-builder-sounds
+  cancel-in-progress: false
+
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+      - name: Download, check and trim
+        env:
+          TRACKS: ${{ inputs.tracks }}
+          MIRROR: ${{ inputs.mirror }}
+          SECONDS_KEEP: ${{ inputs.seconds }}
+        run: node app-builder/tools/add-freepd.mjs
+      - name: Commit
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app-builder/sounds
+          git diff --cached --quiet && { echo "Nothing new."; exit 0; }
+          git commit -m "App Builder: add FreePD sounds (CC0)"
+          git pull --rebase
+          git push

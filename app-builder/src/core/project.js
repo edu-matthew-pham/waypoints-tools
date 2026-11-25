@@ -10,7 +10,7 @@
 // event   = { id, else, conds:[{type,...params}], actions:[{type,...params}], children:[event] }
 
 import { OBJECT_KINDS } from './catalog.js';
-import { imageNames } from './assets.js';
+import { imageNames, soundNames } from './assets.js';
 
 // Screen size of the app being built. Web page is the default; Phone is a per-project option.
 export const DEVICES = {
@@ -97,6 +97,57 @@ export function fieldValue(type, v) {
   return Number.isFinite(n) ? { value: n } : { error: `"${v}" isn't a number` };
 }
 
+// Text copied from a spreadsheet: rows on lines, cells split by tabs (or commas when there are no tabs).
+// Quoted cells may hold tabs, commas or new lines ("a ""quoted"" word" as spreadsheets write it).
+export function parseCells(text) {
+  const src = String(text ?? '').replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+  if (src === '') return [];
+  const sep = src.includes('\t') ? '\t' : ',';
+  const rows = [[]];
+  let cell = '', i = 0, quoted = false;
+  while (i < src.length) {
+    const c = src[i];
+    if (quoted) {
+      if (c === '"' && src[i + 1] === '"') { cell += '"'; i += 2; continue; }
+      if (c === '"') { quoted = false; i++; continue; }
+      cell += c; i++; continue;
+    }
+    if (c === '"' && cell === '') { quoted = true; i++; continue; }
+    if (c === sep) { rows.at(-1).push(cell); cell = ''; i++; continue; }
+    if (c === '\n') { rows.at(-1).push(cell); cell = ''; rows.push([]); i++; continue; }
+    cell += c; i++;
+  }
+  rows.at(-1).push(cell);
+  return rows.map((r) => r.map((x) => x.trim()));
+}
+
+// Paste cells into a table, starting at a row (1-based) and field; rows are added as needed. A first row that
+// repeats the field names is skipped. Nothing changes if any number field gets text: { error } says where.
+// Returns { rows, skipped } (skipped: cells past the last field, which are left out).
+export function pasteRows(table, text, { row = 1, field } = {}) {
+  const fields = table.table.fields;
+  let cells = parseCells(text);
+  let col = Math.max(0, fields.findIndex((f) => f.name === field));
+  if (cells.length && cells[0].length > 1 && cells[0].every((c, i) => fields[col + i] && c.toLowerCase() === fields[col + i].name.toLowerCase())) cells = cells.slice(1);
+  if (!cells.length) return { rows: 0, skipped: 0 };
+  let skipped = 0;
+  const writes = [];
+  for (const [ri, r] of cells.entries()) {
+    for (const [ci, c] of r.entries()) {
+      const f = fields[col + ci];
+      if (!f) { if (c !== '') skipped++; continue; }
+      const res = fieldValue(f.type, c);
+      if (res.error) return { error: `row ${row + ri}, ${f.name}: ${res.error}` };
+      writes.push([row - 1 + ri, f.name, res.value]);
+    }
+  }
+  for (const [ri, name, value] of writes) {
+    while (table.value.length <= ri) table.value.push(Object.fromEntries(fields.map((f) => [f.name, f.type === 'number' ? 0 : ''])));
+    table.value[ri][name] = value;
+  }
+  return { rows: cells.length, skipped };
+}
+
 export function scopeFor(project, screen) {
   return {
     objects: (screen?.objects || []).map((o) => ({ name: o.name, kind: o.kind, vars: o.instanceVars.map((v) => v.name) })),
@@ -106,6 +157,7 @@ export function scopeFor(project, screen) {
     tableFields: Object.fromEntries(project.variables.filter(isTable).map((v) => [v.name, tableFields(v)])),
     screens: project.screens.map((s) => ({ id: s.id, name: s.name })),
     pictures: imageNames(project),
+    sounds: soundNames(project),
   };
 }
 
@@ -119,6 +171,7 @@ export function exprScopeFor(project, screen) {
       const k = OBJECT_KINDS[o.kind] || {};
       const vals = { text: i.text ?? '', x: i.x ?? 0, y: i.y ?? 0, w: i.w ?? 0, h: i.h ?? 0, visible: i.visible !== false };
       for (const [key, v] of Object.entries(k.extra || {})) vals[key] = i[key] ?? v;
+      if (k.exposes?.includes('playing')) vals.playing = false;
       for (const iv of o.instanceVars) vals[iv.name] = i.vars && iv.name in i.vars ? i.vars[iv.name] : iv.value;
       return [o.name, vals];
     })),
@@ -144,6 +197,7 @@ export function checkProject(p) {
   p.variables ||= [];
   for (const v of p.variables) if (v.table) { v.table.fields ||= []; if (!Array.isArray(v.value)) v.value = []; }
   p.assets ||= [];
+  p.sounds ||= [];
   p.device ||= 'phone'; // projects from before the Web page option were phone-sized
   p.features ||= { level: 4 }; // older projects: nothing hidden
   const seen = new Set();

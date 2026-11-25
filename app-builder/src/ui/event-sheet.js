@@ -246,6 +246,7 @@ export class EventSheet extends HTMLElement {
       }
       case 'sortdir': return SORT_DIRS;
       case 'picture': return (sc.pictures || []).map((n) => [n, n]);
+      case 'sound': return (sc.sounds || []).map((n) => [n, n]);
       case 'posSize': return [['w', 'width'], ['h', 'height'], ['x', 'x position'], ['y', 'y position']];
     }
     return [];

@@ -10,6 +10,7 @@
 //  - Actions run before sub-events.
 //  - "Go to screen" happens after the current event finishes. Globals survive, copies reset.
 
+import { soundNames } from './assets.js';
 import { evaluate, parse, ExprError, fieldOf, isRecord } from './expr.js';
 import { CONDITIONS, ACTIONS, OBJECT_KINDS, normaliseKey } from './catalog.js';
 
@@ -133,6 +134,8 @@ export class Runtime {
     const inst = this.byId.get(instanceId);
     const items = inst && this.globals.get(inst.props.source);
     if (!Array.isArray(items) || index < 1 || index > items.length) return;
+    // the clicked row stays highlighted until the list or table it shows changes (a removed row can't stay picked)
+    if (inst.selected !== index) { inst.selected = index; this.#changed(); }
     this.fire('itemClicked', { object: inst.object, instance: inst, clicked: { index, item: items[index - 1] } });
   }
   press(instanceId) { this.#touch('pressed', instanceId); }
@@ -221,6 +224,27 @@ export class Runtime {
     if (!(name in inst.vars)) throw new ExprError(`${inst.object} has no variable called "${name}"`);
     if (inst.vars[name] !== value) { inst.vars[name] = isRecord(value) ? { ...value } : value; this.#changed(); }
   }
+  // Sound and video: the runtime keeps playing (true/false) and a counter the player watches, so "Play" twice starts
+  // from the top twice. The page plays the media; when it finishes it calls mediaEnded().
+  media(inst, op) {
+    inst.props.playing = op === 'play';
+    inst.props.mediaSeq = (inst.props.mediaSeq || 0) + 1;
+    this.#changed();
+  }
+  mediaEnded(instanceId) {
+    const inst = this.byId.get(instanceId);
+    if (!inst || !inst.props.playing) return;
+    inst.props.playing = false;
+    this.#changed();
+    this.fire('ended', { object: inst.object, instance: inst });
+  }
+  // the user played or paused it with the player's own controls: record it (the player is already doing it)
+  mediaState(instanceId, playing) {
+    const inst = this.byId.get(instanceId);
+    if (inst && !!inst.props.playing !== !!playing) { inst.props.playing = !!playing; this.#changed(); }
+  }
+  hasSound(name) { return soundNames(this.project).includes(name); }
+  openLink(link) { this.hooks.openLink?.(link); }
   setProp(inst, name, value) {
     if (inst.props[name] !== value) { inst.props[name] = value; this.#changed(); }
   }
@@ -284,6 +308,7 @@ export class Runtime {
 
   #changed(name) {
     this.version++;
+    if (name) for (const inst of this.allInstances) if (inst.selected && inst.props.source === name) inst.selected = 0;
     if (name && this.remembered?.has(name)) { try { this.store?.save(name, this.globals.get(name)); } catch { /* storage blocked: the app still runs */ } }
     this.hooks.onChange?.();
   }
@@ -313,6 +338,7 @@ export class Runtime {
           props: { x: d.x ?? 0, y: d.y ?? 0, w: d.w ?? kind.props.w, h: d.h ?? kind.props.h, text: d.text ?? kind.props.text, visible: d.visible !== false },
         };
         for (const [k, v] of Object.entries(kind.extra || {})) inst.props[k] = d[k] ?? v;
+        if (kind.exposes?.includes('playing')) inst.props.playing = false;
         this.byId.set(inst.id, inst);
         return inst;
       });

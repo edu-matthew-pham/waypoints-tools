@@ -29,6 +29,7 @@ export class Runner {
         submit: (id) => this.rt?.submit(id),
         key: (name, down) => this.rt?.key(name, down),
         keysReset: () => this.rt?.releaseKeys(),
+        media: (id, type) => { if (type === 'ended') this.rt?.mediaEnded(id); else this.rt?.mediaState(id, type === 'play'); },
       },
     });
     // shown under the app when its events use the keyboard, until the app has focus
@@ -54,6 +55,7 @@ export class Runner {
         onError: () => { this.dirty = true; },
         onEventRan: (id) => this.flash?.(id),
         onScreen: (scr) => this.onScreen?.(scr, rt.project),
+        openLink: (link) => { try { window.open(link, '_blank', 'noopener'); } catch { /* blocked */ } },
       },
     });
     this.rt = rt;
@@ -76,15 +78,15 @@ export class Runner {
   // Forget the remembered values, so the next start is like a first visit.
   forget(project) { const st = rememberStore(); for (const v of project.variables) if (v.remember) st.save(v.name, undefined); }
 
-  stop() { cancelAnimationFrame(this.raf); this.rt = null; this.stage.setPick(null); showNow(null); }
+  stop() { for (const m of this.stage.el.querySelectorAll('audio, video')) m.pause(); cancelAnimationFrame(this.raf); this.rt = null; this.stage.setPick(null); showNow(null); }
 
   #draw() {
     const rt = this.rt;
     if (!rt) return;
     this.hint.hidden = !usesKeys(rt.screen?.events);
     this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, name: i.object, kind: i.kind,
-      props: i.kind === 'list' ? { ...i.props, items: rt.globals.get(i.props.source) }
-        : i.kind === 'table' ? { ...i.props, items: rt.globals.get(i.props.source), fields: tableColumns(rt.project, i.props) }
+      props: i.kind === 'list' ? { ...i.props, items: rt.globals.get(i.props.source), selected: i.selected || 0 }
+        : i.kind === 'table' ? { ...i.props, items: rt.globals.get(i.props.source), fields: tableColumns(rt.project, i.props), selected: i.selected || 0 }
           : i.props })));
     showNow(rt.watch());
     if (this.problemsEl) {

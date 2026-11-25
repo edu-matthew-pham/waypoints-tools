@@ -11,15 +11,15 @@
 import { CONDITIONS, ACTIONS } from './catalog.js';
 
 import { COMPONENTS } from './components.js';
-const BASIC_KINDS = ['button', 'text', 'input', 'shape', 'image', 'toggle', 'slider']; // levels 2-3; new components start at level 4 unless placed here
+const BASIC_KINDS = ['button', 'text', 'input', 'shape', 'image', 'sound', 'video', 'toggle', 'slider']; // levels 2-3; new components start at level 4 unless placed here
 const ALL_KINDS = Object.keys(COMPONENTS);
 const L1_COND = ['onStart', 'onClicked'];
 const L1_ACT = ['setText', 'setVar', 'addTo', 'subtractFrom', 'goToScreen', 'setVisible'];
 const L2_COND = [...L1_COND, 'everyTick', 'compareVar', 'compareValues', 'onChanged',
-  'onPressed', 'onReleased', 'onToggled', 'onSlid', 'onSubmitted', 'isOn', 'onKey', 'onKeyUp', 'onEvery', 'onAfter', 'triggerOnce', 'compareText'];
+  'onPressed', 'onReleased', 'onToggled', 'onSlid', 'onSubmitted', 'isOn', 'onKey', 'onKeyUp', 'onEvery', 'onAfter', 'triggerOnce', 'compareText', 'isPlaying', 'onEnded'];
 const L3_COND = [...L2_COND, 'compareInst', 'keyHeld', 'forEach', 'repeat', 'listHas', 'onItemClicked'];
-const L2_ACT = [...L1_ACT, 'setOn', 'setSlider', 'setSize', 'setImage'];
-const L3_ACT = [...L2_ACT, 'setInst', 'addToInst', 'listAdd', 'listRemoveAt', 'listRemoveValue', 'listSet', 'listClear'];
+const L2_ACT = [...L1_ACT, 'setOn', 'setSlider', 'setSize', 'setImage', 'playSound', 'stopSound', 'setSound', 'setVideo', 'openLink'];
+const L3_ACT = [...L2_ACT, 'setSoundNamed', 'setInst', 'addToInst', 'listAdd', 'listRemoveAt', 'listRemoveValue', 'listSet', 'listClear'];
 // Level 4 only (level 4 offers everything; these lists say which entries are new there, so none is forgotten)
 export const L4_ONLY = { cond: ['forEachRow'], act: ['tableAdd', 'tableSet', 'tableRemove', 'tableClear', 'tableSort'] };
 

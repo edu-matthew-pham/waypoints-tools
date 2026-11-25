@@ -38,3 +38,22 @@ async function toDataUrl(file) {
   c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
   return file.type === 'image/jpeg' ? c.toDataURL('image/jpeg', 0.85) : c.toDataURL('image/png');
 }
+
+// Pick a sound file and keep it as a data: URL in the project. Projects live in the browser (about 5 MB in all),
+// so each sound is capped: short clips and effects, not whole albums.
+const MAX_SOUND = 1_400_000; // data: URL length, about 1 MB of audio
+export function pickSound(onReady, notify) {
+  const input = h('input', { type: 'file', accept: 'audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,.mp3,.m4a,.ogg,.wav' });
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const data = await readAsDataUrl(file);
+      if (data.length > MAX_SOUND) { notify('That sound is too big (keep it under about 1 MB: a short clip, or an MP3 at a lower quality).'); return; }
+      onReady({ fileName: file.name, data });
+    } catch {
+      notify('Could not read that sound.');
+    }
+  });
+  input.click();
+}

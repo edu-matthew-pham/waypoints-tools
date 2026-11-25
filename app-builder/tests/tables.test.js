@@ -179,3 +179,31 @@ test('field values, Table object columns, older files', () => {
   const old = checkProject({ screens: [{ id: 's', name: 'S' }], variables: [{ name: 'T', table: {} }] });
   assert.deepEqual(old.variables[0], { name: 'T', table: { fields: [] }, value: [] });
 });
+
+test('a clicked row stays selected until its table changes', () => {
+  const p = playlist();
+  p.screens[0].events.push(newEvent({ conds: [{ type: 'onItemClicked', target: 'View' }], actions: [] }));
+  const rt = new Runtime(p);
+  rt.start();
+  const view = find(rt, 'View');
+  rt.itemClick(view.id, 2);
+  assert.equal(view.selected, 2);
+  rt.tableChange('Songs', (rows) => rows.pop());
+  assert.equal(view.selected, 0);
+});
+
+test('paste rows from a spreadsheet: header skipped, numbers checked, rows added', async () => {
+  const { pasteRows, parseCells } = await import('../src/core/project.js');
+  assert.deepEqual(parseCells('a\t"b\tc"\n"say ""hi"""\t2\n'), [['a', 'b\tc'], ['say "hi"', '2']]);
+  assert.deepEqual(parseCells('x,y\n1,2'), [['x', 'y'], ['1', '2']]);
+  const t = playlist().variables[0];
+  let r = pasteRows(t, 'Title\tArtist\tLength\nCove\tAva\t4\nDune\tBo\t2\textra', { row: 3 });
+  assert.deepEqual(r, { rows: 2, skipped: 1 });
+  assert.deepEqual(t.value.map((x) => x.title), ['Blue', 'Arc', 'Cove', 'Dune']);
+  assert.equal(t.value[2].length, 4);
+  r = pasteRows(t, 'Mo\tlong', { row: 1, field: 'artist' });
+  assert.match(r.error, /row 1, length/);
+  assert.equal(t.value[0].artist, 'Kai');
+  r = pasteRows(t, 'Zed\nYo', { row: 1, field: 'artist' });
+  assert.deepEqual([t.value[0].artist, t.value[1].artist], ['Zed', 'Yo']);
+});

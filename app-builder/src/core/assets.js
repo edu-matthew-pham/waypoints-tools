@@ -26,3 +26,72 @@ export function assetName(project, fileName) {
   while (taken.has(name)) name = `${base}_${n++}`;
   return name;
 }
+
+// Sounds. Built-in sounds are files beside App Builder (sounds/<name>.mp3, served by the site, so every school gets
+// the same ones with nothing to set up). The first set is App Builder's own, made by tools/make-sounds.mjs and
+// released CC0 with the tool. More built-ins (for example FreePD tracks) can be listed in sounds/extra.json,
+// loaded at start (addBuiltinSounds); uploads live in project.sounds = [{ name, data, title? }] as data: URLs.
+const OWN = 'Made for App Builder, CC0';
+export const BUILTIN_SOUNDS = {
+  chime:  { title: 'Chime', credit: OWN, effect: true },
+  pop:    { title: 'Pop', credit: OWN, effect: true },
+  win:    { title: 'Win jingle', credit: OWN, effect: true },
+  oops:   { title: 'Oops', credit: OWN, effect: true },
+  beat:   { title: 'Beat loop', credit: OWN },
+  calm:   { title: 'Calm', credit: OWN },
+  upbeat: { title: 'Upbeat', credit: OWN },
+  sleepy: { title: 'Music box', credit: OWN },
+};
+// extra built-ins from sounds/extra.json: [{ name, file, title, credit }]
+export function addBuiltinSounds(list) {
+  for (const s of Array.isArray(list) ? list : []) {
+    if (!s || !/^[a-z][a-z0-9_]*$/.test(s.name) || BUILTIN_SOUNDS[s.name] || !/^[\w.-]+\.(mp3|m4a|ogg)$/.test(s.file || '')) continue;
+    BUILTIN_SOUNDS[s.name] = { title: String(s.title || s.name), credit: String(s.credit || ''), file: s.file };
+  }
+}
+export const soundNames = (project) => [...Object.keys(BUILTIN_SOUNDS), ...(project.sounds || []).map((a) => a.name)];
+// { src, title, credit } for a sound name, or null
+export function soundInfo(project, name, base = 'sounds/') {
+  const up = (project.sounds || []).find((a) => a.name === name);
+  if (up) return { src: up.data, title: up.title || up.name, credit: 'Uploaded' };
+  const b = BUILTIN_SOUNDS[name];
+  return b ? { src: base + (b.file || `${name}.mp3`), title: b.title, credit: b.credit } : null;
+}
+// a free, tidy name for an uploaded sound
+export function soundAssetName(project, fileName) {
+  const base = (String(fileName).replace(/\.[^.]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'sound').replace(/^(\d)/, 's$1');
+  const taken = new Set(soundNames(project));
+  let name = base, n = 2;
+  while (taken.has(name)) name = `${base}_${n++}`;
+  return name;
+}
+
+// Videos are links only (never uploaded: too big for a project). A link becomes:
+//   { kind: 'file', src, page?, from }   a video file played in the browser's own player (Wikimedia Commons by default,
+//                                       or any direct link to a .webm/.mp4/.ogv file, e.g. the Internet Archive)
+//   { kind: 'youtube', src, from }       only when the app allows YouTube (project.allowYoutube; off by default)
+//   { kind: 'blocked' | 'none', why }
+// A Commons page link (commons.wikimedia.org/wiki/File:Name.webm) is turned into the file itself (Special:FilePath).
+export function videoSource(link, { allowYoutube = false } = {}) {
+  const raw = String(link ?? '').trim();
+  if (!raw) return { kind: 'none', why: 'No video link yet' };
+  let u;
+  try { u = new URL(raw); } catch { return { kind: 'none', why: 'That isn’t a web link' }; }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return { kind: 'none', why: 'That isn’t a web link' };
+  const host = u.hostname.replace(/^www\./, '');
+  const yt = host === 'youtu.be' ? u.pathname.slice(1) : /(^|\.)youtube(-nocookie)?\.com$/.test(host)
+    ? (u.searchParams.get('v') || u.pathname.match(/^\/(?:embed|shorts|live)\/([^/?#]+)/)?.[1] || '') : null;
+  if (yt !== null) {
+    if (!allowYoutube) return { kind: 'blocked', why: 'YouTube links are off for this app' };
+    if (!/^[\w-]{6,20}$/.test(yt)) return { kind: 'none', why: 'That YouTube link has no video in it' };
+    return { kind: 'youtube', src: `https://www.youtube-nocookie.com/embed/${yt}?rel=0&modestbranding=1&enablejsapi=1&playsinline=1`, from: 'YouTube' };
+  }
+  if (host === 'commons.wikimedia.org' || host === 'commons.m.wikimedia.org') {
+    const m = decodeURIComponent(u.pathname).match(/^\/wiki\/(?:File|Special:FilePath):(.+)$/) || decodeURIComponent(u.pathname).match(/^\/wiki\/Special:FilePath\/(.+)$/);
+    if (!m) return { kind: 'none', why: 'Link to one video file on Wikimedia Commons (its File: page)' };
+    const file = m[1].replace(/ /g, '_');
+    return { kind: 'file', src: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}`, page: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(file)}`, from: 'Wikimedia Commons' };
+  }
+  if (/\.(webm|mp4|ogv|m4v|mov)$/i.test(u.pathname)) return { kind: 'file', src: u.href, from: host };
+  return { kind: 'none', why: 'Use a link to a video file (.webm or .mp4), such as a Wikimedia Commons file' };
+}

@@ -5,8 +5,8 @@ import { OBJECT_KINDS } from '../core/catalog.js';
 import { duplicateInstance, deleteInstance, findInstance, isIdentifier, parseValue, sizeOf, tableColumns, isList, isTable, tableFields } from '../core/project.js';
 import { S, screen, hooks } from '../state.js';
 import { renameInput } from '../ui/rename-input.js';
-import { pickPicture } from '../ui/upload.js';
-import { imageNames, imageData, assetName } from '../core/assets.js';
+import { pickPicture, pickSound } from '../ui/upload.js';
+import { imageNames, imageData, assetName, soundNames, soundInfo, soundAssetName, videoSource, BUILTIN_SOUNDS } from '../core/assets.js';
 import { renameInstVar } from '../core/rename.js';
 
 let renamingIvar = null;
@@ -103,6 +103,41 @@ export function initDesign(root) {
             choose(name);
           }, hooks.notify) }, '+ Upload'))));
     }
+    if (obj.kind === 'sound') {
+      const names = soundNames(S.project);
+      const sel = h('select', { class: 'ctl', 'aria-label': 'Sound', 'data-ab': 'prop:sound', onchange: (e) => { inst.sound = e.target.value; hooks.commit(); } },
+        names.map((n) => { const i = soundInfo(S.project, n); return h('option', { value: n, selected: inst.sound === n }, `${i.title}${BUILTIN_SOUNDS[n]?.effect ? ' (effect)' : ''}`); }));
+      let preview = null;
+      const listen = h('button', { class: 'btn', type: 'button', 'data-ab': 'listen', title: 'Hear this sound', onclick: () => {
+        if (preview && !preview.paused) { preview.pause(); listen.textContent = '▶ Listen'; return; }
+        const info = soundInfo(S.project, inst.sound);
+        if (!info) return;
+        preview = new Audio(info.src);
+        preview.onended = preview.onpause = () => { listen.textContent = '▶ Listen'; };
+        preview.play().then(() => { listen.textContent = '■ Stop'; }).catch(() => hooks.notify('Could not play that sound here.'));
+      } }, '▶ Listen');
+      const info = soundInfo(S.project, inst.sound);
+      extra.push(h('label', { class: 'f wide' }, h('span', {}, 'Sound'), sel),
+        h('div', { class: 'btn-row' }, listen,
+          h('button', { class: 'btn', type: 'button', 'data-ab': 'upload-sound', title: 'Upload your own sound (under about 1 MB)', onclick: () => pickSound(({ fileName, data }) => {
+            const name = soundAssetName(S.project, fileName);
+            S.project.sounds.push({ name, data, title: fileName.replace(/\.[^.]*$/, '') });
+            inst.sound = name; hooks.commit();
+          }, hooks.notify) }, '+ Upload sound')),
+        h('p', { class: 'muted small' }, info ? `${info.title}: ${info.credit}. ` : '', 'Leave Text empty to show the sound\u2019s title.'));
+    }
+    if (obj.kind === 'video') {
+      const src = videoSource(inst.link, { allowYoutube: !!S.project.allowYoutube });
+      const link = h('input', { class: 'ctl', type: 'url', value: inst.link || '', placeholder: 'https://commons.wikimedia.org/wiki/File:…', 'aria-label': 'Video link', 'data-ab': 'prop:link',
+        onchange: (e) => { inst.link = e.target.value.trim(); hooks.commit(); } });
+      extra.push(h('label', { class: 'f wide' }, h('span', {}, 'Video link'), link),
+        h('p', { class: 'muted small' }, src.kind === 'file' || src.kind === 'youtube' ? `Plays from ${src.from}. ` : src.why + '. ',
+          'Find a video on ', h('a', { href: 'https://commons.wikimedia.org/wiki/Category:Videos', target: '_blank', rel: 'noopener' }, 'Wikimedia Commons'),
+          ', open its page and paste that link here. Videos are linked, never uploaded.'),
+        h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: !!S.project.allowYoutube, 'data-ab': 'allow-youtube',
+          onchange: (e) => { S.project.allowYoutube = e.target.checked; hooks.commit(); } }),
+          h('span', {}, 'Allow YouTube links in this app (off by default: YouTube is social media, so turn this on only if your school is happy with it)')));
+    }
     if (obj.kind === 'list') {
       const lists = S.project.variables.filter(isList).map((v) => v.name);
       const sel = h('select', { class: 'ctl', 'aria-label': 'Shows list', onchange: (e) => { inst.source = e.target.value; hooks.commit(); } },
@@ -144,7 +179,7 @@ export function initDesign(root) {
 
     props.replaceChildren(
       h('h3', {}, obj.name, h('small', {}, ` ${OBJECT_KINDS[obj.kind]?.label ?? obj.kind}${obj.instances.length > 1 ? ` · copy ${n} of ${obj.instances.length}` : ''}`)),
-      ...(['slider', 'shape', 'list', 'table'].includes(obj.kind) ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : obj.kind === 'image' ? 'Description (read aloud by screen readers)' : 'Text'), text)]),
+      ...(['slider', 'shape', 'list', 'table'].includes(obj.kind) ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : obj.kind === 'image' || obj.kind === 'video' ? 'Description (read aloud by screen readers)' : obj.kind === 'sound' ? 'Title shown (leave empty for the sound\u2019s own)' : 'Text'), text)]),
       h('div', { class: 'grid4' }, numField('X', 'x', inst), numField('Y', 'y', inst), numField('Width', 'w', inst, 24), numField('Height', 'h', inst, 20)),
       ...extra,
       h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: inst.visible !== false, onchange: (e) => { inst.visible = e.target.checked; hooks.commit(); } }), h('span', {}, 'Visible at start')),
