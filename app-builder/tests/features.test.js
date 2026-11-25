@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolve, canUse, fromParams, LEVELS, L4_ONLY } from '../src/core/features.js';
+import { resolve, canUse, fromParams, LEVELS, L4_ONLY } from '../src/edu/features.js';
 import { CONDITIONS, ACTIONS } from '../src/core/catalog.js';
 import { newProject, checkProject } from '../src/core/project.js';
 import { musicTracker, dailyChores } from '../src/samples.js';

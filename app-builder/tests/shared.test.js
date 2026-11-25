@@ -7,7 +7,7 @@ import { sharedEventsFor, objectsMentioned, objectNames, allObjectsScreen } from
 import { renameObject, renameInstVar, renameVariable, renameField } from '../src/core/rename.js';
 import { sheetText } from '../src/core/sheet-text.js';
 import { screenMap } from '../src/core/map.js';
-import { resolve } from '../src/core/features.js';
+import { resolve } from '../src/edu/features.js';
 
 const click = (target) => ({ type: 'onClicked', target });
 const go = (screen) => ({ type: 'goToScreen', screen });

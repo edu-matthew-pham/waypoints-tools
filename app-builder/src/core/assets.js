@@ -35,8 +35,10 @@ export function assetName(project, fileName) {
 // Sounds. Built-in sounds are files beside App Builder (sounds/<name>.mp3, served by the site, so every school gets
 // the same ones with nothing to set up). The first set is App Builder's own, made by tools/make-sounds.mjs and
 // released CC0 with the tool. More built-ins (for example FreePD tracks) can be listed in sounds/extra.json,
-// loaded at start (addBuiltinSounds); uploads live in project.sounds = [{ name, data, title?, size? }], data as for pictures.
+// loaded at start (addBuiltinSounds). Where the files are served is set by the page (sources.soundBase), so another
+// site can serve its own; core only lists them. Uploads live in project.sounds = [{ name, data, title?, size? }], data as for pictures.
 const OWN = 'Made for App Builder, CC0';
+export const sources = { soundBase: 'sounds/' };
 export const BUILTIN_SOUNDS = {
   chime:  { title: 'Chime', credit: OWN, effect: true },
   pop:    { title: 'Pop', credit: OWN, effect: true },
@@ -56,7 +58,7 @@ export function addBuiltinSounds(list) {
 }
 export const soundNames = (project) => [...Object.keys(BUILTIN_SOUNDS), ...(project.sounds || []).map((a) => a.name)];
 // { src, title, credit } for a sound name, or null
-export function soundInfo(project, name, base = 'sounds/') {
+export function soundInfo(project, name, base = sources.soundBase) {
   const up = (project.sounds || []).find((a) => a.name === name);
   if (up) return { src: mediaSrc(up.data), title: up.title || up.name, credit: 'Uploaded' };
   const b = BUILTIN_SOUNDS[name];

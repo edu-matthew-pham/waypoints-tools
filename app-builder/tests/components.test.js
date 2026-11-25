@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { COMPONENTS, CATEGORIES } from '../src/core/components.js';
 import { ICONS, RENDER } from '../src/ui/component-ui.js';
-import { LEVELS } from '../src/core/features.js';
+import { LEVELS } from '../src/edu/features.js';
 import { newProject, addObject } from '../src/core/project.js';
 
 test('every component is complete: label, hint, category, icon, drawing code, a level', () => {

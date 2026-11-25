@@ -11,7 +11,7 @@
 //   exposes   (optional) property names expressions can read, e.g. Toggle.on
 //
 // To add a component: add an entry here, add its make/write + icon in ui/component-ui.js, place it in a
-// level in features.js, and add its conditions/actions to catalog.js. Tests fail if a step is missed.
+// level in edu/features.js, and add its conditions/actions to catalog.js. Tests fail if a step is missed.
 export const CATEGORIES = ['Basics', 'Choices', 'Data', 'Media', 'Layout'];
 
 export const COMPONENTS = {

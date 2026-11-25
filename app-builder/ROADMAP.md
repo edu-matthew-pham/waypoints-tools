@@ -9,7 +9,7 @@ so the tool can grow with older students and bigger projects (25 Nov 2026).
 
 The picker groups tiles by category and only shows what the current level / lesson allows. Contract (see `core/components.js`):
 `id, label, hint, category, base, props` in core; `ICONS[id]`, `RENDER[id].make/write` in `ui/component-ui.js`; a level in
-`features.js`; conditions/actions in `catalog.js`. `tests/components.test.js` fails if a step is missed.
+`edu/features.js`; conditions/actions in `catalog.js`. `tests/components.test.js` fails if a step is missed.
 
 | Category | Components | Level | Notes |
 |---|---|---|---|
@@ -305,6 +305,20 @@ For lessons, tests and (later) guided tutorials:
 - **No drag needed:** arrow keys move the selected object (Shift: 10 px), Alt + arrows resize it, the Properties panel has X, Y,
   Width and Height boxes, and events are reordered from their ⋯ menu.
 - Tests: `tools/embed-test.mjs` (also in `npm run test:ui`).
+
+## Core kept reusable *(26 Nov 2026, Matthew: small, low-priority; Project doc handoff-app-builder-core-split)*
+
+Keep the event-sheet core usable apart from the education tool (in case it ever leads to a separate low-code product).
+Done 26 Nov, with no change to behaviour or the project format: levels moved to `src/edu/features.js`; `src/player.js`
+runs a project with only `core/` and the stage (the editor's Runner wraps it); the sound folder and extra list are
+set in `app.js`; `tests/layers.test.js` keeps core and the player from reaching the editor or `edu/`.
+Left, on purpose:
+- `core/project.js` still writes `features: { level: 4 }` into new and older projects. That is part of the project
+  format, so it stays; core just carries it. A separate product could ignore it.
+- `videoSource` (core/assets.js) still knows Wikimedia Commons and YouTube link forms. That is link recognition rather
+  than a list of media, so it stays in core; which sources are allowed is already a project setting (Allow YouTube links).
+- Lesson URL settings (`?level`, `?allow`, `?lock`, `?sample`) and the Waypoints embed messages stay in the app shell
+  (`app.js`, `embed.js`), which is the education tool.
 
 ## Considered, not planned
 

@@ -9,7 +9,7 @@ import { validateSheet } from '../src/core/catalog.js';
 import { check } from '../src/core/expr.js';
 import { sheetText } from '../src/core/sheet-text.js';
 import { screenMap } from '../src/core/map.js';
-import { resolve, canUse } from '../src/core/features.js';
+import { resolve, canUse } from '../src/edu/features.js';
 import { starterOf } from '../src/samples.js';
 
 const click = (target) => ({ type: 'onClicked', target });

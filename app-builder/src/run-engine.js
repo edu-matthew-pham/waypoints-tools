@@ -1,93 +1,30 @@
-// Runner: runs a copy of the project in a Stage and keeps the Watch / Problems panels fresh.
+// Runner: the editor's player. Wraps Player (player.js: core plus the stage only) and adds what the editor shows
+// while an app runs: live values beside each variable in the sidebar, and the Problems panel.
 // Used by the Events tab (compact preview) and the Run tab (full size).
-import { Runtime } from './core/runtime.js';
-import { Stage } from './ui/stage.js';
+import { Player, localStore } from './player.js';
 import { h } from './ui/dom.js';
-import { usesKeys } from './core/catalog.js';
-import { sizeOf, tableColumns } from './core/project.js';
 import { S } from './state.js';
 
 // "Remember between visits": values kept in this browser, one entry per variable, under this App Builder's own key
-// (so each lesson step keeps its own). Fails safe: with storage blocked, the app still runs and just forgets.
-export function rememberStore(base = S.storeKey) {
-  const key = (name) => `${base}.remember.${name}`;
-  return {
-    load: (name) => { try { const t = localStorage.getItem(key(name)); return t === null ? undefined : JSON.parse(t); } catch { return undefined; } },
-    save: (name, value) => { try { if (value === undefined) localStorage.removeItem(key(name)); else localStorage.setItem(key(name), JSON.stringify(value)); } catch { /* storage blocked */ } },
-  };
-}
+// (so each lesson step keeps its own).
+export const rememberStore = (base = S.storeKey) => localStore(base);
 
-export class Runner {
-  constructor(stageHost, { watch, problems, flash, onScreen } = {}) {
-    this.stage = new Stage(stageHost, {
-      on: {
-        click: (id) => this.rt?.click(id),
-        itemClick: (id, index) => this.rt?.itemClick(id, index),
-        input: (id, v) => this.rt?.userChange(id, v),
-        press: (id) => this.rt?.press(id),
-        release: (id) => this.rt?.release(id),
-        submit: (id) => this.rt?.submit(id),
-        key: (name, down) => this.rt?.key(name, down),
-        keysReset: () => this.rt?.releaseKeys(),
-        media: (id, type) => { if (type === 'ended') this.rt?.mediaEnded(id); else this.rt?.mediaState(id, type === 'play'); },
-      },
+export class Runner extends Player {
+  constructor(stageHost, { problems, flash, onScreen } = {}) {
+    super(stageHost, {
+      store: () => rememberStore(), // the key is read at each start
+      onEventRan: (id) => flash?.(id),
+      onScreen,
+      onDraw: (rt) => this.#show(rt),
+      onStop: () => showNow(null),
     });
-    // shown under the app when its events use the keyboard, until the app has focus
-    this.hint = h('p', { class: 'kb-hint', hidden: true }, 'This app uses the keyboard: click it first, then press keys.');
-    stageHost.append(this.hint);
-    this.watchEl = watch;
     this.problemsEl = problems;
-    this.flash = flash;
-    this.onScreen = onScreen;
-    this.rt = null;
-    this.dirty = false;
-    this.raf = 0;
   }
-
-  start(project, screenId) {
-    this.stop();
-    this.stage.clear();
-    this.stage.setSize(sizeOf(project));
-    const rt = new Runtime(structuredClone(project), {
-      store: rememberStore(),
-      hooks: {
-        onChange: () => { this.dirty = true; },
-        onError: () => { this.dirty = true; },
-        onEventRan: (id) => this.flash?.(id),
-        onScreen: (scr) => this.onScreen?.(scr, rt.project),
-        openLink: (link) => { try { window.open(link, '_blank', 'noopener'); } catch { /* blocked */ } },
-      },
-    });
-    this.rt = rt;
-    rt.start(screenId);
-    this.#draw();
-    let last = performance.now();
-    const loop = (now = performance.now()) => {
-      if (this.rt !== rt) return;
-      if (rt.hasTimers) rt.advance(Math.min(now - last, 250)); // capped, so a hidden tab doesn't fire a burst
-      last = now;
-      if (rt.needsTick) rt.tick();
-      if (this.dirty) { this.dirty = false; this.#draw(); }
-      this.raf = requestAnimationFrame(loop);
-    };
-    this.raf = requestAnimationFrame(loop);
-  }
-
-  focus() { this.stage.el.focus({ preventScroll: true }); }
 
   // Forget the remembered values, so the next start is like a first visit.
   forget(project) { const st = rememberStore(); for (const v of project.variables) if (v.remember) st.save(v.name, undefined); }
 
-  stop() { for (const m of this.stage.el.querySelectorAll('audio, video')) m.pause(); cancelAnimationFrame(this.raf); this.rt = null; this.stage.setPick(null); showNow(null); }
-
-  #draw() {
-    const rt = this.rt;
-    if (!rt) return;
-    this.hint.hidden = !usesKeys(rt.events);
-    this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, name: i.object, kind: i.kind,
-      props: i.kind === 'list' ? { ...i.props, items: rt.globals.get(i.props.source), selected: i.selected || 0 }
-        : i.kind === 'table' ? { ...i.props, items: rt.globals.get(i.props.source), fields: tableColumns(rt.project, i.props), selected: i.selected || 0 }
-          : i.props })));
+  #show(rt) {
     showNow(rt.watch());
     if (this.problemsEl) {
       this.problemsEl.replaceChildren(...(rt.errors.length ? [

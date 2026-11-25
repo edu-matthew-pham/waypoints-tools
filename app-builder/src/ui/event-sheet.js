@@ -5,7 +5,7 @@
 //       mode: 'guided'   clean read view; click a condition/action to edit it in a dialog (beginners)
 //             'edit'     quick edit: dropdowns and boxes inline (confident users)
 //             'readonly' static (lesson pages, Run tab)
-//       features: resolved feature list (core/features.js), or null for everything
+//       features: resolved feature list (edu/features.js), or null for everything
 //       where: 'screen' | 'all' | 'function' (a function's body: no triggers; Set return value is offered)
 //       sequence: show a function as one list of actions ("When called, do ..."), with no conditions or sub-events
 //       notes: extra warnings [{ id, message }] shown on events (e.g. a function using an object a calling screen lacks)
@@ -20,7 +20,7 @@ import { OPERATORS, defaultParams, validateSheet, entryFor, CONDITIONS, KEYS, SO
 import { check } from '../core/expr.js';
 import { newEvent } from '../core/project.js';
 import { COMPONENTS } from '../core/components.js';
-import { canUse } from '../core/features.js';
+import { canUse } from '../edu/features.js';
 import { h } from './dom.js';
 import { openChooser, openItemDialog } from './sheet-dialogs.js';
 import { openMenu } from './menu.js';

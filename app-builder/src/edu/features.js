@@ -11,9 +11,9 @@
 // what the "add" menus and panels OFFER.
 //
 // No features set (older projects) means everything is available.
-import { CONDITIONS, ACTIONS } from './catalog.js';
+import { CONDITIONS, ACTIONS } from '../core/catalog.js';
 
-import { COMPONENTS } from './components.js';
+import { COMPONENTS } from '../core/components.js';
 const BASIC_KINDS = ['button', 'text', 'input', 'shape', 'image', 'sound', 'video', 'toggle', 'slider']; // levels 2-3; new components start at level 4 unless placed here
 const ALL_KINDS = Object.keys(COMPONENTS);
 const L1_COND = ['onStart', 'onClicked'];

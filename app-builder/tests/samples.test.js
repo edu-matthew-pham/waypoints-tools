@@ -5,7 +5,7 @@ import { Runtime } from '../src/core/runtime.js';
 import { validateSheet, CONDITIONS, ACTIONS } from '../src/core/catalog.js';
 import { exprScopeFor } from '../src/core/project.js';
 import { check } from '../src/core/expr.js';
-import { resolve, canUse } from '../src/core/features.js';
+import { resolve, canUse } from '../src/edu/features.js';
 
 test('every sample: no warnings, every value valid, everything allowed at its level', () => {
   for (const [name, make] of Object.entries(SAMPLES)) {

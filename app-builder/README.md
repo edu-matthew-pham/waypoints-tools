@@ -48,7 +48,9 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
     src/ui/event-sheet.js   <event-sheet> custom element: edit | readonly, flash(id), pickobject event
     src/state.js            shared state + the few callbacks views use to talk to the shell
     src/history.js          undo/redo as JSON snapshots
-    src/run-engine.js       Runner: runs a copy of the project in a Stage, Watch + Problems panels
+    src/player.js           Player: runs project JSON in a container; only core/ and the stage (a test checks)
+    src/run-engine.js       Runner: the editor's Player, adding live values in the sidebar + Problems panel
+    src/edu/features.js     levels and lesson allow lists (the education layer; core only carries project.features)
     src/panels/side.js      project tree (screens > objects > copies) and variables
     src/views/design.js     Design tab: drag-and-drop stage + properties
     src/views/events.js     Events tab: editable sheet beside a live preview; on-screen picker
@@ -64,7 +66,10 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
     src/samples.js          Practice tracker, Daily chores
     tests/                  interpreter and features tests
 
-`core/` has no DOM, so it runs in Node: tests today, checking student projects tomorrow.
+`core/` has no DOM, so it runs in Node: tests today, checking student projects tomorrow. It imports only `core/`, and
+the player only `core/` and `ui/` (`tests/layers.test.js`), so the event-sheet engine stays reusable apart from the
+editor and the education layer (levels, lessons). Where media comes from (the built-in sound folder, `extra.json`) is
+set in `app.js` (MEDIA_SOURCES), not in core.
 
 ## Map
 
@@ -121,7 +126,7 @@ The editor menu, controls, validation and the interpreter pick it up with no UI 
 ## Guided editing and levels
 
 - **Guided** (default): events read as clean sentence cards. Click a condition or action to change it in a dialog (fill-in-the-blanks, name chips, validation, pick-on-screen). Click an event to reveal `+ Condition`, `+ Action` and the `...` menu. **Quick edit** keeps the inline controls for confident users.
-- **Levels** (`core/features.js`): 1 Starter, 2 Conditions, 3 Copies, 4 Everything. They only change what the add menus and panels *offer*; nothing already built is hidden or removed. Projects without `features` show everything.
+- **Levels** (`edu/features.js`): 1 Starter, 2 Conditions, 3 Copies, 4 Everything. They only change what the add menus and panels *offer*; nothing already built is hidden or removed. Projects without `features` show everything.
 - **Lesson allow-lists**: `project.features.allow = { cond: [...], act: [...] }`, or link students in with `?level=1&allow=onClicked,addTo,setText&lock=1`. `lock=1` hides the level switch.
 - New catalog entries must be placed in a level in `features.js` (a test fails if one is forgotten).
 

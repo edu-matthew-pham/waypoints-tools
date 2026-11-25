@@ -4,7 +4,7 @@ import { Runtime } from '../src/core/runtime.js';
 import { newProject, addObject, newEvent } from '../src/core/project.js';
 import { videoSource, soundInfo, soundNames, addBuiltinSounds } from '../src/core/assets.js';
 import { sheetText } from '../src/core/sheet-text.js';
-import { resolve } from '../src/core/features.js';
+import { resolve } from '../src/edu/features.js';
 
 function app() {
   const p = newProject('Player');

@@ -1,7 +1,7 @@
 // Project model helpers (plain JSON in, plain JSON out; no DOM).
 //
 // project = { version, name, features, variables:[variable], screens:[screen], allScreens:{ events:[event] }, functions:[function] }
-//           (features: see features.js; allScreens: core/shared.js; functions: core/functions.js)
+//           (features: the education layer's levels, edu/features.js; core only carries it; allScreens: core/shared.js; functions: core/functions.js)
 // variable= { name, value, remember? }              value: a number or text, an array (a list), or for a table
 //           { name, table:{ fields:[{name,type}] }, value:[record], remember? }   record = { field: value }
 //           type is 'text' or 'number'. remember: kept in the browser between visits (Run, not the project file)
