@@ -20,6 +20,7 @@ media.video = (link) => videoSource(link, { allowYoutube: !!S.project.allowYoutu
 // more built-in sounds (e.g. FreePD tracks) listed beside App Builder; none is fine
 fetch('sounds/extra.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : [])).then((list) => { addBuiltinSounds(list); hooks.refresh?.(); }).catch(() => {});
 import { SAMPLES, sampleById } from './samples.js';
+import * as mediaStore from './media-store.js';
 
 // ?sample=water opens that lesson project. Each lesson link keeps its own saved work, so a student who
 // comes back (or refreshes) carries on where they were; "Start again" reloads the original.
@@ -54,6 +55,21 @@ function notify(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.remove(), 5000);
 }
+mediaStore.setNotify(notify);
+
+// Before a project is shown: move uploads still inside it into the media store, and load the files it and its
+// remembered values use, so pictures and sounds show instantly. Changes p.
+async function prepareMedia(p) {
+  await mediaStore.moveUploads(p);
+  const missing = await mediaStore.load(p) + await mediaStore.load(remembered());
+  if (missing) notify(`${missing === 1 ? 'A picture or recording' : missing + ' pictures or recordings'} in this project ${missing === 1 ? 'isn\u2019t' : 'aren\u2019t'} in this browser (made on another computer, or the site\u2019s data was cleared). Open a saved file of the project to bring ${missing === 1 ? 'it' : 'them'} back.`);
+}
+// what "Remember between visits" kept for this App Builder (lists and tables can hold media references)
+function remembered() {
+  const out = [];
+  store((ls) => { for (let i = 0; i < ls.length; i++) { const k = ls.key(i); if (k?.startsWith(STORE_KEY + '.remember.')) out.push(ls.getItem(k)); } });
+  return out.map((t) => { try { return JSON.parse(t); } catch { return null; } });
+}
 
 // ---------------- project state ----------------
 function setProject(p, { resetHistory = true } = {}) {
@@ -69,6 +85,7 @@ function commit(source) {
   embed.report(S.project);
 }
 function undo(d) {
+  if (!history) return; // still starting
   const json = history.step(d);
   if (json == null) return;
   setProject(JSON.parse(json), { resetHistory: false });
@@ -143,8 +160,9 @@ function confirmTwice(msg) {
   notify(msg + ' Press again to confirm.');
   return false;
 }
-function loadProject(p) {
+async function loadProject(p) {
   p = checkProject(p); applyParams(p);
+  await prepareMedia(p);
   setTab('design');
   S.screenId = null; S.selId = null; S.sheet = 'screen';
   setProject(p);
@@ -153,7 +171,10 @@ function loadProject(p) {
   embed.report(S.project);
 }
 async function saveFile() {
-  const json = JSON.stringify(S.project, null, 2);
+  // uploads go back inside the file as data: URLs, so it opens anywhere (a zip with a media folder comes later)
+  const { project, missing } = await mediaStore.inline(S.project);
+  if (missing) notify(`${missing} picture${missing === 1 ? '' : 's'} or sound${missing === 1 ? '' : 's'} could not be found in this browser, so ${missing === 1 ? 'it is' : 'they are'} not in the file.`);
+  const json = JSON.stringify(project, null, 2);
   const filename = (S.project.name || 'app').replace(/[^\w-]+/g, '-') + '.app.json';
   // Hosted pages can't start downloads themselves; use the page-download feature when it exists.
   try {
@@ -210,6 +231,7 @@ document.addEventListener('keydown', (e) => {
 
 // ---------------- boot ----------------
 let initial = null;
+const hadSaved = !!store((ls) => ls.getItem(STORE_KEY));
 try { const saved = store((ls) => ls.getItem(STORE_KEY)); if (saved) initial = JSON.parse(saved); } catch { /* ignore */ }
 // ?code=<project JSON>: a lesson step's starter (Waypoints playgrounds pass their starter this way)
 let codeStart = null;
@@ -218,16 +240,22 @@ const lessonStart = codeStart || (lessonId && sampleById(lessonId) ? () => sampl
 if (lessonId && !lessonStart) queueMicrotask(() => notify(`There is no lesson called "${lessonId}". Opening your last project instead.`));
 // No lesson link: a playground, so everything is offered (Level 4), like MakeCode or Construct. Lessons set their own level.
 const playground = () => ({ ...SAMPLES['Minutes and goal (two screens)'](), features: { level: 4 } });
+// Async only to load media first (IndexedDB answers later); everything after it runs as before.
+boot();
+async function boot() {
 initial = checkProject(initial || (lessonStart ? lessonStart() : playground()));
 applyParams(initial);
+const before = JSON.stringify(initial);
+await prepareMedia(initial);
 setProject(initial);
+if (hadSaved && JSON.stringify(S.project) !== before) store((ls) => ls.setItem(STORE_KEY, history.current)); // uploads moved out
+mediaStore.tidy(S.project).catch(() => {});
 refresh();
 const tab = new URLSearchParams(location.search).get('tab');
 if (tab && tabViews[tab] !== undefined) setTab(tab);
 window.__app = { S, setTab, loadProject }; // handy for debugging and tests
 
 // An embedding page (a lesson) can start, reset and read the project. See src/embed.js.
-const hadSaved = !!store((ls) => ls.getItem(STORE_KEY));
 embed.start({
   start: (p) => { if (!hadSaved) loadProject(p); else embed.report(S.project); }, // a student's own work wins over the starter
   reset: (p) => loadProject(p),
@@ -236,10 +264,11 @@ embed.start({
 
 // Several copies of App Builder can share one project (a lesson's build steps pass the same ?store=). When another
 // copy saves it, take its version, so moving to the next step carries on from the same app.
-window.addEventListener('storage', (e) => {
+window.addEventListener('storage', async (e) => {
   if (e.key !== STORE_KEY || !e.newValue || e.newValue === JSON.stringify(S.project)) return;
   try {
     const p = checkProject(JSON.parse(e.newValue)); applyParams(p);
+    await mediaStore.load(p); // files the other copy just kept
     const tab = S.tab;
     setProject(p); // keeps the open screen when it still exists
     S.selId = null;
@@ -248,3 +277,4 @@ window.addEventListener('storage', (e) => {
     embed.report(S.project);
   } catch { /* a broken copy elsewhere: keep ours */ }
 });
+}

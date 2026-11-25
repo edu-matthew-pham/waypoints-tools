@@ -5,6 +5,7 @@ import { OBJECT_KINDS } from '../core/catalog.js';
 import { duplicateInstance, deleteInstance, findInstance, isIdentifier, parseValue, sizeOf, tableColumns, isList, isTable, tableFields } from '../core/project.js';
 import { S, screen, hooks } from '../state.js';
 import { renameInput } from '../ui/rename-input.js';
+import { keep } from '../media-store.js';
 import { pickPicture, pickSound } from '../ui/upload.js';
 import { imageNames, imageData, assetName, soundNames, soundInfo, soundAssetName, videoSource, BUILTIN_SOUNDS } from '../core/assets.js';
 import { renameInstVar } from '../core/rename.js';
@@ -95,9 +96,9 @@ export function initDesign(root) {
         h('div', { class: 'pic-grid' },
           ...imageNames(S.project).map((n) => h('button', { class: 'pic' + (inst.image === n ? ' on' : ''), 'data-ab': 'picture:' + n, type: 'button', title: n, 'aria-label': 'Use picture ' + n, 'aria-pressed': String(inst.image === n), onclick: () => choose(n) },
             h('img', { src: imageData(S.project, n), alt: '' }))),
-          h('button', { class: 'pic add', 'data-ab': 'upload-picture', type: 'button', title: 'Upload a picture', onclick: () => pickPicture(({ fileName, data }) => {
+          h('button', { class: 'pic add', 'data-ab': 'upload-picture', type: 'button', title: 'Upload a picture', onclick: () => pickPicture(async ({ fileName, data }) => {
             const name = assetName(S.project, fileName);
-            S.project.assets.push({ name, data });
+            S.project.assets.push({ name, ...await keep(data) });
             choose(name);
           }, hooks.notify) }, '+ Upload'))));
     }
@@ -117,9 +118,9 @@ export function initDesign(root) {
       const info = soundInfo(S.project, inst.sound);
       extra.push(h('label', { class: 'f wide' }, h('span', {}, 'Sound'), sel),
         h('div', { class: 'btn-row' }, listen,
-          h('button', { class: 'btn', type: 'button', 'data-ab': 'upload-sound', title: 'Upload your own sound (under about 1 MB)', onclick: () => pickSound(({ fileName, data }) => {
+          h('button', { class: 'btn', type: 'button', 'data-ab': 'upload-sound', title: 'Upload your own sound (under about 1 MB)', onclick: () => pickSound(async ({ fileName, data }) => {
             const name = soundAssetName(S.project, fileName);
-            S.project.sounds.push({ name, data, title: fileName.replace(/\.[^.]*$/, '') });
+            S.project.sounds.push({ name, ...await keep(data), title: fileName.replace(/\.[^.]*$/, '') });
             inst.sound = name; hooks.commit();
           }, hooks.notify) }, '+ Upload sound')),
         h('p', { class: 'muted small' }, info ? `${info.title}: ${info.credit}. ` : '', 'Leave Text empty to show the sound\u2019s title.'));

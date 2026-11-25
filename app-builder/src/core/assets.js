@@ -1,5 +1,7 @@
-// Pictures. A project keeps its uploads in project.assets = [{ name, data }] (data: URLs, so the
-// project stays one file). Built-in pictures are always available and need no upload.
+// Pictures. A project keeps its uploads in project.assets = [{ name, data, size? }]: data is a media reference
+// (media:7f3a09c2, the file is in the browser's media store, see core/media.js) or, in older projects and saved
+// files, a data: URL. Built-in pictures are always available and need no upload.
+import { isRef, mediaSrc } from './media.js';
 const svgUrl = (body, fill) => 'data:image/svg+xml,' + encodeURIComponent(
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><g fill="${fill}" stroke="none">${body}</g></svg>`);
 
@@ -15,8 +17,11 @@ export const BUILTIN_IMAGES = {
 };
 
 export const imageNames = (project) => [...Object.keys(BUILTIN_IMAGES), ...(project.assets || []).map((a) => a.name)];
+// name (or a media reference, e.g. a picture a user drew) -> something an <img> can show
 export function imageData(project, name) {
-  return (project.assets || []).find((a) => a.name === name)?.data ?? BUILTIN_IMAGES[name] ?? '';
+  if (isRef(name)) return mediaSrc(name);
+  const up = (project.assets || []).find((a) => a.name === name);
+  return up ? mediaSrc(up.data) : BUILTIN_IMAGES[name] ?? '';
 }
 // a free, tidy name from a file name: "My Cat (2).PNG" -> "my_cat_2"
 export function assetName(project, fileName) {
@@ -30,7 +35,7 @@ export function assetName(project, fileName) {
 // Sounds. Built-in sounds are files beside App Builder (sounds/<name>.mp3, served by the site, so every school gets
 // the same ones with nothing to set up). The first set is App Builder's own, made by tools/make-sounds.mjs and
 // released CC0 with the tool. More built-ins (for example FreePD tracks) can be listed in sounds/extra.json,
-// loaded at start (addBuiltinSounds); uploads live in project.sounds = [{ name, data, title? }] as data: URLs.
+// loaded at start (addBuiltinSounds); uploads live in project.sounds = [{ name, data, title?, size? }], data as for pictures.
 const OWN = 'Made for App Builder, CC0';
 export const BUILTIN_SOUNDS = {
   chime:  { title: 'Chime', credit: OWN, effect: true },
@@ -53,7 +58,7 @@ export const soundNames = (project) => [...Object.keys(BUILTIN_SOUNDS), ...(proj
 // { src, title, credit } for a sound name, or null
 export function soundInfo(project, name, base = 'sounds/') {
   const up = (project.sounds || []).find((a) => a.name === name);
-  if (up) return { src: up.data, title: up.title || up.name, credit: 'Uploaded' };
+  if (up) return { src: mediaSrc(up.data), title: up.title || up.name, credit: 'Uploaded' };
   const b = BUILTIN_SOUNDS[name];
   return b ? { src: base + (b.file || `${name}.mp3`), title: b.title, credit: b.credit } : null;
 }

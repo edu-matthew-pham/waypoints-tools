@@ -57,6 +57,8 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
     src/core/map.js         screenMap(project): links, start, unreachable screens, dead ends (no DOM; tests and checks use it)
     src/core/shared.js      the All screens sheet: which shared events apply to a screen (objects matched by name)
     src/core/functions.js   functions: the model and helpers (where one is called, is it a plain list of actions)
+    src/core/media.js       media references (media:7f3a09c2): finding them, ref -> loaded URL, data: URL <-> bytes
+    src/media-store.js      the media store in IndexedDB: keep, load on start, move old uploads, Save copy, tidy
     src/ui/screen-items.js  what the stage draws for one screen (shared by Design and Map)
     src/app.js              shell: top bar, tabs, save/open, wiring
     src/samples.js          Practice tracker, Daily chores
@@ -179,7 +181,7 @@ Level 4 (or a lesson allow-list that names a table action). Plan: tutorials Proj
 ## Sound and Video (25 Nov 2026)
 
 - **Sound object** (Media, level 2+): a play button with the sound's title and credit. Properties: the sound, Listen,
-  + Upload sound (up to about 1 MB, kept in the project). Built-in sounds are files in `sounds/` beside App Builder:
+  + Upload sound (up to about 1 MB, kept in the media store, see below). Built-in sounds are files in `sounds/` beside App Builder:
   eight of App Builder's own (chime, pop, win, oops, beat, calm, upbeat, sleepy), made by `tools/make-sounds.mjs` and
   released CC0, plus any listed in `sounds/extra.json` (`[{ name, file, title, credit }]`), which App Builder reads at
   start. The manual workflow **App Builder: add FreePD sounds** downloads FreePD tracks (CC0; FreePD closed in 2025,
@@ -192,3 +194,28 @@ Level 4 (or a lesson allow-list that names a table action). Plan: tutorials Proj
   to (a link expression); Open link in a new tab. A browser plays sound only after the user has clicked something.
 - Sheet text: `object Music (sound) text "" sound calm`, `object Clip (video) text "" link "https://…"`.
 - Tests: `tests/media.test.js`.
+
+## Media store (ROADMAP §10, step 1, 26 Nov 2026)
+
+Uploaded pictures and sounds are kept as files in the browser's IndexedDB (database `appbuilder-media`): this site's
+own storage in this browser on this device, nothing sent anywhere, usually hundreds of MB. The project (in localStorage,
+about 5 MB) holds only a reference in the upload's `data`, `media:7f3a09c2`, plus its `size`. Older projects and saved
+files have a `data:` URL there instead, which still works.
+
+- **Load on start.** IndexedDB answers later, but events need answers now. So when a project opens, App Builder loads
+  the files it and its remembered values use into memory (object URLs), then shows it. New uploads are kept in the
+  background and show straight away. Events, the stage and the sidebar stay simple and synchronous.
+- **Move on open.** Uploads still inside a project (data: URLs) move to the store whenever a project opens: at start,
+  Open, a lesson starter, an embedding page.
+- **Save** puts uploads back inside the `.json` as data: URLs, so a saved file is complete on its own and opens
+  anywhere (a zip with a `media/` folder comes with step 3).
+- **Missing files** (a project copied from another computer, or the site's data cleared) show nothing, with a plain
+  notice to open a saved file.
+- **Tidy** runs once when App Builder opens, never while someone works, so Undo can always bring a picture back. It
+  deletes files that no App Builder project or remembered value in this browser points to (every lesson link keeps its
+  own) and that are more than a day old (another tab may still be using them).
+- App Builder asks the browser to keep its storage (`navigator.storage.persist`; the browser may say no), the sidebar
+  shows how much is used, and it warns at 80% full or when a file can't be kept.
+- No IndexedDB (blocked, some private windows): uploads stay inside the project as before.
+- Browser check used: a one-off Playwright script (old project moves out, picture loads, Save round-trips, new upload,
+  Open in a fresh browser, tidy keeps another lesson's file, missing-file notice). See ROADMAP › Testing.

@@ -183,7 +183,13 @@ Planned, lightest first:
 Not planned: built-in LLM calls (keys, costs, privacy for under-13s, upkeep). An in-browser model for option 1
 (Transformers.js, about 20–30 MB) only if plain phrase matching proves too weak.
 
-## 10. Make your own media *(proposed 26 Nov 2026, agreed with Matthew; not built)*
+## 10. Make your own media *(proposed 26 Nov 2026, agreed with Matthew; step 1, the media store, built 26 Nov: README › Media store)*
+
+Settled with Matthew (26 Nov 2026): load the media an app uses into memory when it opens and keep new media in the
+background (events stay instant); move uploads out of a project whenever it opens, keeping data: URLs readable; camera
+and mic switched on per app by a project setting in Design (like Allow YouTube links); a hand-written zip (store-only
+writer, Open also reads compressed zips with the browser's own DecompressionStream). If odd zips ever cause trouble,
+the fallback is the fflate library (about 8 KB, MIT notice to ship with it).
 
 Apps where the user makes the content: a drawing gallery, a plant or science photo log, voice notes, a sound board.
 The same principle as tables: a row holds a *reference* to a picture or recording, and the file lives elsewhere, the way
@@ -265,7 +271,7 @@ rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever clas
 1. §8 Map view (built and live 26 Nov; snapshot still to do).
 2. §11 All screens sheet (built and live 26 Nov), then §11 Functions (built and live 26 Nov; agreed 26 Nov: smaller than media, help every app; media doesn't need
    them and they don't need media).
-3. §10 media store in IndexedDB (also fixes uploads filling the ~5 MB a project has now).
+3. §10 media store in IndexedDB (built 26 Nov; upload size caps of about 1 MB not yet raised).
 4. §10 Drawing and Photo, with the picture field and Set image to an expression.
 5. §10 Recorder and the sound field; zip Save and Open with the data made while running.
 6. §9 AI help, once how AI is used in class is decided.  7. Layout and tabs, yes/no fields, Grid.

@@ -8,7 +8,9 @@ import { renameInput } from '../ui/rename-input.js';
 import { renameObject, renameVariable, renameField, nameProblem, renameFunction, functionNamesTaken } from '../core/rename.js';
 import { newFunction, functionUsers, paramNames, functionsOf } from '../core/functions.js';
 import { pickPicture } from '../ui/upload.js';
-import { assetName } from '../core/assets.js';
+import { assetName, imageData } from '../core/assets.js';
+import { uploadSize } from '../core/media.js';
+import { keep, usage, mb } from '../media-store.js';
 import { S, screen, hooks, showAllScreens, showFunctions } from '../state.js';
 import { allScreensEvents } from '../core/shared.js';
 import { nowText, liveTable } from '../run-engine.js';
@@ -160,25 +162,27 @@ export function renderSide(el) {
     ...(!S.rf || S.rf.kinds.includes('image') ? [
       h('h3', {}, 'Pictures (whole app)'),
       ...(S.project.assets.length ? [h('div', { class: 'pic-list' }, S.project.assets.map((a) => h('div', { class: 'var pic-row' },
-        h('img', { src: a.data, alt: '' }), h('span', { class: 'vname' }, a.name),
+        h('img', { src: imageData(S.project, a.name), alt: '' }), h('span', { class: 'vname' }, a.name),
         h('button', { class: 'icon danger', title: 'Delete picture', onclick: () => {
           const users = pictureUsers(a.name);
           if (users.length) { hooks.notify(`${a.name} is still used by ${users.join(', ')}. Change those first.`); return; }
           S.project.assets = S.project.assets.filter((x) => x !== a); hooks.commit();
         } }, '\u00d7'))))] : [h('p', { class: 'muted' }, 'Built-in pictures are ready to use. Upload your own here or on an Image.')]),
-      h('button', { class: 'btn add-screen', type: 'button', onclick: () => pickPicture(({ fileName, data }) => {
-        S.project.assets.push({ name: assetName(S.project, fileName), data }); hooks.commit();
+      h('button', { class: 'btn add-screen', type: 'button', onclick: () => pickPicture(async ({ fileName, data }) => {
+        const name = assetName(S.project, fileName);
+        S.project.assets.push({ name, ...await keep(data) }); hooks.commit();
       }, hooks.notify), 'data-ab': 'upload-picture' }, '+ Upload picture')] : []),
     ...(S.project.sounds?.length ? [
       h('h3', {}, 'Sounds (whole app)'),
       h('div', { class: 'pic-list' }, S.project.sounds.map((a) => h('div', { class: 'var' },
         h('span', { class: 'vname' }, '🔊 ' + a.name),
-        h('span', { class: 'muted start-count' }, `${Math.round(a.data.length * 0.75 / 1024)} KB`),
+        h('span', { class: 'muted start-count' }, `${Math.round(uploadSize(a) / 1024)} KB`),
         h('button', { class: 'icon danger', title: 'Delete sound', onclick: () => {
           const users = soundUsers(a.name);
           if (users.length) { hooks.notify(`${a.name} is still used by ${users.join(', ')}. Change those first.`); return; }
           S.project.sounds = S.project.sounds.filter((x) => x !== a); hooks.commit();
         } }, '\u00d7'))))] : []),
+    ...(S.project.assets.length || S.project.sounds?.length ? [storageNote()] : []),
     h('p', { class: 'muted legal' }, 'Free for education. Commercial use by permission only.'),
   );
 }
@@ -471,4 +475,11 @@ function commitKeepFocus(input) {
     hooks.commit();
     if (next) document.querySelector(`[data-ab="${CSS.escape(next)}"]`)?.focus();
   }, 0);
+}
+
+// How much this browser holds for App Builder (projects, pictures, recordings), filled in when the browser says.
+function storageNote() {
+  const p = h('p', { class: 'muted small', 'data-ab': 'media-usage', title: 'Pictures and recordings are kept in this browser on this computer. Nothing is sent anywhere. Save makes a copy you can keep.' });
+  usage().then((u) => { if (u?.quota) p.textContent = `Kept in this browser: ${mb(u.usage)} used of about ${mb(u.quota)}. Save keeps a copy.`; });
+  return p;
 }
