@@ -219,7 +219,7 @@ Construct has two ways to avoid writing the same events again: **functions** and
 App Builder has neither yet, so a Home button on four screens needs the same event four times. Both are smaller jobs than
 §10, so they go first (Matthew, 26 Nov 2026).
 
-**All screens sheet** (Level 3+). One extra event sheet whose events run on every screen, alongside that screen's own
+**All screens sheet** (Level 3+; *built 26 Nov 2026, not yet live*). One extra event sheet whose events run on every screen, alongside that screen's own
 (they run first). It covers the usual reasons for an include (shared navigation, a timer, key shortcuts) without students
 managing which sheet includes which. Objects are matched **by name** (option a): "HomeButton is clicked → Go to screen
 Home" works on every screen that has a HomeButton. An event that mentions an object the current screen doesn't have is
@@ -239,7 +239,7 @@ Done (24–25 Nov 2026): toggle, slider, keys, timers, image and assets, lists, 
 rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever classes say; map view first as the smaller job):
 
 1. §8 Map view (built and live 26 Nov; snapshot still to do).
-2. §11 All screens sheet, then §11 Functions (agreed 26 Nov: smaller than media, help every app; media doesn't need
+2. §11 All screens sheet (built 26 Nov), then §11 Functions (agreed 26 Nov: smaller than media, help every app; media doesn't need
    them and they don't need media).
 3. §10 media store in IndexedDB (also fixes uploads filling the ~5 MB a project has now).
 4. §10 Drawing and Photo, with the picture field and Set image to an expression.

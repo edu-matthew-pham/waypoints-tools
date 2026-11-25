@@ -9,10 +9,13 @@
 //  - Else runs if the event above it (and any Else above) didn't run.
 //  - Actions run before sub-events.
 //  - "Go to screen" happens after the current event finishes. Globals survive, copies reset.
+//  - The All screens sheet (core/shared.js) runs first, as its own chain: an Else at the top of a screen's sheet
+//    never follows a shared event. If a shared event goes to another screen, that screen's own events don't run for it.
 
 import { soundNames } from './assets.js';
 import { evaluate, parse, ExprError, fieldOf, isRecord } from './expr.js';
 import { CONDITIONS, ACTIONS, OBJECT_KINDS, normaliseKey } from './catalog.js';
+import { sharedEventsFor } from './shared.js';
 
 export const triggerOf = (ev) => (ev.conds || []).find((c) => CONDITIONS[c.type]?.trigger);
 
@@ -29,6 +32,7 @@ export class Runtime {
     this.pendingScreen = null;
     this.screen = null;
     this.screenId = null;
+    this.shared = []; // the All screens events that apply to this screen
     this.objects = new Map(); // name -> { def, kind, instances:[] }
     this.byId = new Map();
     this.version = 0;
@@ -90,7 +94,7 @@ export class Runtime {
   }
   #setUpTimers() {
     this.timers = [];
-    for (const ev of this.screen.events || []) {
+    for (const ev of this.events) {
       const entry = CONDITIONS[triggerOf(ev)?.type];
       if (!entry?.timer) continue;
       const gap = this.#timerGap(ev);
@@ -98,12 +102,14 @@ export class Runtime {
     }
   }
 
-  get needsTick() { return !!this.screen && (this.screen.events || []).some((ev) => !triggerOf(ev)); }
+  // every event that can run on this screen: the shared ones first, then its own
+  get events() { return this.screen ? [...this.shared, ...(this.screen.events || [])] : []; }
+  get needsTick() { return this.events.some((ev) => !triggerOf(ev)); }
 
   tick() {
     if (!this.screen || this.busy) return;
     this.ticks++;
-    this.#pump(() => this.#runChain(this.screen.events || [], this.#ctx(), true, null));
+    this.#pump(() => this.#runBoth(null));
   }
 
   // ---------- input from a renderer ----------
@@ -326,6 +332,7 @@ export class Runtime {
     const scr = this.project.screens.find((s) => s.id === screenId) || this.project.screens[0];
     this.screen = scr;
     this.screenId = scr.id;
+    this.shared = sharedEventsFor(this.project, scr);
     this.objects = new Map();
     this.byId = new Map();
     for (const od of scr.objects || []) {
@@ -371,12 +378,18 @@ export class Runtime {
           break;
         }
         const occ = this.queue.shift();
-        this.#runChain(this.screen.events || [], this.#ctx(), true, occ);
+        this.#runBoth(occ);
         this.#applyPending();
       }
     } finally {
       this.busy = false;
     }
+  }
+
+  // the All screens chain, then this screen's own (skipped if a shared event is changing screen)
+  #runBoth(occ) {
+    if (this.shared.length) this.#runChain(this.shared, this.#ctx(), true, occ);
+    if (this.pendingScreen === null) this.#runChain(this.screen.events || [], this.#ctx(), true, occ);
   }
 
   #matches(trig, occ, ctx, ev) {

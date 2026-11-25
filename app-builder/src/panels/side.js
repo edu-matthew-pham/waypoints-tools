@@ -8,7 +8,8 @@ import { renameInput } from '../ui/rename-input.js';
 import { renameObject, renameVariable, renameField, nameProblem } from '../core/rename.js';
 import { pickPicture } from '../ui/upload.js';
 import { assetName } from '../core/assets.js';
-import { S, screen, hooks } from '../state.js';
+import { S, screen, hooks, showAllScreens } from '../state.js';
+import { allScreensEvents } from '../core/shared.js';
 import { nowText, liveTable } from '../run-engine.js';
 
 function addRow(placeholder, onAdd, withValue) {
@@ -50,7 +51,7 @@ function objectRow(o) {
     return h('div', { class: 'tree-row obj on' }, renameInput({
       value: o.name, label: 'Object name', notify: hooks.notify, onDone: done,
       taken: screen().objects.map((x) => x.name),
-      onSave: (v) => { renameObject(screen(), o.name, v); renamingObj = null; hooks.commit(); },
+      onSave: (v) => { renameObject(screen(), o.name, v, S.project); renamingObj = null; hooks.commit(); },
     }));
   }
   const row = h('div', { class: 'tree-row obj' + (on ? ' on' : '') },
@@ -97,7 +98,7 @@ export function renderSide(el) {
     if (s.id !== sc.id) {
       return h('div', { class: 'tree-node' },
         h('div', { class: 'tree-row screen' },
-          h('button', { class: 'link', 'data-ab': 'screen:' + s.name, onclick: () => { S.screenId = s.id; S.selId = null; collapsed.delete(s.id); hooks.refresh(); } }, '▸ ' + s.name)));
+          h('button', { class: 'link', 'data-ab': 'screen:' + s.name, onclick: () => { S.screenId = s.id; S.selId = null; S.sheet = 'screen'; collapsed.delete(s.id); hooks.refresh(); } }, '▸ ' + s.name)));
     }
     const folded = collapsed.has(s.id);
     let nameEl;
@@ -143,7 +144,7 @@ export function renderSide(el) {
 
   el.replaceChildren(
     h('h3', {}, 'Project'),
-    h('div', { class: 'tree' }, ...tree),
+    h('div', { class: 'tree' }, ...tree, showAllScreens() ? allScreensRow() : null),
     h('button', { class: 'btn add-screen', type: 'button', 'data-ab': 'add-screen', onclick: addScreen }, '+ Screen'),
     h('h3', {}, 'Variables (whole app)'),
     ...(vars.some(Boolean) ? [h('div', { class: 'var var-head' }, h('span', { class: 'vname' }), h('span', { class: 'col-start' }, 'starts at'), h('span', { class: 'col-now' }, 'now'), h('span', { class: 'col-x' })), ...vars.filter(Boolean)] : [h('p', { class: 'muted' }, 'None yet.')]),
@@ -180,13 +181,31 @@ export function renderSide(el) {
   );
 }
 
+// The All screens sheet: events that run on every screen. Opens it in the Events tab.
+function allScreensRow() {
+  const n = allScreensEvents(S.project).length;
+  const on = S.sheet === 'all' && S.tab === 'events';
+  return h('div', { class: 'tree-node' }, h('div', { class: 'tree-row screen all-screens' + (on ? ' on' : '') },
+    h('button', { class: 'link', type: 'button', 'data-ab': 'all-screens', 'aria-current': on ? 'true' : null,
+      title: 'Events that run on every screen, like a Home button on each one',
+      onclick: () => { S.sheet = 'all'; if (S.tab === 'events') hooks.refresh(); else hooks.setTab('events'); } },
+    '\u29c9 All screens', h('span', { class: 'kind' }, n ? `${n} event${n === 1 ? '' : 's'}` : 'events'))));
+}
+
+// every event in a list, sub-events included, with where it is ("an event on Home")
+function eachEventWhere(cb) {
+  const walk = (evs, where) => { for (const ev of evs || []) { cb(ev, where); walk(ev.children, where); } };
+  for (const sc of S.project.screens) walk(sc.events, 'an event on ' + sc.name);
+  walk(allScreensEvents(S.project), 'an event on All screens');
+}
+
 // objects and events that use a picture (so it isn't deleted out from under them)
 function pictureUsers(name) {
   const out = new Set();
   for (const sc of S.project.screens) {
     for (const o of sc.objects) if (o.instances.some((i) => i.image === name)) out.add(o.name);
-    (function walk(evs) { for (const ev of evs) { if (ev.actions.some((a) => a.type === 'setImage' && a.image === name)) out.add('an event on ' + sc.name); walk(ev.children || []); } })(sc.events);
   }
+  eachEventWhere((ev, where) => { if (ev.actions.some((a) => a.type === 'setImage' && a.image === name)) out.add(where); });
   return [...out];
 }
 
@@ -195,8 +214,8 @@ function soundUsers(name) {
   const out = new Set();
   for (const sc of S.project.screens) {
     for (const o of sc.objects) if (o.instances.some((i) => i.sound === name)) out.add(o.name);
-    (function walk(evs) { for (const ev of evs) { if (ev.actions.some((a) => a.type === 'setSound' && a.sound === name)) out.add('an event on ' + sc.name); walk(ev.children || []); } })(sc.events);
   }
+  eachEventWhere((ev, where) => { if (ev.actions.some((a) => a.type === 'setSound' && a.sound === name)) out.add(where); });
   return [...out];
 }
 

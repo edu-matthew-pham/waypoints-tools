@@ -83,7 +83,7 @@ export class Runner {
   #draw() {
     const rt = this.rt;
     if (!rt) return;
-    this.hint.hidden = !usesKeys(rt.screen?.events);
+    this.hint.hidden = !usesKeys(rt.events);
     this.stage.sync(rt.allInstances.map((i) => ({ id: i.id, name: i.object, kind: i.kind,
       props: i.kind === 'list' ? { ...i.props, items: rt.globals.get(i.props.source), selected: i.selected || 0 }
         : i.kind === 'table' ? { ...i.props, items: rt.globals.get(i.props.source), fields: tableColumns(rt.project, i.props), selected: i.selected || 0 }

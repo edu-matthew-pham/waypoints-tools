@@ -1,6 +1,6 @@
 // Project model helpers (plain JSON in, plain JSON out; no DOM).
 //
-// project = { version, name, features, variables:[variable], screens:[screen] }   (features: see features.js)
+// project = { version, name, features, variables:[variable], screens:[screen], allScreens:{ events:[event] } }   (features: see features.js; allScreens: core/shared.js)
 // variable= { name, value, remember? }              value: a number or text, an array (a list), or for a table
 //           { name, table:{ fields:[{name,type}] }, value:[record], remember? }   record = { field: value }
 //           type is 'text' or 'number'. remember: kept in the browser between visits (Run, not the project file)
@@ -231,6 +231,8 @@ export function checkProject(p) {
   p.variables ||= [];
   for (const v of p.variables) if (v.table) { v.table.fields ||= []; if (!Array.isArray(v.value)) v.value = []; }
   for (const v of p.variables) for (const f of v.table?.fields || []) if (f.type === 'link' && !p.variables.some((t) => t.table && t.name === f.to && t !== v)) { f.type = 'text'; delete f.to; }
+  p.allScreens ||= { events: [] }; // the All screens sheet (core/shared.js)
+  p.allScreens.events ||= [];
   p.assets ||= [];
   p.sounds ||= [];
   p.device ||= 'phone'; // projects from before the Web page option were phone-sized

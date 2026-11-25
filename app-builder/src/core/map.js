@@ -13,8 +13,10 @@
 // deadEnd: there are other screens but nothing on this one goes to any of them.
 // depth: fewest links from the first screen (null if not reachable); the map lays screens out by it.
 // broken: links to a screen that no longer exists.
+// A Go to screen on the All screens sheet is a link from every screen it runs on, its label ending "(all screens)".
 import { itemText } from './sheet-text.js';
 import { CONDITIONS } from './catalog.js';
+import { sharedEventsFor } from './shared.js';
 
 // What kind of thing starts an event, in words for the map's summary ("6 ways: 4 clicks, 1 timer, 1 check").
 // Decided by the first trigger in the event or its parents; with no trigger, it is a test checked every tick.
@@ -32,12 +34,12 @@ const wayKind = (conds) => {
   return 'check';
 };
 
-function walk(events, path, screens, out) {
+function walk(events, path, screens, out, tag = '') {
   for (const ev of events || []) {
     const conds = [...path.conds, ...(ev.conds || [])];
     const words = [...path.words, ...(ev.else ? ['otherwise'] : []), ...(ev.conds || []).map((c) => itemText('cond', c, screens))];
-    for (const a of ev.actions || []) if (a.type === 'goToScreen') out.push({ to: a.screen, label: words.join(', ') || 'all the time', kind: wayKind(conds) });
-    walk(ev.children, { conds, words }, screens, out);
+    for (const a of ev.actions || []) if (a.type === 'goToScreen') out.push({ to: a.screen, label: (words.join(', ') || 'all the time') + tag, kind: wayKind(conds) });
+    walk(ev.children, { conds, words }, screens, out, tag);
   }
 }
 
@@ -55,6 +57,7 @@ export function screenMap(project) {
   const ids = new Set(all.map((s) => s.id));
   const screens = all.map((s, i) => {
     const found = [];
+    walk(sharedEventsFor(project, s), { conds: [], words: [] }, all, found, ' (all screens)');
     walk(s.events, { conds: [], words: [] }, all, found);
     return {
       id: s.id, name: s.name, first: i === 0,

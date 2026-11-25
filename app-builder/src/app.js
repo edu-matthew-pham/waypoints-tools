@@ -146,7 +146,7 @@ function confirmTwice(msg) {
 function loadProject(p) {
   p = checkProject(p); applyParams(p);
   setTab('design');
-  S.screenId = null; S.selId = null;
+  S.screenId = null; S.selId = null; S.sheet = 'screen';
   setProject(p);
   store((ls) => ls.setItem(STORE_KEY, JSON.stringify(S.project)));
   refresh();

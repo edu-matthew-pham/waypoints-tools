@@ -3,6 +3,13 @@
 import { CONDITIONS, ACTIONS } from './catalog.js';
 import { highlight, FUNCTION_NAMES } from './expr.js';
 import { isIdentifier } from './project.js';
+import { allScreensEvents, objectNames } from './shared.js';
+
+// each sheet's events with the object names its expressions can mean: every screen, then the All screens sheet
+const sheets = (project) => [
+  ...project.screens.map((s) => ({ events: s.events, objects: new Set(s.objects.map((o) => o.name)) })),
+  { events: allScreensEvents(project), objects: objectNames(project) },
+];
 
 const RESERVED = new Set([...FUNCTION_NAMES(), 'true', 'false', 'and', 'or', 'not']);
 
@@ -42,37 +49,45 @@ export function renameVariable(project, from, to) {
   if (!v) return;
   v.name = to;
   for (const t of project.variables) for (const f of t.table?.fields || []) if (f.type === 'link' && f.to === from) f.to = to;
-  for (const s of project.screens) {
-    for (const o of s.objects) for (const i of o.instances) if (i.source === from) i.source = to; // List and Table components showing it
-    eachItem(s.events, (item, entry) => {
+  for (const s of project.screens) for (const o of s.objects) for (const i of o.instances) if (i.source === from) i.source = to; // List and Table components showing it
+  for (const { events, objects } of sheets(project)) {
+    eachItem(events, (item, entry) => {
       for (const p of entry?.params || []) if (['variable', 'list', 'table'].includes(p.type) && item[p.name] === from) item[p.name] = to;
-      eachExpr(item, entry, (src) => rewrite(src, (t) => (t === from ? to : t.startsWith(from + '.') && !s.objects.some((o) => o.name === from) ? to + t.slice(from.length) : t)));
+      eachExpr(item, entry, (src) => rewrite(src, (t) => (t === from ? to : t.startsWith(from + '.') && !objects.has(from) ? to + t.slice(from.length) : t)));
     });
   }
 }
 
-export function renameObject(screen, from, to) {
+// project (optional): the All screens sheet follows too, but only if no other screen still has an object called
+// from (objects there are matched by name, so the others would lose their shared events).
+export function renameObject(screen, from, to, project) {
   const o = screen.objects.find((x) => x.name === from);
   if (!o) return;
   o.name = to;
-  eachItem(screen.events, (item, entry) => {
+  const fix = (events) => eachItem(events, (item, entry) => {
     for (const p of entry?.params || []) if (p.type === 'object' && item[p.name] === from) item[p.name] = to;
     eachExpr(item, entry, (src) => rewrite(src, (t) => (t.startsWith(from + '.') ? to + t.slice(from.length) : t)));
   });
+  fix(screen.events);
+  if (project && !project.screens.some((s) => s !== screen && s.objects.some((x) => x.name === from))) fix(allScreensEvents(project));
 }
 
 // an object's own variable (instance variable)
-export function renameInstVar(screen, objName, from, to) {
+// project (optional): the All screens sheet follows too, unless another screen's objName still has a variable called from
+export function renameInstVar(screen, objName, from, to, project) {
   const o = screen.objects.find((x) => x.name === objName);
   const iv = o?.instanceVars.find((x) => x.name === from);
   if (!iv) return;
   iv.name = to;
   for (const inst of o.instances) if (inst.vars && from in inst.vars) { inst.vars[to] = inst.vars[from]; delete inst.vars[from]; }
-  eachItem(screen.events, (item, entry) => {
+  const fix = (events) => eachItem(events, (item, entry) => {
     const objP = (entry?.params || []).find((p) => p.type === 'object');
     for (const p of entry?.params || []) if (p.type === 'instVar' && objP && item[objP.name] === objName && item[p.name] === from) item[p.name] = to;
     eachExpr(item, entry, (src) => rewrite(src, (t) => (t === `${objName}.${from}` ? `${objName}.${to}` : t)));
   });
+  fix(screen.events);
+  const stillThere = (s) => s !== screen && s.objects.some((x) => x.name === objName && x.instanceVars.some((v) => v.name === from));
+  if (project && !project.screens.some(stillThere)) fix(allScreensEvents(project));
 }
 
 // A field of a table. Its rows, the Table objects showing it, the actions that name it and every
@@ -85,10 +100,9 @@ export function renameField(project, tableName, from, to) {
   if (!f) return;
   f.name = to;
   v.value = v.value.map((r) => Object.fromEntries(Object.entries(r).map(([k, x]) => [k === from ? to : k, x])));
-  for (const s of project.screens) {
-    const objects = new Set(s.objects.map((o) => o.name));
-    for (const o of s.objects) for (const i of o.instances) if (i.source === tableName && i.columns) i.columns = i.columns.split(',').map((c) => (c.trim() === from ? to : c.trim())).join(', ');
-    eachItem(s.events, (item, entry) => {
+  for (const s of project.screens) for (const o of s.objects) for (const i of o.instances) if (i.source === tableName && i.columns) i.columns = i.columns.split(',').map((c) => (c.trim() === from ? to : c.trim())).join(', ');
+  for (const { events, objects } of sheets(project)) {
+    eachItem(events, (item, entry) => {
       const t = (entry?.params || []).find((p) => p.type === 'table');
       if (t && item[t.name] === tableName) {
         for (const p of entry.params) {

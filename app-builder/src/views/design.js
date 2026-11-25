@@ -59,7 +59,7 @@ export function initDesign(root) {
         renamingIvar === obj.name + '.' + v.name
           ? renameInput({ value: v.name, label: 'Variable name', notify: hooks.notify, taken: [...obj.instanceVars.map((x) => x.name), 'text', 'x', 'y', 'w', 'h', 'visible', ...(OBJECT_KINDS[obj.kind]?.exposes || [])],
             onDone: () => { renamingIvar = null; renderProps(); },
-            onSave: (nv) => { renameInstVar(screen(), obj.name, v.name, nv); renamingIvar = null; hooks.commit(); } })
+            onSave: (nv) => { renameInstVar(screen(), obj.name, v.name, nv, S.project); renamingIvar = null; hooks.commit(); } })
           : h('button', { class: 'vname link-name', type: 'button', title: 'Click to rename (events are updated too)', onclick: () => { renamingIvar = obj.name + '.' + v.name; renderProps(); } }, v.name),
         h('input', { class: 'ctl small', value: String(cur), 'data-ab': 'objvar:' + v.name, 'aria-label': `${v.name} for this copy`, onchange: (e) => { inst.vars[v.name] = parseValue(e.target.value); hooks.commit(); } }),
         h('button', { class: 'icon danger', title: `Remove ${v.name} from every ${obj.name}`, onclick: () => {

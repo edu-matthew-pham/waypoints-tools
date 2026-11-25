@@ -4,10 +4,21 @@
 import { h } from '../ui/dom.js';
 import { Runner } from '../run-engine.js';
 import { scopeFor, exprScopeFor } from '../core/project.js';
-import { S, screen, hooks } from '../state.js';
+import { allObjectsScreen, sharedEventsFor } from '../core/shared.js';
+import { S, screen, hooks, showAllScreens } from '../state.js';
 
 export function initEvents(root) {
   const hint = h('p', { class: 'hint' });
+  // which sheet: this screen's, or the All screens sheet (Level 3+)
+  const whichBar = h('div', { class: 'which-sheet', role: 'group', 'aria-label': 'Which event sheet' });
+  const drawWhich = () => {
+    whichBar.hidden = !showAllScreens();
+    const btn = (id, label, title) => h('button', { class: 'seg' + (S.sheet === id ? ' on' : ''), type: 'button', 'data-ab': 'sheet:' + id, 'aria-pressed': String(S.sheet === id), title,
+      onclick: () => { if (S.sheet !== id) { S.sheet = id; hooks.refresh(); } } }, label);
+    whichBar.replaceChildren(
+      btn('screen', `This screen: ${screen().name}`, 'Events that run only on this screen'),
+      btn('all', 'All screens', 'Events that run on every screen (like a Home button), before each screen’s own'));
+  };
   const sheet = document.createElement('event-sheet');
   const banner = h('div', { class: 'pick-banner', hidden: true }, 'Click an object in the preview to choose it. Esc to cancel.');
   const stageHost = h('div', { class: 'stage-host' });
@@ -31,7 +42,7 @@ export function initEvents(root) {
   });
   drawMode();
   root.append(
-    h('div', { class: 'sheet-col' }, h('div', { class: 'sheet-bar' }, hint, modeBtn), sheet),
+    h('div', { class: 'sheet-col' }, whichBar, h('div', { class: 'sheet-bar' }, hint, modeBtn), sheet),
     h('div', { class: 'preview-col' },
       h('div', { class: 'run-bar' },
         h('button', { class: 'btn', 'data-ab': 'restart', onclick: restart }, '↻ Restart'),
@@ -63,9 +74,17 @@ export function initEvents(root) {
 
   return {
     render(source) {
-      hint.textContent = `Events for “${screen().name}”. ⚡ events run the moment something happens; the others are checked every tick, top to bottom.`;
+      if (!showAllScreens()) S.sheet = 'screen';
+      drawWhich();
+      const all = S.sheet === 'all';
+      const shared = all ? [] : sharedEventsFor(S.project, screen());
+      hint.textContent = all
+        ? 'Events for all screens. They run on every screen, before that screen’s own. An event is skipped on a screen that doesn’t have every object it mentions. The preview shows the screen you are on.'
+        : `Events for “${screen().name}”. ⚡ events run the moment something happens; the others are checked every tick, top to bottom.`
+          + (shared.length ? ` ${shared.length === 1 ? '1 event' : shared.length + ' events'} from All screens run${shared.length === 1 ? 's' : ''} here first.` : '');
       if (source !== 'sheet') {
-        sheet.setData({ events: screen().events, scope: scopeFor(S.project, screen()), exprScope: exprScopeFor(S.project, screen()), mode: S.guided ? 'guided' : 'edit', canPick: true, features: S.rf });
+        const scr = all ? allObjectsScreen(S.project) : screen();
+        sheet.setData({ events: all ? S.project.allScreens.events : screen().events, scope: scopeFor(S.project, scr), exprScope: exprScopeFor(S.project, scr), mode: S.guided ? 'guided' : 'edit', canPick: true, features: S.rf });
       }
       if (active) later();
     },

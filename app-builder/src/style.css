@@ -191,6 +191,11 @@ select.ctl { padding-right: 4px; }
 .sheet-bar .hint { margin: 0; }
 .seg { font: inherit; font-size: 12px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 99px; background: #fff; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .seg:hover { border-color: var(--accent); color: var(--accent); }
+.which-sheet { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.which-sheet[hidden] { display: none; }
+.seg.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.tree-row.all-screens .kind { margin-left: 8px; }
+.tree-row.all-screens.on .link { font-weight: 600; color: var(--accent); }
 .tag.lvl { margin-left: 0; }
 .dbg { margin-top: 8px; font-size: 13px; }
 .dbg summary { cursor: pointer; color: var(--muted); }

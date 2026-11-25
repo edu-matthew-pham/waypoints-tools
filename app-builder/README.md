@@ -53,6 +53,7 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
     src/views/run.js        Run tab: full-size app + read-only sheet that flashes as rows run
     src/views/map.js        Map tab: every screen as a small picture, arrows from Go to screen actions
     src/core/map.js         screenMap(project): links, start, unreachable screens, dead ends (no DOM; tests and checks use it)
+    src/core/shared.js      the All screens sheet: which shared events apply to a screen (objects matched by name)
     src/ui/screen-items.js  what the stage draws for one screen (shared by Design and Map)
     src/app.js              shell: top bar, tabs, save/open, wiring
     src/samples.js          Practice tracker, Daily chores
