@@ -313,3 +313,14 @@ Loading another app (New, a sample, Open, Start again, a recent app) never loses
 keeps their pictures and sounds), and **Undo** straight after brings it back. Empty apps aren't kept. Locked lesson links
 show no Recent button.
 
+## Share by link (26 Nov 2026)
+
+**Share** (toolbar) makes a link with the whole app inside it, after the `#`, compressed (`src/core/share-link.js`;
+deflate-raw with CompressionStream, base64url): nothing is uploaded and there's no server. `index.html#play=…` opens
+just the working app, full size (`src/play-page.js`, the Player only), with Restart and **Open a copy in App Builder**
+(`#open=…`: loads it as the viewer's own copy; their current app goes to Recent). The original never changes; a changed
+app needs a new link. A shared app's Remember between visits data stays in each viewer's browser (its own key per link).
+Apps with their own pictures or sounds (uploads, recordings) are too big for a link: Share says so and offers Save.
+Typical links are 1–3k characters; over 8k, the dialog warns that some chat apps cut long links. Inside the tutorials,
+the link points at the tutorials site's copy of App Builder, so a student can send a teacher their app from a lesson.
+

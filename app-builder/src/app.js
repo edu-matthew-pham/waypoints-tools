@@ -25,6 +25,8 @@ import * as mediaStore from './media-store.js';
 import { buildSave, readProjectFile, savesAsZip, saveName } from './project-file.js';
 import { modal } from './ui/sheet-dialogs.js';
 import { openMenu } from './ui/menu.js';
+import { encodeApp, decodeApp, canShareByLink } from './core/share-link.js';
+import { startPlay } from './play-page.js';
 
 // ?sample=water opens that lesson project. Each lesson link keeps its own saved work, so a student who
 // comes back (or refreshes) carries on where they were; "Start again" reloads the original.
@@ -142,6 +144,7 @@ function renderTop() {
     again: '<path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/>',
     new: '<path d="M12 5v14M5 12h14"/>',
     recent: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
   };
   const icon = (k) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICON[k]; return s; };
   els.top.replaceChildren(
@@ -155,6 +158,7 @@ function renderTop() {
       h('button', { class: 'btn', 'data-ab': 'open', title: 'Open a saved app (.json or .zip)', onclick: openFile }, icon('open'), 'Open…'),
       S.locked ? '' : h('button', { class: 'btn', 'data-ab': 'recent', title: 'Apps you had before in this browser', 'aria-haspopup': 'menu', onclick: (e) => recentMenu(e.currentTarget) }, icon('recent'), 'Recent'),
       h('button', { class: 'btn primary', 'data-ab': 'save', title: saveTo ? `Save to ${saveTo.handle.name} (Ctrl+S)` : 'Save this app as a file (Ctrl+S)', onclick: () => saveFile() }, icon('save'), 'Save'),
+      h('button', { class: 'btn', 'data-ab': 'share', title: 'Share a link to your working app', onclick: shareApp }, icon('share'), 'Share'),
       canPick ? h('button', { class: 'btn icon-only save-as', 'data-ab': 'save-as', title: 'Save as… a new file (Ctrl+Shift+S)', onclick: () => saveFile({ as: true }) }, h('span', { 'aria-hidden': 'true' }, '▾'), h('span', { class: 'lbl' }, 'Save as…')) : ''),
     h('span', { class: 'grp' },
       h('button', { class: 'btn icon-only', 'data-ab': 'undo', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, icon('undo'), h('span', { class: 'lbl' }, 'Undo')),
@@ -333,6 +337,30 @@ async function openFrom(fileObj, handle) {
   } catch (e) { notify('Could not open that file: ' + e.message); }
 }
 
+// Share by link (core/share-link.js): the whole app inside the link; it opens just the working app (#play=), with a
+// button there to open a copy in App Builder (#open=). Apps with their own pictures or sounds are shared as a file.
+async function shareApp() {
+  if (!canShareByLink(S.project)) {
+    const { close } = modal('Share', h('p', {}, 'This app has pictures or sounds of its own (uploaded or recorded), and they are too big to fit in a link. Save it and share the file instead: the other person opens it with Open\u2026 in App Builder.'),
+      [h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close'), h('button', { class: 'btn primary', type: 'button', onclick: () => { close(); saveFile(); } }, 'Save the file')]);
+    return;
+  }
+  let url;
+  try { url = location.origin + location.pathname + '#play=' + await encodeApp(S.project); } catch (e) { notify('Could not make a link: ' + (e?.message || 'unknown problem')); return; }
+  const box = h('input', { class: 'ctl share-link', readonly: '', value: url, 'aria-label': 'Link to your app', 'data-ab': 'share-link', onfocus: (e) => e.target.select() });
+  const copy = h('button', { class: 'btn primary', type: 'button', 'data-ab': 'share-copy', onclick: async () => {
+    try { await navigator.clipboard.writeText(url); copy.textContent = 'Copied'; } catch { box.focus(); box.select(); copy.textContent = 'Press Ctrl+C to copy'; }
+  } }, 'Copy link');
+  const { close } = modal('Share by link',
+    h('div', {},
+      h('p', {}, 'Anyone with this link can use your app, and open their own copy to look inside. Your app stays as it is; if you change it later, share a new link.'),
+      box,
+      url.length > 8000 ? h('p', { class: 'muted small' }, `A long link (${Math.round(url.length / 1000)}k characters). Email or a class page is safest; some chat apps cut long links short.`) : null,
+      h('p', { class: 'muted small' }, 'Nothing is uploaded: the app is inside the link itself. What the app remembers stays in each person\u2019s own browser.')),
+    [h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close'),
+      h('a', { class: 'btn', href: url, target: '_blank', rel: 'noopener', 'data-ab': 'share-open' }, 'Try the link'), copy]);
+}
+
 function renderTabs() {
   // while the app runs, the Run tab reads Stop and goes back to the tab you came from (Restart is on the Run tab)
   const running = S.tab === 'run';
@@ -357,6 +385,7 @@ function setTab(t) {
 
 // ---------------- refresh ----------------
 function refresh(source) {
+  if (S.playing || !S.project) return; // a shared link's play-only page has no editor
   renderTop();
   renderSide(els.side);
   design.render();
@@ -366,11 +395,15 @@ function refresh(source) {
 }
 
 document.addEventListener('keydown', (e) => {
+  if (S.playing || !history) return;
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); undo(e.shiftKey ? 1 : -1); return; }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveFile({ as: e.shiftKey }); return; }
   if (S.tab === 'design' && !typing && design.onKey(e)) e.preventDefault();
 });
+
+// a shared link pasted into this same tab only changes the # part, which doesn't reload the page: start again
+addEventListener('hashchange', () => { if (/^#(play|open)=/.test(location.hash)) location.reload(); });
 
 // ---------------- boot ----------------
 let initial = null;
@@ -386,6 +419,8 @@ const playground = () => ({ ...SAMPLES['Minutes and goal (two screens)'](), feat
 // Async only to load media first (IndexedDB answers later); everything after it runs as before.
 boot();
 async function boot() {
+// a shared link (#play=…): just the working app, no editor (play-page.js)
+if (location.hash.startsWith('#play=')) { S.playing = true; await startPlay(location.hash.slice(6), { soundBase: MEDIA_SOURCES.soundBase }); return; }
 initial = checkProject(initial || (lessonStart ? lessonStart() : playground()));
 applyParams(initial);
 const before = JSON.stringify(initial);
@@ -393,6 +428,13 @@ await prepareMedia(initial);
 setProject(initial);
 if (hadSaved && JSON.stringify(S.project) !== before) store((ls) => ls.setItem(STORE_KEY, history.current)); // uploads moved out
 mediaStore.tidy(S.project).catch(() => {});
+// #open=…: "Open a copy in App Builder" from a shared app. Your current app goes to Recent (loadProject).
+if (location.hash.startsWith('#open=')) {
+  const code = location.hash.slice(6);
+  window.history.replaceState(null, '', location.pathname + location.search);
+  try { await loadProject(await decodeApp(code)); notify('This is your own copy of the shared app. The app you had before is in Recent.'); }
+  catch { notify('That link couldn\u2019t be opened: it may have been cut short.'); }
+}
 refresh();
 const tab = new URLSearchParams(location.search).get('tab');
 if (tab && tabViews[tab] !== undefined) setTab(tab);

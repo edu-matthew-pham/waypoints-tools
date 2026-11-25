@@ -271,7 +271,7 @@ names (it would clash with a same-named object on a screen).
 Taught in Year 7, then used by any student in any subject, the way they use Word, Excel or Google Sites: a science data
 logger, a revision quiz, a budget, a timeline. No accounts, so school approval is easier. Gaps, biggest first:
 1. **Share by link.** A link that opens just the working app (the standalone player, `src/player.js`). Most apps fit in
-   the link itself, compressed after `#`, so no server; apps with photos or recordings need the file (or 2).
+   the link itself, compressed after `#`, so no server; apps with photos or recordings need the file (or 2). *(Built 26 Nov, in v1: README › Share by link.)*
 2. **Work in one browser.** Projects live on one device unless saved; saving to Google Drive or OneDrive would close the
    gap without App Builder running accounts.
 3. **Easy layout and good-looking defaults** (§5; and the visual refresh before v1).
