@@ -300,3 +300,10 @@ New features are 1.1, 1.2…. Promise: projects saved in v1 keep opening in late
 runs a frozen v1 project (`tests/fixtures/v1-project.json`, made by `tools/make-v1-fixture.mjs`) and checks its sheet text,
 which the tutorials' lesson checks read. If it fails, add an upgrade step in `checkProject`; don't edit the fixture.
 
+## Recent apps and Undo after New (26 Nov 2026)
+
+Loading another app (New, a sample, Open, Start again, a recent app) never loses the one you had: it goes into **Recent**
+(the toolbar button beside Open; the last 5 apps, kept in this browser under `<store key>.recent`, so the media tidy-up
+keeps their pictures and sounds), and **Undo** straight after brings it back. Empty apps aren't kept. Locked lesson links
+show no Recent button.
+

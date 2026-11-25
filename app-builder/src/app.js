@@ -24,6 +24,7 @@ import { SAMPLES, sampleById } from './samples.js';
 import * as mediaStore from './media-store.js';
 import { buildSave, readProjectFile } from './project-file.js';
 import { modal } from './ui/sheet-dialogs.js';
+import { openMenu } from './ui/menu.js';
 
 // ?sample=water opens that lesson project. Each lesson link keeps its own saved work, so a student who
 // comes back (or refreshes) carries on where they were; "Start again" reloads the original.
@@ -140,6 +141,7 @@ function renderTop() {
     redo: '<path d="m15 14 5-5-5-5M20 9H9a5 5 0 0 0 0 10h3"/>',
     again: '<path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/>',
     new: '<path d="M12 5v14M5 12h14"/>',
+    recent: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
   };
   const icon = (k) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICON[k]; return s; };
   els.top.replaceChildren(
@@ -151,6 +153,7 @@ function renderTop() {
       } }, icon('again'), 'Start again')
         : h('button', { class: 'btn', 'data-ab': 'new', title: 'Start a new app', onclick: () => loadProject(newProject()) }, icon('new'), 'New'),
       h('button', { class: 'btn', 'data-ab': 'open', title: 'Open a saved app (.json or .zip)', onclick: openFile }, icon('open'), 'Open…'),
+      S.locked ? '' : h('button', { class: 'btn', 'data-ab': 'recent', title: 'Apps you had before in this browser', 'aria-haspopup': 'menu', onclick: (e) => recentMenu(e.currentTarget) }, icon('recent'), 'Recent'),
       h('button', { class: 'btn primary', 'data-ab': 'save', title: 'Save a copy of this app as a file', onclick: saveFile }, icon('save'), 'Save')),
     h('span', { class: 'grp' },
       h('button', { class: 'btn icon-only', 'data-ab': 'undo', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, icon('undo'), h('span', { class: 'lbl' }, 'Undo')),
@@ -175,12 +178,46 @@ function confirmTwice(msg) {
   notify(msg + ' Press again to confirm.');
   return false;
 }
-async function loadProject(p) {
+// Loading another app (New, a sample, Open, a recent app, Start again) never loses the one you had: it goes into
+// Recent (kept in this browser), and Undo straight after brings it back.
+const RECENT_KEY = STORE_KEY + '.recent', RECENT_MAX = 5;
+function recentApps() {
+  try { return JSON.parse(store((ls) => ls.getItem(RECENT_KEY)) || '[]'); } catch { return []; }
+}
+const emptyApp = (p) => p.screens.length <= 1 && !p.variables.length && !(p.assets || []).length && !(p.sounds || []).length
+  && p.screens.every((s) => !s.events.length) && !(p.allScreens?.events || []).length && !(p.functions || []).length;
+function keepInRecent(p) {
+  if (!p || emptyApp(p)) return;
+  const json = JSON.stringify(p);
+  let list = recentApps().filter((r) => r.json !== json);
+  list.unshift({ name: p.name || 'Untitled app', at: Date.now(), json });
+  list = list.slice(0, RECENT_MAX);
+  // full storage: drop the oldest until it fits (the app itself is already saved separately)
+  while (list.length && !store((ls) => { ls.setItem(RECENT_KEY, JSON.stringify(list)); return true; })) list.pop();
+}
+const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
+function recentMenu(btn) {
+  const list = recentApps();
+  const r = btn.getBoundingClientRect();
+  openMenu({ x: r.left, y: r.bottom + 4, returnFocus: btn, items: list.length
+    ? list.map((it, i) => ({ label: `${it.name} · ${ago(it.at)}`, fn: () => {
+      keepInRecent(S.project);
+      const rest = recentApps().filter((x) => x.json !== it.json); // it moves from Recent back to being your app
+      store((ls) => ls.setItem(RECENT_KEY, JSON.stringify(rest)));
+      loadProject(JSON.parse(it.json), { toRecent: false });
+    } }))
+    : [{ label: 'No recent apps yet: when you start a new app or open another, the one you had goes here', fn: () => {}, disabled: true }] });
+}
+
+async function loadProject(p, { toRecent = true } = {}) {
   p = checkProject(p); applyParams(p);
   await prepareMedia(p);
+  const before = history && S.project;
+  if (toRecent && before) keepInRecent(before);
   setTab('design');
   S.screenId = null; S.selId = null; S.sheet = 'screen';
-  setProject(p);
+  setProject(p, { resetHistory: !before });
+  if (before) history.push(JSON.stringify(S.project)); // Undo goes back to the app you had
   store((ls) => ls.setItem(STORE_KEY, JSON.stringify(S.project)));
   refresh();
   embed.report(S.project);
