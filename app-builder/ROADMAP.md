@@ -73,6 +73,10 @@ Time runs from the interpreter's tick counter, not the wall clock, so tests are 
   and Songs (title, artist, playlist). "Songs in this playlist" is For each + a condition, as students already know. Later, a
   field type that links to another table (a dropdown of its rows when editing). Relational thinking without nesting; leads
   towards SQL. Higher level only, so beginners never see it.
+- **Nested view of linked tables** *(later, advanced, proposed 25 Nov 2026)*: in the read-only JSON view, an option such as
+  "Show Songs grouped by playlist" builds the nested version from two linked tables, to look at and copy, never to edit or
+  store. Shows "store flat, send nested". Tutorials use it to show the idea; writing that conversion in code stays a task
+  for the Python and web courses. Only after linked tables.
 - **Grid** *(later idea)*: a table found by row and column number (`cell(Seats, 2, 3)`), for seating plans, bingo cards or
   timetables. Same sidebar editor in a second mode. Only if real projects ask for it.
 - **Tables inside tables** (nesting): not planned for now. Hard to show and edit, and expressions get long
