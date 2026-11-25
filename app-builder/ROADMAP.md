@@ -2,6 +2,8 @@
 
 Guiding rules: every addition is **one registry entry** (component or catalog item) plus a test; each is placed in a **level** so
 beginners don't see it until needed; and anything that can run without a screen (the interpreter) stays testable in Node.
+Years 7–8 are the main audience, not the ceiling: advanced options can be added at higher levels (hidden from beginners)
+so the tool can grow with older students and bigger projects (25 Nov 2026).
 
 ## 1. Components (the "Add an object" picker)
 
@@ -58,11 +60,23 @@ Time runs from the interpreter's tick counter, not the wall clock, so tests are 
 - **Tables (records you can see)** *(proposed 24 Nov 2026)*: a list of records, each row with the same named fields. Construct's
   Array, Dictionary and JSON are invisible until the debugger; here the data shape is always on screen.
   - Sidebar: edited like a small spreadsheet (columns are fields, rows are records).
-  - Watch box: a live table while running, the row in use highlighted, so For each is seen stepping through rows.
+  - While running: the table's live values show in the sidebar (as variables' values do), the row in use highlighted, so
+    For each is seen stepping through rows.
   - A **Table** object shows one on screen; clicking a row works like a list item (ClickedIndex).
-  - Expressions `item(Songs, 2).artist`, `LoopItem.artist`; actions add row, set field, remove row, sort by field, filter.
+  - Expressions `item(Songs, 2).artist`, `LoopItem.artist`; actions add row, set field, remove row, sort by field. No
+    built-in filter: filtering is For each + a condition + add a row to a results table (it's the algorithm to learn).
+  - Fields are text or number (number makes sort and totals behave); yes/no later.
   - One record alone (a dictionary) shows as a two-column field/value table: no separate concept.
   - Saves as JSON with "Remember between visits". Sheet text gets `table Songs = [title, artist, length] 3 rows` for lesson checks.
+  - Full spec and the Data apps course outline: tutorials Project doc `data-apps-and-tables-plan`.
+- **Linked tables** *(advanced option, proposed 25 Nov 2026)*: two tables joined by a shared value, such as Playlists (name)
+  and Songs (title, artist, playlist). "Songs in this playlist" is For each + a condition, as students already know. Later, a
+  field type that links to another table (a dropdown of its rows when editing). Relational thinking without nesting; leads
+  towards SQL. Higher level only, so beginners never see it.
+- **Grid** *(later idea)*: a table found by row and column number (`cell(Seats, 2, 3)`), for seating plans, bingo cards or
+  timetables. Same sidebar editor in a second mode. Only if real projects ask for it.
+- **Tables inside tables** (nesting): not planned for now. Hard to show and edit, and expressions get long
+  (`item(item(Playlists, 1).songs, 2)`); linked tables cover most needs. Revisit if advanced projects need it.
 - **Screen stack**: "Go back" action alongside "Go to screen".
 - **Rename** objects, variables and screens with references updated in events and expressions (rewrite identifiers via the tokenizer).
 
