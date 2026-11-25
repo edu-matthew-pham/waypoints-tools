@@ -200,10 +200,11 @@ export const RENDER = {
   // snapshot() gives the current frame as a small JPEG. destroy() turns the camera off.
   photo: {
     make: (design) => {
-      const el = h('div', { class: 'pho' }), v = h('video', { playsinline: '', muted: '', autoplay: '' }), msg = h('div', { class: 'pho-msg' });
-      v.muted = true;
-      el.append(v, msg);
-      Object.assign(el, { _v: v, _msg: msg, _design: design });
+      // the <video> is added only when the camera starts: browser extensions that put buttons on every video then have
+      // nothing to latch onto before that (and never in Design)
+      const el = h('div', { class: 'pho' }), msg = h('div', { class: 'pho-msg' });
+      el.append(msg);
+      Object.assign(el, { _v: null, _msg: msg, _design: design });
       msg.textContent = design ? '📷 Camera: the user taps here to start it when the app runs' : '📷 Tap to start the camera';
       if (design) return el;
       el.addEventListener('click', () => { if (!el._stream) startCamera(el); });
@@ -213,7 +214,7 @@ export const RENDER = {
     read: (v) => !!v.srcObject?.active,
     snapshot: (el) => {
       const v = el._v;
-      if (!el._stream || !v.videoWidth) return null;
+      if (!el._stream || !v?.videoWidth) return null;
       const scale = Math.min(1, 640 / Math.max(v.videoWidth, v.videoHeight));
       const c = h('canvas', {});
       c.width = Math.round(v.videoWidth * scale); c.height = Math.round(v.videoHeight * scale);
@@ -319,6 +320,7 @@ async function startCamera(el) {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
     if (!el.isConnected) { stream.getTracks().forEach((t) => t.stop()); return; }
     el._stream = stream;
+    if (!el._v) { el._v = h('video', { playsinline: '', muted: '', autoplay: '' }); el._v.muted = true; el.prepend(el._v); }
     el._v.srcObject = stream;
     await el._v.play().catch(() => {});
     el.classList.add('live');
