@@ -359,6 +359,15 @@ one shape in `src/carry.js`, so a drive can be added later as one more place for
 
 ## Sign in to save to your drive *(live 26 Nov 2026: 1.3–1.6; README › Your drive)*
 
+How saving fits together (Matthew, 26 Nov 2026):
+- **Files are the main way to keep apps:** one file per app, kept wherever students keep work. A synced school
+  OneDrive or Google Drive folder works with no approval at all.
+- **Browser storage and Recent** are automatic, on that computer. **Continue and Share links** move or share one
+  app (the app is inside the link); they're not for keeping a collection.
+- **Drive sign-in is a convenience** for schools whose IT approves it. App Builder never depends on it.
+- **Not wanted:** App Builder's own accounts, including email sign-up. They'd need a server holding minors' data,
+  and schools vet those harder than drive sign-in.
+
 Status, 26 Nov 2026 (Matthew tested sign-in and saving on the live site with personal Microsoft and Google accounts:
 both work):
 - **Microsoft:** registered in Matthew's own directory (client ID in `src/drive/config.js`).
