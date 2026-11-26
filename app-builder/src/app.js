@@ -418,14 +418,15 @@ addEventListener('hashchange', () => { if (/^#(play|open)=/.test(location.hash))
 // ---------------- guided tutorial: Try the finished app ----------------
 // The lesson's finished app, running in a player over the editor: the student's own app is never swapped out.
 let getLessonFile = null;
-async function playFinished(lesson, ref) {
+async function playFinished(lesson, ref, { next = '', onNext } = {}) {
   let p;
   try { p = checkProject(await loadRef(lesson, ref, tutorialLink.url, getLessonFile)); } catch { notify('The finished app couldn\u2019t be opened.'); return; }
   await mediaStore.load(p);
   const host = h('div', { class: 'stage-host' }), area = h('div', { class: 'tut-play-stage' }, host);
   const dlg = h('dialog', { class: 'es-dlg tut-play-dlg', 'aria-label': 'The finished app' },
-    h('div', { class: 'dlg-head' }, h('strong', {}, 'The finished app: try it'), h('span', { class: 'spacer' }),
+    h('div', { class: 'dlg-head' }, h('div', {}, h('strong', {}, 'The finished app'), h('div', { class: 'muted' }, 'Try it out. When you\u2019re ready, start building your own.')), h('span', { class: 'spacer' }),
       h('button', { class: 'btn', 'data-ab': 'tutorial-play-restart', onclick: () => start() }, '\u21BB Restart'),
+      h('button', { class: 'btn primary', 'data-ab': 'tutorial-play-next', onclick: () => { dlg.close(); onNext?.(); } }, next ? 'Start building \u25B8' : 'Back to my app'),
       h('button', { class: 'icon', 'data-ab': 'tutorial-play-close', 'aria-label': 'Close the finished app', onclick: () => dlg.close() }, '\u2715')),
     area);
   document.body.append(dlg);
@@ -485,8 +486,8 @@ refresh();
 const tab = new URLSearchParams(location.search).get('tab');
 if (tab && tabViews[tab] !== undefined) setTab(tab);
 window.__app = { S, setTab, loadProject }; // handy for debugging and tests
-if (lesson) tutorial = startTutorial({ tutorial: lesson, id: tutorialLink.id, getSheet: () => sheetText(S.project), getTab: () => S.tab, getProject: () => S.project, store,
-  onPlay: (ref) => playFinished(lesson, ref) });
+if (lesson) tutorial = startTutorial({ tutorial: lesson, id: tutorialLink.id, lessonUrl: tutorialLink.url, getSheet: () => sheetText(S.project), getTab: () => S.tab, getProject: () => S.project, store,
+  onPlay: (ref, opts) => playFinished(lesson, ref, opts) });
 
 // An embedding page (a lesson) can start, reset and read the project. See src/embed.js.
 embed.start({

@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseLesson, parseSource, ticks, region, targetsOf, triesOf, mentionedVariables, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
+import { parseLesson, parseSource, ticks, region, targetsOf, triesOf, mentionedVariables, clipUrls, hintsOf, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
 import { sheetText } from '../src/core/sheet-text.js';
 import { checkProject } from '../src/core/project.js';
 
@@ -62,6 +62,16 @@ test('the clip\u2019s expect: lines on the running app become Try it ticks; name
   assert.deepEqual(t.steps[2].tries, [], 'an expect on the editor (the event sheet) is not a try');
   assert.deepEqual(triesOf([{ expect: { selector: '.view-run .stage', contains: 'Glasses: 0 of 8' } }]), [{ widget: '', contains: 'Glasses: 0 of 8', after: '' }]);
   assert.deepEqual(mentionedVariables('beside *Minutes*, its value goes up; Sessions too', ['Minutes', 'Sessions']), ['Minutes']);
+});
+
+test('Stuck? help: the clip captions as hints, and the step\u2019s video only from the tutorials site', () => {
+  const t = parseLesson(lesson);
+  assert.equal(t.steps[2].clip, 'step-3', 'the website numbers every section, Try the finished app included');
+  assert.equal(t.steps[2].title, 'Build 2: count with a variable');
+  assert.ok(hintsOf(t.steps[2]).length >= 2);
+  assert.equal(clipUrls(t.steps[2], 'https://tutorials.learningwaypoints.com/code/apps/practice-tracker/source.json').video, 'https://tutorials.learningwaypoints.com/code/apps/practice-tracker/clips/step-3.mp4');
+  assert.equal(clipUrls(t.steps[2], 'http://localhost:8000/lesson.md'), null);
+  assert.equal(clipUrls(t.steps[4], 'https://tutorials.learningwaypoints.com/x/source.json'), null, 'a step with no clip has no video');
 });
 
 test('teacher notes, a second finished-app step and quizzes stay out', () => {

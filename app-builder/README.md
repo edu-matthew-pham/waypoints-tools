@@ -59,6 +59,11 @@ From the lesson it takes each build step (a `## Step` whose step block has `try:
   its live value on the left (or at the Events tab, since values show only while the app runs);
 - **Try the finished app:** an App Builder step before the build starts, with its own starter, becomes step 1 with an
   "Open the finished app" button: it runs in a player over the editor, so the student's own app is never swapped.
+  Its "Start building" button closes it and moves on.
+- **Step done:** when a step is complete, a green "Step done! Next: …" banner (with its own Next) and a glow; if the card
+  is hidden, its Tutorial button turns green. Back and Next stay pinned at the bottom of the card;
+- **Stuck?** (closed until opened): the clip's captions as a short how-to, and "Watch how it's done", the lesson's own
+  video of that step (`clips/step-N.mp4` beside the lesson page on the tutorials site; only for lessons opened from there).
 
 Nothing is locked: Back, Next and the step dots always work. The tutorial starts from the first build step's starter
 (`app.json#start` beside the lesson), keeps its work and step in the browser under its own name, and uses the step's

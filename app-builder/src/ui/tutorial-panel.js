@@ -8,11 +8,11 @@
 // Once a step is built, it points at what to try in the running app (a "Try it" tick, from the clip's expect: lines)
 // and then at the live value of any variable the step names, so students watch it change.
 import { h } from './dom.js';
-import { ticks, mentionedVariables } from '../edu/tutorial.js';
+import { ticks, mentionedVariables, clipUrls, hintsOf } from '../edu/tutorial.js';
 
 const APP = (sel) => `.view-events .preview-col ${sel}, .view-run ${sel}`; // the running app: preview or Run tab
 
-export function startTutorial({ tutorial, id, getSheet, getTab, getProject, onPlay, store }) {
+export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getProject, onPlay, store }) {
   const KEY = 'appbuilder.tutorial.' + id + '.step';
   const TRIED = 'appbuilder.tutorial.' + id + '.tried';
   let done = ticks(tutorial, getSheet());
@@ -27,18 +27,21 @@ export function startTutorial({ tutorial, id, getSheet, getTab, getProject, onPl
     : Math.max(0, tutorial.steps.findIndex((_, i) => !complete(i)));
   let ptr = 0;            // which of this step's pointers is next
   let open = true, small = innerWidth < 700, left = false, finished = false; // phones start with just the title
+  let cheer = -1; // the step that has just been completed: a green "Step done" banner until the student moves on
 
   const ring = h('div', { class: 'tut-ring', 'aria-hidden': 'true' });
   const bubble = h('div', { class: 'tut-bubble', 'aria-hidden': 'true' });
   const card = h('aside', { class: 'tut', 'data-ab': 'tutorial', 'aria-label': 'Tutorial' });
-  const reopen = h('button', { class: 'btn tut-reopen', 'data-ab': 'tutorial-open', onclick: () => { open = true; draw(); } }, '\u{1F4D6} Tutorial');
+  const reopen = h('button', { class: 'btn tut-reopen', 'data-ab': 'tutorial-open', onclick: () => { open = true; draw(); } });
   document.body.append(card, reopen);
 
-  const go = (i) => { at = Math.max(0, Math.min(tutorial.steps.length - 1, i)); ptr = 0; finished = false; store((ls) => ls.setItem(KEY, String(at))); draw(); };
+  const go = (i) => { at = Math.max(0, Math.min(tutorial.steps.length - 1, i)); ptr = 0; finished = false; cheer = -1; wasAt = at; wasComplete = complete(at); store((ls) => ls.setItem(KEY, String(at))); draw(); };
 
   function draw() {
     card.hidden = !open; reopen.hidden = open;
-    card.classList.toggle('small', small); card.classList.toggle('left', left);
+    card.classList.toggle('small', small); card.classList.toggle('left', left); card.classList.toggle('cheer', cheer === at);
+    reopen.classList.toggle('cheer', cheer === at);
+    reopen.textContent = cheer === at ? '\u2713 Step done: show the tutorial' : '\u{1F4D6} Tutorial';
     if (!open) { place(); return; }
     const s = tutorial.steps[at];
     const last = at === tutorial.steps.length - 1;
@@ -55,7 +58,7 @@ export function startTutorial({ tutorial, id, getSheet, getTab, getProject, onPl
       h('button', { class: 'icon', 'data-ab': 'tutorial-shrink', title: small ? 'Show the whole step' : 'Make smaller', 'aria-label': small ? 'Show the whole step' : 'Make the tutorial smaller', 'aria-expanded': String(!small), onclick: () => { small = !small; draw(); } }, small ? '▴' : '▾'),
       h('button', { class: 'icon', 'data-ab': 'tutorial-close', title: 'Hide the tutorial', 'aria-label': 'Hide the tutorial', onclick: () => { open = false; draw(); } }, '✕'));
     const check = [];
-    if (s.play) check.push(h('button', { class: 'btn primary tut-play', 'data-ab': 'tutorial-play', onclick: async () => { await onPlay(s.play); mark(`${at}:play`); draw(); } }, '▶ Open the finished app'));
+    if (s.play) check.push(h('button', { class: 'btn primary tut-play', 'data-ab': 'tutorial-play', onclick: () => { mark(`${at}:play`); celebrate(); draw(); onPlay(s.play, { next: at + 1 < tutorial.steps.length ? tutorial.steps[at + 1].title : '', onNext: () => go(at + 1) }); } }, '▶ Open the finished app'));
     if (s.check) check.push(h('p', { class: 'tut-check' + (built(at) ? ' ok' : ''), role: 'status' }, built(at) ? '✓ Done: ' : 'This ticks by itself when it’s done: ', s.check.text));
     s.tries.forEach((t, n) => { const y = tried.has(`${at}:${n}`); check.push(h('p', { class: 'tut-check' + (y ? ' ok' : ''), role: 'status' }, (y ? '✓ ' : '') + tryText(t))); });
     if (!check.length) check.push(h('p', { class: 'tut-check none' }, 'When you’ve done this, choose Next.'));
@@ -67,11 +70,17 @@ export function startTutorial({ tutorial, id, getSheet, getTab, getProject, onPl
     const body = finished
       ? h('div', { class: 'tut-body' }, h('p', {}, tutorial.steps.every((st, i) => st.play || complete(i) || !(st.check || st.tries.length)) ? 'That’s the whole tutorial done. ' : 'That’s the last step. Steps without a tick are still waiting for you. ', 'Keep building, or go back to the lesson for what comes next.'))
       : h('div', { class: 'tut-body' }, markdown(s.body));
-    card.replaceChildren(head, h('div', { class: 'tut-main' },
+    const banner = cheer === at && !finished ? h('div', { class: 'tut-cheer', role: 'status' },
+      h('strong', {}, '\u2713 Step done!'), last ? ' That was the last step.' : [' Next: ', tutorial.steps[at + 1].title,
+        h('button', { class: 'btn', 'data-ab': 'tutorial-cheer-next', onclick: () => go(at + 1) }, 'Next \u25B8')]) : null;
+    // Back and Next stay at the bottom of the card, however long the step's text is
+    card.replaceChildren(head, h('div', { class: 'tut-main' }, banner,
       s.part ? h('p', { class: 'tut-part' }, s.part) : null,
-      h('h2', { class: 'tut-title' }, s.title), dots, body, finished ? null : check, nav));
+      h('h2', { class: 'tut-title' }, s.title), dots, body, finished ? null : check, finished ? null : stuck(s)), nav);
     place();
   }
+
+  const stuck = (s) => stuckSection(s, lessonUrl);
 
   // ---------------- the ring ----------------
   const visible = (el) => {
@@ -116,7 +125,15 @@ export function startTutorial({ tutorial, id, getSheet, getTab, getProject, onPl
       const designed = t.widget ? designText(t.widget) : null;
       if (els.some((el) => { const x = el.textContent || ''; return (t.contains && x.includes(t.contains)) || (designed !== null && x.trim() !== designed.trim()); })) { mark(`${at}:${n}`); changed = true; }
     });
-    if (changed) draw();
+    if (changed) { celebrate(); draw(); }
+  }
+  // a step that has just become complete gets the banner; a hidden card's Tutorial button turns green
+  let wasComplete = complete(at), wasAt = at;
+  function celebrate() {
+    const now = complete(at);
+    if (wasAt === at && !wasComplete && now) cheer = at;
+    if (!now && cheer === at) cheer = -1;
+    wasComplete = now; wasAt = at;
   }
   const designText = (name) => { for (const sc of getProject().screens || []) for (const o of sc.objects || []) if (o.name === name) return String(o.instances?.[0]?.text ?? ''); return null; };
   function place() {
@@ -155,9 +172,28 @@ export function startTutorial({ tutorial, id, getSheet, getTab, getProject, onPl
     changed() {
       const before = done.join();
       done = ticks(tutorial, getSheet());
-      if (done.join() !== before) draw(); else place();
+      if (done.join() !== before) { celebrate(); draw(); } else place();
     },
   };
+}
+
+// "Stuck?": the clip's captions as a short how-to, and the lesson's own video of the step (if the lesson came from the
+// tutorials site, which publishes clips/step-N.mp4 beside the page). Closed until the student opens it.
+function stuckSection(s, lessonUrl) {
+  const hints = hintsOf(s), clip = clipUrls(s, lessonUrl);
+  if (!hints.length && !clip) return null;
+  const where = h('div', { class: 'tut-video' });
+  const watch = clip && h('button', { class: 'btn', 'data-ab': 'tutorial-video', onclick: () => {
+    const v = h('video', { controls: true, autoplay: true, muted: true, playsinline: true, crossorigin: 'anonymous', poster: clip.poster, src: clip.video },
+      h('track', { kind: 'captions', srclang: 'en', label: 'Transcript', src: clip.captions }));
+    v.muted = true;
+    v.addEventListener('error', () => where.replaceChildren(h('p', { class: 'muted' }, 'There\u2019s no video for this step yet. The lesson page may have more help.')));
+    where.replaceChildren(v, h('p', { class: 'muted' }, 'Turn the sound on for the voiceover.'));
+    watch.remove();
+  } }, '\u25B6 Watch how it\u2019s done');
+  return h('details', { class: 'tut-stuck', 'data-ab': 'tutorial-stuck' }, h('summary', {}, 'Stuck?'),
+    hints.length ? [h('p', { class: 'muted' }, 'How the lesson video does it:'), h('ol', {}, hints.map((x) => h('li', {}, x)))] : null,
+    watch || null, where);
 }
 
 function tryText(t) {

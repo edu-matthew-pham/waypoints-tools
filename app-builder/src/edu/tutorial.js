@@ -107,7 +107,9 @@ export function parseLesson(raw) {
   const sections = rest.split(/^## /m).slice(1);
   let keep, starter, level;
   const steps = [];
+  let sec = 0; // the website numbers every section: its clip video is clips/step-<sec>.mp4
   for (const chunk of sections) {
+    sec++;
     const nl = chunk.indexOf('\n');
     const title = (nl === -1 ? chunk : chunk.slice(0, nl)).trim();
     let body = nl === -1 ? '' : chunk.slice(nl + 1);
@@ -120,12 +122,13 @@ export function parseLesson(raw) {
     if (t?.playground !== 'appbuilder') continue;
     if (!t.keep) {
       // Try the finished app: only before the build starts, and only one
-      if (keep === undefined && t.starter && !steps.length) steps.push({ title, body: body.trim(), check: null, targets: [], tries: [], play: String(t.starter) });
+      if (keep === undefined && t.starter && !steps.length) steps.push({ title, body: body.trim(), check: null, targets: [], tries: [], clip: '', play: String(t.starter) });
       continue;
     }
     if (keep === undefined) { keep = t.keep; starter = t.starter; level = t.level; }
     else if (t.keep !== keep) continue;
     const targets = targetsOf(config.clip);
+    const clip = Array.isArray(config.clip) && config.clip.length ? `step-${sec}` : '';
     const secs = body.split(/^### /m);
     const lead = secs.shift().trim();
     if (secs.length >= 2) {
@@ -133,9 +136,9 @@ export function parseLesson(raw) {
         const nl2 = s.indexOf('\n');
         const task = Array.isArray(config.tasks) ? config.tasks[n] || {} : {};
         steps.push({ title: (nl2 === -1 ? s : s.slice(0, nl2)).trim(), part: title, body: [n === 0 ? lead : '', nl2 === -1 ? '' : s.slice(nl2 + 1).trim()].filter(Boolean).join('\n\n'),
-          check: codeCheck(task.check), targets: n === 0 ? targets : targetsOf(task.clip), tries: n === 0 ? triesOf(config.clip) : triesOf(task.clip) });
+          check: codeCheck(task.check), targets: n === 0 ? targets : targetsOf(task.clip), tries: n === 0 ? triesOf(config.clip) : triesOf(task.clip), clip: n === 0 ? clip : '' });
       });
-    } else steps.push({ title, body: body.trim(), check: codeCheck(config.check), targets, tries: triesOf(config.clip) });
+    } else steps.push({ title, body: body.trim(), check: codeCheck(config.check), targets, tries: triesOf(config.clip), clip });
   }
   if (keep === undefined) throw new Error('This lesson has no App Builder build steps to guide.');
   return { title: meta.title ? String(meta.title) : 'Tutorial', starter: starter || '', level: Number(level) || null, steps, files };
@@ -155,6 +158,17 @@ export function parseSource(text) {
   for (const [name, body] of Object.entries(src.files)) if (name !== 'lesson.md' && typeof body === 'string' && !(name in tut.files)) tut.files[name] = body;
   return tut;
 }
+
+// The step's video on the tutorials site (beside the lesson page: clips/step-N.mp4, with a transcript .vtt), or '' when
+// the lesson didn't come from there (a lesson.md on GitHub or localhost has no recorded clips beside it).
+export function clipUrls(step, lessonUrl) {
+  if (!step.clip || !/^https:\/\/([a-z0-9-]+\.)*learningwaypoints\.com\//.test(lessonUrl || '')) return null;
+  const at = (ext) => new URL(`clips/${step.clip}.${ext}`, lessonUrl).href;
+  return { video: at('mp4'), poster: at('jpg'), captions: at('vtt') };
+}
+
+// "Stuck?" hints: the clip's captions, in order, without repeats.
+export const hintsOf = (step) => [...new Set(step.targets.map((t) => t.caption).filter(Boolean))];
 
 // Which steps are done: a step with a check is done while its rules pass (so undoing un-ticks it).
 export const ticks = (tutorial, text) => tutorial.steps.map((s) => (s.check ? passes(s.check.rules, text) : null));
