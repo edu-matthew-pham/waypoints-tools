@@ -241,3 +241,28 @@ export async function loadRef(tutorial, ref, lessonUrl, fetchText) {
   const text = tutorial.files[file] ?? await fetchText(new URL(file, lessonUrl).href);
   return JSON.parse(region(text, name));
 }
+
+// The list of guided tutorials: published by the tutorials site with each full publish (appbuilder-tutorials.json,
+// generated from every lesson with an App Builder try box; courses in pathway order, lessons in course order), so a
+// new lesson joins by itself and App Builder keeps no copy. Shape v1:
+//   { v: 1, site, courses: [{ path, title, units: [{ id, title }], lessons: [{ slug, title, summary, unit, optional }] }] }
+// Read leniently: anything unexpected in one lesson drops that lesson, not the list.
+export const TUTORIAL_LIST = LESSON_BASE + 'appbuilder-tutorials.json';
+export function parseTutorialList(json) {
+  const d = typeof json === 'string' ? JSON.parse(json) : json;
+  if (!d || d.v !== 1 || !Array.isArray(d.courses)) throw new Error('The list of tutorials is in a newer form than this App Builder reads.');
+  const slug = /^[\w-]+(\/[\w-]+)+$/;
+  return d.courses.filter((c) => c && Array.isArray(c.lessons)).map((c) => {
+    const units = new Map((Array.isArray(c.units) ? c.units : []).filter((u) => u?.id).map((u) => [String(u.id), String(u.title || '')]));
+    const lessons = c.lessons.filter((l) => l && slug.test(String(l.slug || '')) && l.title).map((l) => ({
+      slug: String(l.slug), title: String(l.title), summary: String(l.summary || ''), unit: String(l.unit || ''), optional: !!l.optional }));
+    // lessons grouped by unit, in the order the units first appear
+    const groups = [];
+    for (const l of lessons) {
+      let g = groups.find((x) => x.unit === l.unit);
+      if (!g) groups.push(g = { unit: l.unit, title: units.get(l.unit) || '', lessons: [] });
+      g.lessons.push(l);
+    }
+    return { path: String(c.path || ''), title: String(c.title || c.path || 'Tutorials'), groups };
+  }).filter((c) => c.groups.length);
+}

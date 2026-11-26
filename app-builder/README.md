@@ -80,6 +80,15 @@ level. The card can be moved to the other side (it also moves itself off whateve
 hidden (a Tutorial button brings it back). On phones it's a strip along the bottom. Steps that aren't App Builder (a quiz) stay on the website. Code: `src/edu/tutorial.js` (reading the
 lesson, ticks; no DOM, tested in Node against a copy of the practice tracker lesson) and `src/ui/tutorial-panel.js`.
 
+**The list of tutorials** (1.8): a **Tutorials** button in the top bar (beside Samples; not on locked lesson links)
+opens "Guided tutorials". The list comes from the tutorials site, `https://tutorials.learningwaypoints.com/appbuilder-tutorials.json`,
+which its full publish generates from every lesson with an App Builder try box (courses in pathway order, lessons in
+course order; shape `v: 1`, read by `parseTutorialList` in `src/edu/tutorial.js`). So new lessons appear by
+themselves and App Builder keeps no copy. Lessons are grouped by course and unit, with "extra" for optional ones,
+"started" for any with work or a step kept in this browser, and "open now". Choosing one opens it with `?lesson=`; the
+app being built stays in this browser, as each tutorial keeps its own. Inside a tutorial, "Leave the tutorial" goes
+back to normal building. If the list can't be loaded (no internet), the dialog says so; nothing else changes.
+
 ## Layout
 
     src/core/expr.js        safe expression parser/evaluator (no eval) + static checker

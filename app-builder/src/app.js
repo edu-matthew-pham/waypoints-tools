@@ -12,7 +12,7 @@ import { initMap } from './views/map.js';
 import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './edu/features.js';
 import { embed } from './embed.js';
-import { parseSource, loadStarter, loadRef, tutorialUrl } from './edu/tutorial.js';
+import { parseSource, loadStarter, loadRef, tutorialUrl, TUTORIAL_LIST, parseTutorialList } from './edu/tutorial.js';
 import { startTutorial } from './ui/tutorial-panel.js';
 import { sheetText } from './core/sheet-text.js';
 import { addBuiltinSounds, sources } from './core/assets.js';
@@ -159,6 +159,7 @@ function renderTop() {
     again: '<path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/>',
     new: '<path d="M12 5v14M5 12h14"/>',
     recent: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    guide: '<path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"/><path d="M4 19V5M9 8h6M9 12h4"/>',
     cloud: '<path d="M7 18h10a4 4 0 0 0 .6-8A6 6 0 0 0 6.2 9.2 4.4 4.4 0 0 0 7 18z"/>',
     carry: '<rect x="3" y="5" width="13" height="10" rx="1"/><path d="M1 18h17"/><rect x="18" y="9" width="5" height="10" rx="1"/>',
     share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
@@ -186,6 +187,7 @@ function renderTop() {
       h('button', { class: 'btn icon-only', 'data-ab': 'redo', disabled: !history.canRedo, title: 'Redo (Ctrl+Shift+Z)', onclick: () => undo(1) }, icon('redo'), h('span', { class: 'lbl' }, 'Redo'))),
     h('span', { class: 'spacer' }),
     h('span', { class: 'grp' },
+      S.locked ? '' : h('button', { class: 'btn', 'data-ab': 'tutorials', title: 'Guided tutorials: build an app step by step, with a pointer to what to click', onclick: tutorialList }, icon('guide'), 'Tutorials'),
       S.locked ? '' : sel, // a locked lesson link keeps students in the lesson project
       level,
       (() => {
@@ -450,6 +452,43 @@ function carryOn({ project, remembered, progress }) {
         location.href = location.pathname + progress.link;
       } }, 'Go to the tutorial')]);
 }
+// ---------------- the list of guided tutorials ----------------
+// From the tutorials site (edu/tutorial.js TUTORIAL_LIST), so new lessons appear by themselves. Choosing one opens it
+// here with ?lesson=; the app you were building stays in this browser (each tutorial keeps its own work too).
+async function tutorialList() {
+  const body = h('div', { class: 'tl' }, h('p', { class: 'muted' }, 'Loading the tutorials\u2026'));
+  const here = location.origin + location.pathname;
+  const current = tutorialLink?.id || '';
+  const foot = [
+    current ? h('button', { class: 'btn', type: 'button', 'data-ab': 'tutorial-leave', onclick: () => { location.href = here; } }, 'Leave the tutorial') : null,
+    h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close')].filter(Boolean);
+  const { close } = modal('Guided tutorials', body, foot);
+  let courses;
+  try {
+    const r = await fetch(TUTORIAL_LIST, { cache: 'no-cache' });
+    if (!r.ok) throw new Error('missing');
+    courses = parseTutorialList(await r.json());
+  } catch (e) {
+    body.replaceChildren(h('p', {}, /newer form/.test(e?.message) ? e.message : 'The list of tutorials couldn\u2019t be loaded. Check the internet connection, or open a tutorial from its lesson page.'));
+    return;
+  }
+  // started: its work or its step is kept in this browser
+  const started = (slug) => store((ls) => ls.getItem('appbuilder.tutorial.' + slug) !== null || ls.getItem('appbuilder.tutorial.' + slug + '.step') !== null);
+  body.replaceChildren(
+    h('p', { class: 'muted small' }, 'Build an app step by step: the steps sit beside App Builder, with a pointer to what to click and a tick as each step is done. ',
+      current ? 'Your work on each tutorial is kept separately in this browser.' : 'The app you\u2019re building now stays in this browser.'),
+    ...courses.map((c) => h('section', { class: 'tl-course' }, h('h3', {}, c.title),
+      c.groups.map((g) => [g.title ? h('h4', {}, g.title) : null,
+        h('ul', {}, g.lessons.map((l) => {
+          const isNow = l.slug === current;
+          return h('li', {}, h('button', { class: 'tl-item' + (isNow ? ' now' : ''), type: 'button', 'data-ab': 'tutorial:' + l.slug,
+            onclick: () => { if (isNow) { close(); return; } location.href = here + '?lesson=' + encodeURI(l.slug); } },
+            h('span', { class: 'tl-title' }, l.title, l.optional ? h('span', { class: 'tag' }, 'extra') : null,
+              isNow ? h('span', { class: 'tag on' }, 'open now') : started(l.slug) ? h('span', { class: 'tag' }, 'started') : null),
+            l.summary ? h('span', { class: 'tl-sum' }, l.summary) : null));
+        }))]))));
+}
+
 async function continueElsewhere() {
   const remembered = rememberedNow(), progress = progressNow();
   const carry = { project: S.project, remembered: Object.keys(remembered).length ? remembered : null, progress };

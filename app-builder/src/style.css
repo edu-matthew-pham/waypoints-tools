@@ -827,3 +827,16 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
   .tut-reopen { right: 10px; bottom: 10px; }
   .tut [data-ab='tutorial-side'] { display: none; }
 }
+
+/* the list of guided tutorials (app.js tutorialList) */
+.tl { max-height: 65vh; overflow-y: auto; }
+.tl-course h3 { font-size: 15px; margin: 14px 0 4px; }
+.tl-course h4 { font-size: 12px; margin: 10px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.tl ul { list-style: none; margin: 0; padding: 0; }
+.tl-item { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 10px; margin: 0 0 6px; cursor: pointer; }
+.tl-item:hover { border-color: #f59e0b; }
+.tl-item.now { border-color: #f59e0b; background: #fffbeb; }
+.tl-title { display: flex; gap: 6px; align-items: center; font-weight: 600; }
+.tl-title .tag { font-weight: 500; font-size: 11px; }
+.tl-title .tag.on { background: #fde68a; }
+.tl-sum { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }

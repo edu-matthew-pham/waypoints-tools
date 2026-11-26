@@ -128,3 +128,21 @@ test('tutorial links: ?lesson= names a lesson in the tutorials repo; ?tutorial= 
   assert.ok(q('tutorial=https://evil.example/lesson.md').error);
   assert.equal(q(''), null);
 });
+
+test('the list of guided tutorials (appbuilder-tutorials.json v1): courses, lessons grouped by unit, bad entries dropped', async () => {
+  const { parseTutorialList, TUTORIAL_LIST } = await import('../src/edu/tutorial.js');
+  assert.equal(TUTORIAL_LIST, 'https://tutorials.learningwaypoints.com/appbuilder-tutorials.json');
+  const list = parseTutorialList({ v: 1, site: 'https://tutorials.learningwaypoints.com/', courses: [
+    { path: 'code/apps', title: 'App Builder apps', units: [{ id: 'respond', title: 'Respond to the user' }, { id: 'media', title: 'Pictures and sound' }],
+      lessons: [
+        { slug: 'code/apps/practice-tracker', title: 'Your practice tracker', summary: 'Count minutes', unit: 'respond', optional: false },
+        { slug: 'code/apps/water-sound', title: 'Goal reached', unit: 'media', optional: true },
+        { slug: '../../etc', title: 'Bad' }, { slug: 'code/apps/no-title' }, null] },
+    { path: 'code/empty', title: 'Nothing yet', lessons: [] }] });
+  assert.equal(list.length, 1, 'a course with no usable lessons is left out');
+  assert.equal(list[0].title, 'App Builder apps');
+  assert.deepEqual(list[0].groups.map((g) => [g.title, g.lessons.map((l) => l.slug)]), [
+    ['Respond to the user', ['code/apps/practice-tracker']], ['Pictures and sound', ['code/apps/water-sound']]]);
+  assert.equal(list[0].groups[1].lessons[0].optional, true);
+  assert.throws(() => parseTutorialList({ v: 2, courses: [] }), /newer form/);
+});
