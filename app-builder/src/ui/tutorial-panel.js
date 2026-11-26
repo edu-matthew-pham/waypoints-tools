@@ -12,6 +12,7 @@ import { ticks, mentionedVariables, clipUrls, hintsOf, todo } from '../edu/tutor
 import { COMPONENTS } from '../core/components.js';
 
 const OBJECTISH = /add-object|kind:|object-menu|menu:rename|input\.rename/; // clip moves that add or rename objects
+const VARISH = /new-variable-/; // clip moves that make a variable
 const APP = (sel) => `.view-events .preview-col ${sel}, .view-run ${sel}`; // the running app: preview or Run tab
 
 export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getProject, onPlay, store }) {
@@ -37,7 +38,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
   const reopen = h('button', { class: 'btn tut-reopen', 'data-ab': 'tutorial-open', onclick: () => { open = true; draw(); } });
   document.body.append(card, reopen);
 
-  const go = (i) => { at = Math.max(0, Math.min(tutorial.steps.length - 1, i)); ptr = 0; finished = false; cheer = -1; wasAt = at; wasComplete = complete(at); store((ls) => ls.setItem(KEY, String(at))); draw(); };
+  const go = (i) => { at = Math.max(0, Math.min(tutorial.steps.length - 1, i)); ptr = 0; card.dataset.next = tutorial.steps[at].targets[0]?.selector || ''; finished = false; cheer = -1; wasAt = at; wasComplete = complete(at); store((ls) => ls.setItem(KEY, String(at))); draw(); };
 
   function draw() {
     card.hidden = !open; reopen.hidden = open;
@@ -64,7 +65,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     if (s.check) {
       check.push(h('p', { class: 'tut-check' + (built(at) ? ' ok' : ''), role: 'status' }, built(at) ? '✓ Done: ' : 'This ticks by itself when it’s done: ', s.check.text));
       const items = built(at) ? [] : todo(s.check.rules, getSheet());
-      if (items.length > 1) check.push(h('ul', { class: 'tut-todo', 'data-ab': 'tutorial-todo' }, items.map((i) => h('li', { class: i.ok ? 'ok' : '' }, (i.ok ? '✓ ' : '○ ') + i.label))));
+      if (items.length) check.push(h('ul', { class: 'tut-todo', 'data-ab': 'tutorial-todo' }, items.map((i) => h('li', { class: i.ok ? 'ok' : '' }, (i.ok ? '✓ ' : '○ ') + i.label))));
     }
     s.tries.forEach((t, n) => { const y = tried.has(`${at}:${n}`); check.push(h('p', { class: 'tut-check' + (y ? ' ok' : ''), role: 'status' }, (y ? '✓ ' : '') + tryText(t))); });
     if (!check.length) check.push(h('p', { class: 'tut-check none' }, 'When you’ve done this, choose Next.'));
@@ -94,7 +95,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     const modal = document.querySelector('dialog[open]');
     return !modal || modal.contains(el); // behind an open dialog it can't be reached
   };
-  const find = (sel) => { try { return [...document.querySelectorAll(sel)].find(visible) || null; } catch { return null; } };
+  const find = (sel) => { try { const { css, nth } = parseSel(sel); const all = [...document.querySelectorAll(css)].filter(visible); return (nth == null ? all[0] : all[nth]) || null; } catch { return null; } };
   function target() {
     if (!open || finished) return null;
     const s = tutorial.steps[at], t = s.targets;
@@ -103,25 +104,30 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       // or rename through a menu that only shows once the object is selected); the clip leads for the rest (events
       // and variables, where its exact clicks help most); then the check again, for whatever the clip didn't show.
       const items = todo(s.check?.rules, getSheet()).filter((i) => !i.ok);
+      // a clip move to another screen comes first: objects and events belong on that screen
+      if (ptr < t.length && /\[data-ab='screen:/.test(t[ptr].selector)) { const el = find(t[ptr].selector); if (el) return { el, caption: t[ptr].caption || 'Open this screen.' }; }
       const obj = items.find((i) => i.type === 'object');
       if (obj) { const g = objectGuide(obj, items); if (g) return g; }
-      while (ptr < t.length && !obj && OBJECTISH.test(t[ptr].selector)) ptr++; // objects done another way: skip that part
+      // missing variables next (a clip's expressions may use one the step's text asks for), unless one exists by that name
+      const names = new Set((getProject().variables || []).map((x) => x.name));
+      const v = items.find((i) => i.type === 'variable' && !names.has(i.name));
+      if (v && !document.querySelector('dialog[open]')) { const el = find("[data-ab='new-variable-name']"); if (el) return { el, caption: `Make a variable called ${v.name}${v.value !== '' ? `, starting at ${v.value}` : ''}: type its name here${v.value !== '' ? ` and ${v.value} in the box beside it` : ''}, then press Enter.` }; }
+      if (ptr < t.length && t[ptr].closes && !document.querySelector('dialog[open]')) ptr++; // closed with Esc or ✕: same thing
+      while (ptr < t.length && ((!obj && OBJECTISH.test(t[ptr].selector)) || (!v && VARISH.test(t[ptr].selector)))) ptr++; // done another way: skip that part
       if (ptr < t.length) {
         const el = find(t[ptr].selector);
-        if (el) return { el, caption: t[ptr].caption };
+        if (el) return { el, caption: captionFor(t[ptr], el) };
         const tab = t[ptr].selector.match(/\.view-(\w+)/)?.[1];
         if (tab && getTab() !== tab) { const te = find(`[data-ab='tab:${tab}']`); if (te) return { el: te, caption: `Open the ${tab[0].toUpperCase() + tab.slice(1)} tab.` }; }
         if (ptr > 0) { const back = find(t[ptr - 1].selector); if (back) return { el: back, caption: t[ptr - 1].caption }; }
       }
-      if (document.querySelector('dialog[open]')) return null; // mid-way through a dialog: leave it be
-      const v = items.find((i) => i.type === 'variable');
-      if (v) { const el = find("[data-ab='new-variable-name']"); if (el) return { el, caption: `Make a variable called ${v.name}: type it here, then press Enter.` }; }
-      const e = items.find((i) => i.type === 'event');
-      if (e) {
-        if (getTab() !== 'events') { const te = find("[data-ab='tab:events']"); if (te) return { el: te, caption: 'Open the Events tab.' }; }
-        const el = find(".view-events [data-ab='add-event']");
-        if (el) return { el, caption: `Still needed: ${e.label}. Add it here, or add to an event you have.` };
-      }
+      // a dialog open with nothing in it to point at (the clip pressed Enter to finish it): Done, when it can be chosen
+      const dlg = document.querySelector('dialog[open]');
+      if (dlg) { const d = [...dlg.querySelectorAll("[data-ab='done']")].find((x) => visible(x) && !x.disabled); return d ? { el: d, caption: 'When it says what you want, choose Done.' } : null; }
+      // the clip has shown its part; the rest is in the step's text. Point at what's left on the card, not at a
+      // button that would add another empty event each time it's clicked
+      const left = card.querySelector('.tut-todo li:not(.ok)');
+      if (left && open && !small) return { el: left, caption: 'Still to do, as the step\u2019s text explains. Stuck? has the lesson\u2019s video.' };
       return null;
     }
     const next = s.tries.find((_, n) => !tried.has(`${at}:${n}`)); // built: try it in the running app
@@ -189,9 +195,11 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     wasComplete = now; wasAt = at;
   }
   const designText = (name) => { for (const sc of getProject().screens || []) for (const o of sc.objects || []) if (o.name === name) return String(o.instances?.[0]?.text ?? ''); return null; };
+  let lastEl = null;
   function place() {
     const t = target();
     if (!t) { ring.remove(); bubble.remove(); return; }
+    if (t.el !== lastEl) { lastEl = t.el; t.el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } // off-screen in a long panel
     const layer = t.el.closest('dialog[open]') || document.body;
     if (ring.parentNode !== layer) layer.append(ring, bubble);
     const r = t.el.getBoundingClientRect();
@@ -205,17 +213,23 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     if (open && !card.hidden && r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom) { left = !left; card.classList.toggle('left', left); }
   }
   // clicking or typing into what the ring points at moves it on (capture: before the editor redraws)
+  // pointerdown as well as click: the app's own objects on the stage take the press (to select or drag them), so
+  // their click may never come; a dropdown moves on when it changes, since opening it is only half the move
   const advance = (e, action) => {
     const t = tutorial.steps[at].targets;
+    if (!(e.target instanceof Element)) return;
     for (let k = ptr; k < t.length; k++) {
-      if (t[k].action !== action) continue;
-      const el = find(t[k].selector);
-      if (el && el.contains(e.target)) { ptr = k + 1; setTimeout(place, 0); return; }
+      if (t[k].action !== action && !(action === 'change' && (t[k].action === 'type' || t[k].key))) continue;
+      if (action === 'click' && t[k].key) continue; // a dropdown: wait for the choice
+      let hit = false; try { hit = !!e.target.closest(parseSel(t[k].selector).css); } catch { /* not a selector */ }
+      if (hit) { ptr = k + 1; card.dataset.next = t[ptr]?.selector || ''; setTimeout(place, 0); return; }
     }
   };
-  document.addEventListener('click', (e) => advance(e, 'click'), true);
-  document.addEventListener('change', (e) => advance(e, 'type'), true);
-  document.addEventListener('keydown', (e) => { if (e.key === 'Enter') advance(e, 'type'); }, true);
+  let down = null; // one press and its click are one move
+  document.addEventListener('pointerdown', (e) => { down = { el: e.target, at: Date.now() }; advance(e, 'click'); }, true);
+  document.addEventListener('click', (e) => { if (down && down.el === e.target && Date.now() - down.at < 1000) return; advance(e, 'click'); }, true);
+  document.addEventListener('change', (e) => advance(e, 'change'), true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Enter') advance(e, 'change'); }, true);
   addEventListener('resize', place);
   document.addEventListener('scroll', place, true);
   setInterval(() => { if (open && !finished) checkTries(); place(); }, 250); // the running app, dialogs, tabs, things moving
@@ -227,7 +241,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       try { tried = new Set(JSON.parse(store((ls) => ls.getItem(TRIED)) || '[]')); } catch { tried = new Set(); }
       const n = Number(store((ls) => ls.getItem(KEY)));
       at = Number.isInteger(n) && n >= 0 && n < tutorial.steps.length ? n : at;
-      ptr = 0; finished = false; open = true; cheer = -1;
+      ptr = 0; finished = false; open = true; cheer = -1; lastEl = null; card.dataset.next = tutorial.steps[at].targets[0]?.selector || '';
       done = ticks(tutorial, getSheet());
       wasAt = at; wasComplete = complete(at); lastSig = sig(); // no "Step done" banner for progress that just arrived
       draw();
@@ -257,6 +271,22 @@ function stuckSection(s, lessonUrl) {
   return h('details', { class: 'tut-stuck', 'data-ab': 'tutorial-stuck' }, h('summary', {}, 'Stuck?'),
     hints.length ? [h('p', { class: 'muted' }, 'How the lesson video does it:'), h('ol', {}, hints.map((x) => h('li', {}, x)))] : null,
     watch || null, where);
+}
+
+// Lesson clips are Playwright selectors: CSS, sometimes ending ` >> nth=N` (the Nth match, from 0).
+function parseSel(sel) {
+  const m = String(sel).match(/^(.*?)\s*>>\s*nth=(\d+)\s*$/);
+  return m ? { css: m[1], nth: Number(m[2]) } : { css: String(sel), nth: null };
+}
+
+// What the ring's bubble says for a clip move: its caption, plus what to type or which option to choose.
+function captionFor(t, el) {
+  if (t.action === 'type') return t.text ? `${t.caption} Type: ${t.text}` : `${t.caption} Leave it empty.`;
+  if (t.key && el.tagName === 'SELECT') {
+    const o = [...el.options].find((x) => x.text.trim().toUpperCase().startsWith(t.key.toUpperCase()));
+    if (o) return `${t.caption} Choose: ${o.text.trim()}`;
+  }
+  return t.caption;
 }
 
 function tryText(t) {

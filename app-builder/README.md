@@ -63,7 +63,12 @@ From the lesson it takes each build step (a `## Step` whose step block has `try:
 - **Still to do:** while a step is being built, its check is listed in plain words (a Text input, a Button called
   SaveButton…), each ticking as it's done. For objects the ring follows this list rather than the clip, which may add
   them in another order: Add object, the right tile, then renaming the newest default-named one (Button1 → SaveButton).
-  For variables and events the clip leads, then the list fills any gap;
+  Missing variables come next ("Make a variable called Goal, starting at 8"), since a clip's expressions may use one
+  the text asks for. A clip move to another screen comes before both. For events the clip leads: its typing shows
+  "Type: …", a dropdown it sets by a letter shows "Choose: …", an Escape it presses points at Cancel, and a dialog it
+  finishes with Enter points at Done. The ring scrolls its target into view. When the clip has shown its part and the
+  step's text has the rest, the ring points at what's left on the checklist (never at Add event, which would add
+  empty events);
 - **Step done:** when a step is complete, a green "Step done! Next: …" banner (with its own Next) and a glow; if the card
   is hidden, its Tutorial button turns green. Back and Next stay pinned at the bottom of the card;
 - **Stuck?** (closed until opened): the clip's captions as a short how-to, and "Watch how it's done", the lesson's own
