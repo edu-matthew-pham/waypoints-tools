@@ -52,7 +52,7 @@ export function createOneDrive({ clientId, href = location.href, fetch: f = (...
   const byName = (name) => (tok?.mode === 'files' ? `/me/drive/root:/Apps/App Builder/${encodeURIComponent(name)}:` : `/me/drive/special/approot:/${encodeURIComponent(name)}:`);
 
   return {
-    id: 'microsoft', name: 'OneDrive', company: 'Microsoft',
+    id: 'microsoft', name: 'OneDrive', company: 'Microsoft', bin: 'OneDrive recycle bin',
     signedIn: () => !!tok,
     account: () => (tok ? { name: tok.name, email: tok.email } : null),
     // call straight from a click: the sign-in window has to open before anything waits
@@ -98,6 +98,11 @@ export function createOneDrive({ clientId, href = location.href, fetch: f = (...
         if (!last.ok && last.status !== 202) throw await fail(last, 'Couldn’t save to OneDrive');
       }
       const j = await last.json(); return { id: j.id, name: j.name };
+    },
+    // to the OneDrive recycle bin (OneDrive keeps deleted files there for a while; they can be restored)
+    async remove(id) {
+      const r = await graph(`/me/drive/items/${id}`, { method: 'DELETE' });
+      if (!r.ok && r.status !== 404) throw await fail(r, 'Couldn’t delete that app');
     },
     async open(id) {
       const r = await graph(`/me/drive/items/${id}?$select=id,name,@microsoft.graph.downloadUrl`);

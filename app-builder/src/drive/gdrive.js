@@ -58,7 +58,7 @@ export function createGoogleDrive({ clientId, fetch: f = (...a) => fetch(...a), 
   }
 
   return {
-    id: 'google', name: 'Google Drive', company: 'Google',
+    id: 'google', name: 'Google Drive', company: 'Google', bin: 'Google Drive bin',
     signedIn: () => !!tok,
     account: () => (tok ? { name: tok.name, email: tok.email } : null),
     // call straight from a click. The library loads first on the very first use, which can make the browser block the
@@ -94,6 +94,11 @@ export function createGoogleDrive({ clientId, fetch: f = (...a) => fetch(...a), 
       const put = await api(start.headers.get('Location'), { method: 'PUT', headers: { 'Content-Type': type }, body: bytes });
       if (!put.ok) throw await fail(put, 'Couldn’t save to Google Drive');
       const j = await put.json(); return { id: j.id, name: j.name };
+    },
+    // to the Google Drive bin, not deleted for good: it can be restored from there
+    async remove(id) {
+      const r = await api(`${API}/files/${id}?fields=id`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ trashed: true }) });
+      if (!r.ok && r.status !== 404) throw await fail(r, 'Couldn’t delete that app');
     },
     async open(id) {
       const r = await api(`${API}/files/${id}?alt=media`);

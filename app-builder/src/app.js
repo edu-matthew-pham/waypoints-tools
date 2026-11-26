@@ -367,6 +367,7 @@ const drives = {};
 for (const id of configured()) drives[id] = id === 'microsoft' ? createOneDrive({ clientId: DRIVE.microsoft.clientId }) : createGoogleDrive({ clientId: DRIVE.google.clientId });
 function openDrive() {
   driveDialog({ drives, current: saveTo?.drive ? saveTo : null, notify, save: saveToDrive,
+    removed: (d, it) => { if (saveTo?.drive === d.id && saveTo.id === it.id) { saveTo = null; renderTop(); } }, // the app stays open; Save asks where
     open: async (d, it) => { await openRead(await readProjectFile(await d.open(it.id)), { drive: d.id, id: it.id, name: it.name, zip: /\.zip$/i.test(it.name) }); notify(`Opened ${it.name.replace(/\.app\.(json|zip)$/i, '')} from ${d.name}.`); } });
 }
 async function saveToDrive(d) {

@@ -6,14 +6,14 @@ import { modal } from './sheet-dialogs.js';
 const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 const shown = (name) => name.replace(/\.app\.(json|zip)$/i, '');
 
-// drives: { microsoft?, google? } (src/drive); save(drive) and open(drive, item) are the shell's; current: the drive
-// file this app is saved to, if any ({ drive, id, name })
-export function driveDialog({ drives, save, open, current, notify }) {
+// drives: { microsoft?, google? } (src/drive); save(drive), open(drive, item) and removed(drive, item) are the shell's;
+// current: the drive file this app is saved to, if any ({ drive, id, name })
+export function driveDialog({ drives, save, open, removed, current, notify }) {
   const signedIn = Object.values(drives).find((d) => d.signedIn());
   const body = h('div', { class: 'drive' });
   const { close } = modal(signedIn ? `Your ${signedIn.name}` : 'Save to your drive', body,
     [h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close')]);
-  const again = () => { close(); driveDialog({ drives, save, open, current, notify }); };
+  const again = () => { close(); driveDialog({ drives, save, open, removed, current, notify }); };
   const problem = (e, d) => {
     if (e?.needFiles) {
       body.replaceChildren(
@@ -48,12 +48,39 @@ export function driveDialog({ drives, save, open, current, notify }) {
     } }, current?.drive === d.id ? `Save to ${shown(current.name)}` : `Save this app to ${d.name}`),
     h('h3', { class: 'drive-h' }, `Your apps in ${d.name}`),
     list);
-  d.list().then((items) => {
-    list.replaceChildren(...(items.length ? items.map((it) => h('div', { class: 'drive-item' + (current?.id === it.id ? ' on' : '') },
+  let items = [];
+  const empty = () => h('p', { class: 'muted' }, 'Nothing saved here yet.');
+  function row(it) {
+    const el = h('div', { class: 'drive-item' + (current?.id === it.id ? ' on' : '') });
+    const plain = () => el.replaceChildren(
       h('span', { class: 'drive-name' }, shown(it.name)), h('span', { class: 'muted small' }, ago(it.modified)),
       h('button', { class: 'btn', type: 'button', 'data-ab': 'drive-open', onclick: async (ev) => {
         const b = ev.currentTarget; b.disabled = true;
         try { await open(d, it); close(); } catch (e) { b.disabled = false; problem(e, d); }
-      } }, 'Open'))) : [h('p', { class: 'muted' }, 'Nothing saved here yet.')]));
+      } }, 'Open'),
+      h('button', { class: 'btn icon-only drive-del', type: 'button', 'data-ab': 'drive-delete', title: `Delete ${shown(it.name)}`, 'aria-label': `Delete ${shown(it.name)}`, onclick: ask }, '\u{1F5D1}'));
+    // ask first, in the row itself: where it goes, and that it can be got back
+    function ask() {
+      el.classList.add('asking');
+      el.replaceChildren(
+        h('span', { class: 'drive-ask', role: 'alert' }, `Delete \u201C${shown(it.name)}\u201D? It goes to your ${d.bin}, where you can restore it for a while.${current?.id === it.id ? ' It\u2019s the app you have open: that stays open, and Save then asks where.' : ''}`),
+        h('button', { class: 'btn', type: 'button', 'data-ab': 'drive-delete-cancel', onclick: () => { el.classList.remove('asking'); plain(); } }, 'Cancel'),
+        h('button', { class: 'btn danger', type: 'button', 'data-ab': 'drive-delete-confirm', onclick: async (ev) => {
+          const b = ev.currentTarget; b.disabled = true;
+          try {
+            await d.remove(it.id);
+            items = items.filter((x) => x !== it); el.remove();
+            if (!items.length) list.replaceChildren(empty());
+            removed?.(d, it);
+            notify?.(`Moved \u201C${shown(it.name)}\u201D to your ${d.bin}.`);
+          } catch (e) { b.disabled = false; problem(e, d); }
+        } }, 'Delete'));
+    }
+    plain();
+    return el;
+  }
+  d.list().then((found) => {
+    items = found;
+    list.replaceChildren(...(items.length ? items.map(row) : [empty()]));
   }, (e) => { list.replaceChildren(); problem(e, d); });
 }

@@ -134,3 +134,22 @@ test('Google Drive: after an hour (no lasting token for a page) it asks to sign 
   await assert.rejects(h.list(), (e) => e.code === 'signin');
   assert.ok(!h.signedIn());
 });
+
+test('Delete moves an app to the drive’s bin (OneDrive recycle bin; Google Drive bin), never deletes it for good', async () => {
+  const n = net([[(c) => c.method === 'DELETE', () => new Response(null, { status: 204 })]]);
+  const od = createOneDrive({ clientId: 'c', href: HERE, fetch: n.f, token: { access: 'A', expires: later, mode: 'app' } });
+  await od.remove('7');
+  assert.equal(n.calls[0].url, 'https://graph.microsoft.com/v1.0/me/drive/items/7');
+  assert.match(od.bin, /recycle bin/);
+  const g = net([[(c) => c.method === 'PATCH', () => json({ id: 'a' })]]);
+  const gd = createGoogleDrive({ clientId: 'c', fetch: g.f, token: { access: 'G', expires: later } });
+  await gd.remove('a');
+  assert.match(g.calls[0].url, /\/drive\/v3\/files\/a\?fields=id$/);
+  assert.deepEqual(JSON.parse(g.calls[0].body), { trashed: true }, 'to the bin, not files.delete');
+  assert.match(gd.bin, /bin/);
+  // already gone is fine; a refusal is reported
+  const gone = createOneDrive({ clientId: 'c', href: HERE, fetch: net([[() => true, () => json({}, 404)]]).f, token: { access: 'A', expires: later, mode: 'app' } });
+  await gone.remove('x');
+  const no = createGoogleDrive({ clientId: 'c', fetch: net([[() => true, () => json({ error: { message: 'Forbidden' } }, 403)]]).f, token: { access: 'G', expires: later } });
+  await assert.rejects(no.remove('x'), /Couldn’t delete/);
+});
