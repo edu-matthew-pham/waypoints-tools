@@ -32,6 +32,10 @@ import { encodeApp, decodeApp, canShareByLink } from './core/share-link.js';
 import { startPlay } from './play-page.js';
 import { storeKeyFor, readProgress, writeProgress, fitsInLink, encodeCarry, decodeCarry, tutorialLinkPart } from './carry.js';
 import qrcode from 'qrcode-generator';
+import { DRIVE, configured } from './drive/config.js';
+import { createOneDrive } from './drive/onedrive.js';
+import { createGoogleDrive } from './drive/gdrive.js';
+import { driveDialog } from './ui/drive-dialog.js';
 
 // ?sample=water opens that lesson project. Each lesson link keeps its own saved work, so a student who
 // comes back (or refreshes) carries on where they were; "Start again" reloads the original.
@@ -155,6 +159,7 @@ function renderTop() {
     again: '<path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/>',
     new: '<path d="M12 5v14M5 12h14"/>',
     recent: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    cloud: '<path d="M7 18h10a4 4 0 0 0 .6-8A6 6 0 0 0 6.2 9.2 4.4 4.4 0 0 0 7 18z"/>',
     carry: '<rect x="3" y="5" width="13" height="10" rx="1"/><path d="M1 18h17"/><rect x="18" y="9" width="5" height="10" rx="1"/>',
     share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
   };
@@ -169,9 +174,10 @@ function renderTop() {
         : h('button', { class: 'btn', 'data-ab': 'new', title: 'Start a new app', onclick: () => loadProject(newProject()) }, icon('new'), 'New'),
       h('button', { class: 'btn', 'data-ab': 'open', title: 'Open a saved app (.json or .zip)', onclick: openFile }, icon('open'), 'Open…'),
       S.locked ? '' : h('button', { class: 'btn', 'data-ab': 'recent', title: 'Apps you had before in this browser', 'aria-haspopup': 'menu', onclick: (e) => recentMenu(e.currentTarget) }, icon('recent'), 'Recent'),
-      h('button', { class: 'btn primary', 'data-ab': 'save', title: saveTo ? `Save to ${saveTo.handle.name} (Ctrl+S)` : 'Save this app as a file (Ctrl+S)', onclick: () => saveFile() }, icon('save'), 'Save'),
-      h('button', { class: 'btn', 'data-ab': 'share', title: 'Share a link to your working app', onclick: shareApp }, icon('share'), 'Share'),
+      h('button', { class: 'btn primary', 'data-ab': 'save', title: saveTo?.drive ? `Save to ${drives[saveTo.drive].name}: ${saveTo.name} (Ctrl+S)` : saveTo ? `Save to ${saveTo.handle.name} (Ctrl+S)` : 'Save this app as a file (Ctrl+S)', onclick: () => saveFile() }, icon('save'), 'Save'),
       canPick ? h('button', { class: 'btn icon-only save-as', 'data-ab': 'save-as', title: 'Save as… a new file (Ctrl+Shift+S)', onclick: () => saveFile({ as: true }) }, h('span', { 'aria-hidden': 'true' }, '▾'), h('span', { class: 'lbl' }, 'Save as…')) : '',
+      Object.keys(drives).length ? h('button', { class: 'btn' + (Object.values(drives).some((d) => d.signedIn()) ? ' on' : ''), 'data-ab': 'drive', title: 'Save to, or open from, your own OneDrive or Google Drive', onclick: openDrive }, icon('cloud'), 'Drive') : '',
+      h('button', { class: 'btn', 'data-ab': 'share', title: 'Share a link to your working app', onclick: shareApp }, icon('share'), 'Share'),
       h('button', { class: 'btn', 'data-ab': 'continue', title: 'Carry on with this app (and your tutorial step) on another computer or tablet', onclick: continueElsewhere }, icon('carry'), 'Other device')),
     h('span', { class: 'grp' },
       h('button', { class: 'btn icon-only', 'data-ab': 'undo', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, icon('undo'), h('span', { class: 'lbl' }, 'Undo')),
@@ -261,6 +267,7 @@ function rememberedNow() {
 const canPick = typeof window.showSaveFilePicker === 'function' && !window.claude;
 let saveTo = null;        // { handle, zip, kept } : the file the last Save went to, and whether it included kept data
 function saveFile({ as = false } = {}) {
+  if (!as && saveTo?.drive) { saveToDrive(drives[saveTo.drive]).catch((e) => { notify(e?.message || 'Couldn\u2019t save to your drive.'); if (e?.code === 'signin') openDrive(); }); return; }
   if (!as && saveTo && canPick) { writeTo(saveTo.handle, saveTo.kept ? rememberedNow() : null, saveTo); return; }
   const kept = rememberedNow(), n = Object.keys(kept).length;
   if (!n) { chooseAndSave(null); return; }
@@ -340,15 +347,44 @@ async function openFile() {
   input.click();
 }
 async function openFrom(fileObj, handle) {
-  try {
-    const { project, remembered, progress, missing } = await readProjectFile(fileObj);
-    // what the app kept while running goes back first, so its pictures and recordings load with the project
-    if (remembered) store((ls) => { for (const [k, v] of Object.entries(remembered)) ls.setItem(`${STORE_KEY}.remember.${k}`, JSON.stringify(v)); });
-    await loadProject(project);
-    if (handle) { saveTo = { handle, zip: /\.zip$/i.test(handle.name), kept: !!remembered }; renderTop(); }
-    if (missing) notify(`${missing} picture${missing === 1 ? '' : 's'} or recording${missing === 1 ? '' : 's'} weren’t in the file.`);
-    if (progress) carryOn({ project, remembered, progress });
-  } catch (e) { notify('Could not open that file: ' + e.message); }
+  try { await openRead(await readProjectFile(fileObj), handle ? { handle, zip: /\.zip$/i.test(handle.name) } : null); }
+  catch (e) { notify('Could not open that file: ' + e.message); }
+}
+// a project read from a file (on the computer or in a drive); target: where Save goes back to, or null
+async function openRead({ project, remembered, progress, missing }, target) {
+  // what the app kept while running goes back first, so its pictures and recordings load with the project
+  if (remembered) store((ls) => { for (const [k, v] of Object.entries(remembered)) ls.setItem(`${STORE_KEY}.remember.${k}`, JSON.stringify(v)); });
+  await loadProject(project);
+  if (target) { saveTo = { ...target, kept: !!remembered }; renderTop(); }
+  if (missing) notify(`${missing} picture${missing === 1 ? '' : 's'} or recording${missing === 1 ? '' : 's'} weren’t in the file.`);
+  if (progress) carryOn({ project, remembered, progress });
+}
+
+// ---------------- your drive (src/drive, ui/drive-dialog.js) ----------------
+// Sign in with Microsoft or Google and save to an App Builder folder in the student's own drive. Shown only when a
+// client ID is set in drive/config.js. A drive save holds everything, like Continue: the app, what it kept, the step.
+const drives = {};
+for (const id of configured()) drives[id] = id === 'microsoft' ? createOneDrive({ clientId: DRIVE.microsoft.clientId }) : createGoogleDrive({ clientId: DRIVE.google.clientId });
+function openDrive() {
+  driveDialog({ drives, current: saveTo?.drive ? saveTo : null, notify, save: saveToDrive,
+    open: async (d, it) => { await openRead(await readProjectFile(await d.open(it.id)), { drive: d.id, id: it.id, name: it.name, zip: /\.zip$/i.test(it.name) }); notify(`Opened ${it.name.replace(/\.app\.(json|zip)$/i, '')} from ${d.name}.`); } });
+}
+async function saveToDrive(d) {
+  const kept = rememberedNow();
+  const file = await buildSave(S.project, Object.keys(kept).length ? kept : null, progressNow());
+  missingNote(file);
+  const zip = /\.zip$/.test(file.filename);
+  // the same drive file again, unless the app now needs the other kind (it gained or lost pictures): then a new one
+  const same = saveTo?.drive === d.id && saveTo.zip === zip ? saveTo : null;
+  let name = file.filename;
+  if (!same) {
+    const taken = new Set((await d.list()).map((it) => it.name.toLowerCase()));
+    for (let n = 2; taken.has(name.toLowerCase()); n++) name = file.filename.replace(/(\.app\.(json|zip))$/i, ` (${n})$1`);
+  }
+  const done = await d.save({ name, data: file.data, type: file.type, id: same?.id || null });
+  saveTo = { drive: d.id, id: done.id, name: done.name || name, zip, kept: true };
+  renderTop();
+  notify(`Saved to ${d.name}: ${saveTo.name.replace(/\.app\.(json|zip)$/i, '')}`);
 }
 
 // ---------------- continue on another device (carry.js) ----------------

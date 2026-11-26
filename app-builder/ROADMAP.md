@@ -357,7 +357,11 @@ Matthew, 26 Nov 2026: guided progress should carry across devices. Chosen: no ac
 doc handoff-app-builder-accounts), a Continue link with a QR code, and the tutorial step inside saved files, all through
 one shape in `src/carry.js`, so a drive can be added later as one more place for it.
 
-## Sign in to save to your drive *(aim, not built; 26 Nov 2026, Matthew)*
+## Sign in to save to your drive *(built 26 Nov 2026, waiting for client IDs; README › Your drive)*
+
+Matthew, 26 Nov 2026: build both now (CGGS uses Microsoft; Google for other schools), the Construct 3 way: sign in only to
+use the student's own drive, no App Builder accounts. Hidden until client IDs are set in `src/drive/config.js`. The
+plan as written before building:
 
 Optional, never required: "Sign in to save to your drive", Microsoft (MSAL, the OneDrive app folder) and Google
 (Identity Services, `drive.file`), entirely in the browser, as new places for `carry.js`'s shape. Data stays in the

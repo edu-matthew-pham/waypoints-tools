@@ -105,6 +105,9 @@ lesson, ticks; no DOM, tested in Node against a copy of the practice tracker les
     src/media-store.js      the media store in IndexedDB: keep, load on start, move old uploads, tidy, forget
     src/project-file.js     Save and Open: .json, or a .zip with project.json + media/
     src/carry.js            Continue on another device: { project, remembered, progress } in a link or a file (no DOM)
+    src/drive/              Your drive: config.js (client IDs), oauth.js (sign-in window), onedrive.js, gdrive.js
+    src/ui/drive-dialog.js  the Drive dialog (sign in, save, your apps, open)
+    auth.html               where Microsoft sends the student back after signing in; privacy.html: the privacy page
     src/core/zip.js         small zip writer (stored) and reader (stored or deflated)
     src/ui/screen-items.js  what the stage draws for one screen (shared by Design and Map)
     src/app.js              shell: top bar, tabs, save/open, wiring
@@ -385,4 +388,72 @@ the app, what Remember between visits kept, and, in a guided tutorial, the step 
   before.
 - Signing in to save straight to a student's own drive could come later as one more place for the same shape
   (ROADMAP › Sign in to save to your drive).
+
+## Your drive: OneDrive and Google Drive (26 Nov 2026)
+
+Like Construct 3's cloud saving: students sign in with Microsoft or Google only to let App Builder use their own drive.
+No App Builder accounts, no server, nothing kept by App Builder (`privacy.html`).
+- **Drive** (toolbar) appears once a client ID is set in `src/drive/config.js` (each provider separately).
+  - Signed out, it offers Sign in with Microsoft and Sign in with Google.
+  - Signed in, it shows who, **Save this app to OneDrive / Google Drive**, and the apps saved there, each with
+    **Open**. A drive save holds everything Continue does: the app, what it kept, the tutorial step.
+  - After a drive save or open, **Save** and Ctrl+S go back to that drive file. Save as… still asks for a place on
+    the computer.
+- **Where files go:** an App Builder folder in the student's own drive.
+  - OneDrive asks for `Files.ReadWrite.AppFolder` (Apps/App Builder). Microsoft's docs disagree on whether school
+    accounts allow it, so if one refuses, the dialog asks once more for `Files.ReadWrite` and uses the same folder by
+    path.
+  - Google asks for `drive.file` (only files App Builder made) and keeps them in a folder called App Builder.
+- **Sign-in:**
+  - Microsoft: the authorization code flow with PKCE for a single-page app, by hand (no library). The sign-in window
+    returns to `auth.html`, which hands the code back to the page and closes.
+  - Google: Google Identity Services, loaded from Google only when a student chooses Google. Google gives a page no
+    lasting token, so after an hour the student signs in again (usually one click).
+  - Tokens are kept in `sessionStorage`, so closing the tab on a shared computer signs out.
+- **Schools:** an admin may have to allow App Builder first. The dialog says so when a sign-in is refused for that
+  reason, and Save to a file still works.
+- Tests: `tests/drive.test.js` (against a pretend network). Signing in itself needs real registrations.
+
+### Getting the client IDs
+
+Register with an account you own (not a school account), since the tool is yours. Client IDs aren't secret: they go
+in `src/drive/config.js`.
+
+**Microsoft (Microsoft Entra)**
+1. You need a directory (tenant): a personal Microsoft account alone can't register apps any more. Sign up for a free
+   Azure account (azure.microsoft.com/free) with your personal Microsoft account; it makes a Default Directory with
+   you as its admin. (Or use an existing tenant you own.)
+2. Go to entra.microsoft.com › Applications › App registrations › **New registration**.
+   - Name: App Builder (students see this when they sign in).
+   - Supported account types: **Accounts in any organizational directory and personal Microsoft accounts**. Choose
+     this now: it is hard to change later.
+   - Redirect URI: platform **Single-page application (SPA)**,
+     `https://tools.learningwaypoints.com/app-builder/auth.html`.
+3. Register. On the Overview page, copy **Application (client) ID**: that's the client ID.
+4. Authentication: add more SPA redirect URIs for every other address App Builder runs at, each ending in
+   `auth.html` (for local testing, `http://localhost:8765/app-builder/auth.html`; the tutorials site's copy, if it
+   offers Drive). No client secret, and leave implicit grant off.
+5. API permissions › Add › Microsoft Graph › Delegated: `Files.ReadWrite.AppFolder`, `Files.ReadWrite`,
+   `offline_access`, `openid`, `profile`. Don't grant admin consent for your own directory: schools grant it in theirs.
+6. Branding: home page `https://tools.learningwaypoints.com/app-builder/`, privacy
+   `https://tools.learningwaypoints.com/app-builder/privacy.html`.
+7. Test with your personal Outlook account (no one else's approval needed), then a CGGS account: CGGS's admin will
+   probably have to consent first. For other schools, Microsoft's publisher verification (a free Microsoft Partner
+   ID) makes the sign-in screen show you as a verified publisher.
+
+**Google (Google Cloud)**
+1. console.cloud.google.com with your own Google account › new project "App Builder".
+2. APIs & Services › Library › enable **Google Drive API**.
+3. Google Auth Platform (OAuth consent screen):
+   - Audience **External**, app name App Builder, your email.
+   - Home page and privacy page as above; authorised domain `learningwaypoints.com`.
+   - Scopes: `drive.file`, `openid`, `email`, `profile`.
+   - Leave it in **Testing** and add test users (up to 100) by email. No Google verification is needed while testing.
+4. Clients › Create client › **Web application**.
+   - Authorised JavaScript origins: `https://tools.learningwaypoints.com` (and `http://localhost:8765` for local
+     testing). No redirect URIs needed.
+   - Copy the **Client ID** (ends in `.apps.googleusercontent.com`).
+5. Before other schools use it: publish the app, and Google's brand verification (name, logo, privacy page).
+   `drive.file` is a non-sensitive scope, so no security assessment. Google Workspace for Education admins have to
+   allow App Builder for under-18 accounts.
 

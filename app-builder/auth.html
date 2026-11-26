@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Signing in… App Builder</title>
+<style>body { font: 16px system-ui, sans-serif; display: grid; place-items: center; height: 100vh; margin: 0; color: #333; }</style>
+</head>
+<body>
+<p>Signing in… This window closes by itself.</p>
+<script>
+// App Builder's sign-in return page (src/drive/oauth.js): Microsoft sends the student back here with a one-time code.
+// Hand it to the App Builder page that opened this window (whichever way the browser allows), then close.
+(function () {
+  var q = new URLSearchParams(location.search), h = new URLSearchParams(location.hash.slice(1));
+  var get = function (k) { return q.get(k) || h.get(k); };
+  var m = { state: get('state'), code: get('code'), error: get('error'), error_description: get('error_description') };
+  history.replaceState(null, '', location.pathname); // the code leaves the address bar at once
+  try { if (window.opener && window.opener.location.origin === location.origin) window.opener.postMessage({ appBuilderAuth: m }, location.origin); } catch (e) {}
+  try { var bc = new BroadcastChannel('appbuilder-auth'); bc.postMessage(m); bc.close(); } catch (e) {}
+  try { localStorage.setItem('appbuilder.auth.result', JSON.stringify(m)); localStorage.removeItem('appbuilder.auth.result'); } catch (e) {}
+  setTimeout(function () { window.close(); }, 400);
+})();
+</script>
+</body>
+</html>
