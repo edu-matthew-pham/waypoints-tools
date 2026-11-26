@@ -8,8 +8,10 @@
 // Once a step is built, it points at what to try in the running app (a "Try it" tick, from the clip's expect: lines)
 // and then at the live value of any variable the step names, so students watch it change.
 import { h } from './dom.js';
-import { ticks, mentionedVariables, clipUrls, hintsOf } from '../edu/tutorial.js';
+import { ticks, mentionedVariables, clipUrls, hintsOf, todo } from '../edu/tutorial.js';
+import { COMPONENTS } from '../core/components.js';
 
+const OBJECTISH = /add-object|kind:|object-menu|menu:rename|input\.rename/; // clip moves that add or rename objects
 const APP = (sel) => `.view-events .preview-col ${sel}, .view-run ${sel}`; // the running app: preview or Run tab
 
 export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getProject, onPlay, store }) {
@@ -59,7 +61,11 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       h('button', { class: 'icon', 'data-ab': 'tutorial-close', title: 'Hide the tutorial', 'aria-label': 'Hide the tutorial', onclick: () => { open = false; draw(); } }, '✕'));
     const check = [];
     if (s.play) check.push(h('button', { class: 'btn primary tut-play', 'data-ab': 'tutorial-play', onclick: () => { mark(`${at}:play`); celebrate(); draw(); onPlay(s.play, { next: at + 1 < tutorial.steps.length ? tutorial.steps[at + 1].title : '', onNext: () => go(at + 1) }); } }, '▶ Open the finished app'));
-    if (s.check) check.push(h('p', { class: 'tut-check' + (built(at) ? ' ok' : ''), role: 'status' }, built(at) ? '✓ Done: ' : 'This ticks by itself when it’s done: ', s.check.text));
+    if (s.check) {
+      check.push(h('p', { class: 'tut-check' + (built(at) ? ' ok' : ''), role: 'status' }, built(at) ? '✓ Done: ' : 'This ticks by itself when it’s done: ', s.check.text));
+      const items = built(at) ? [] : todo(s.check.rules, getSheet());
+      if (items.length > 1) check.push(h('ul', { class: 'tut-todo', 'data-ab': 'tutorial-todo' }, items.map((i) => h('li', { class: i.ok ? 'ok' : '' }, (i.ok ? '✓ ' : '○ ') + i.label))));
+    }
     s.tries.forEach((t, n) => { const y = tried.has(`${at}:${n}`); check.push(h('p', { class: 'tut-check' + (y ? ' ok' : ''), role: 'status' }, (y ? '✓ ' : '') + tryText(t))); });
     if (!check.length) check.push(h('p', { class: 'tut-check none' }, 'When you’ve done this, choose Next.'));
     const nav = h('div', { class: 'tut-nav' },
@@ -92,15 +98,32 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
   function target() {
     if (!open || finished) return null;
     const s = tutorial.steps[at], t = s.targets;
-    if (!built(at) && ptr < t.length) { // building: follow the clip
-      const el = find(t[ptr].selector);
-      if (el) return { el, caption: t[ptr].caption };
-      const tab = t[ptr].selector.match(/\.view-(\w+)/)?.[1];
-      if (tab && getTab() !== tab) { const te = find(`[data-ab='tab:${tab}']`); if (te) return { el: te, caption: `Open the ${tab[0].toUpperCase() + tab.slice(1)} tab.` }; }
-      if (ptr > 0) { const back = find(t[ptr - 1].selector); if (back) return { el: back, caption: t[ptr - 1].caption }; }
+    if (!built(at)) {
+      // Building. What the step's check still needs comes first for objects (the clip may add them in another order,
+      // or rename through a menu that only shows once the object is selected); the clip leads for the rest (events
+      // and variables, where its exact clicks help most); then the check again, for whatever the clip didn't show.
+      const items = todo(s.check?.rules, getSheet()).filter((i) => !i.ok);
+      const obj = items.find((i) => i.type === 'object');
+      if (obj) { const g = objectGuide(obj, items); if (g) return g; }
+      while (ptr < t.length && !obj && OBJECTISH.test(t[ptr].selector)) ptr++; // objects done another way: skip that part
+      if (ptr < t.length) {
+        const el = find(t[ptr].selector);
+        if (el) return { el, caption: t[ptr].caption };
+        const tab = t[ptr].selector.match(/\.view-(\w+)/)?.[1];
+        if (tab && getTab() !== tab) { const te = find(`[data-ab='tab:${tab}']`); if (te) return { el: te, caption: `Open the ${tab[0].toUpperCase() + tab.slice(1)} tab.` }; }
+        if (ptr > 0) { const back = find(t[ptr - 1].selector); if (back) return { el: back, caption: t[ptr - 1].caption }; }
+      }
+      if (document.querySelector('dialog[open]')) return null; // mid-way through a dialog: leave it be
+      const v = items.find((i) => i.type === 'variable');
+      if (v) { const el = find("[data-ab='new-variable-name']"); if (el) return { el, caption: `Make a variable called ${v.name}: type it here, then press Enter.` }; }
+      const e = items.find((i) => i.type === 'event');
+      if (e) {
+        if (getTab() !== 'events') { const te = find("[data-ab='tab:events']"); if (te) return { el: te, caption: 'Open the Events tab.' }; }
+        const el = find(".view-events [data-ab='add-event']");
+        if (el) return { el, caption: `Still needed: ${e.label}. Add it here, or add to an event you have.` };
+      }
       return null;
     }
-    if (!built(at)) return null;
     const next = s.tries.find((_, n) => !tried.has(`${at}:${n}`)); // built: try it in the running app
     if (next) {
       const el = next.after && find(APP(`[data-ab='widget:${next.after}']`));
@@ -115,6 +138,33 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     if (watch.length && !find(APP('.stage'))) { const te = find("[data-ab='tab:events']"); if (te) return { el: te, caption: `Open Events to run the app and watch ${watch[0]} change.` }; }
     return null;
   }
+  // Pointing at what a missing object needs: the picker tile, renaming one the student added with its default name
+  // (Button1 -> SaveButton), or Add object.
+  function objectGuide(item, items) {
+    const c = COMPONENTS[item.kind];
+    const tile = find(`[data-ab='kind:${item.kind}']`);
+    if (tile) return { el: tile, caption: `Pick ${c.label}.` };
+    if (document.querySelector('dialog[open]')) return null;
+    if (item.name) {
+      const wanted = new Set(items.filter((i) => i.type === 'object' && i.name).map((i) => i.name));
+      const named = new Set(todo(tutorial.steps[at].check?.rules, '').filter((i) => i.name).map((i) => i.name));
+      const cand = (getProject().screens || []).flatMap((sc) => sc.objects || []).filter((o) => o.kind === item.kind && !named.has(o.name) && !wanted.has(o.name)).pop(); // the newest: an earlier one may be for something else (a title)
+      if (cand) {
+        const input = find('.side input.rename');
+        if (input) return { el: input, caption: `Type ${item.name}, then press Enter.` };
+        const ren = find("[data-ab='menu:rename']");
+        if (ren) return { el: ren, caption: 'Choose Rename.' };
+        const menu = find(`.side .obj.on [data-ab='object-menu']`);
+        if (menu && menu.closest('.obj')?.querySelector(`[data-ab='object:${CSS.escape(cand.name)}']`)) return { el: menu, caption: `Click \u22EF to rename ${cand.name} to ${item.name}.` };
+        const row = find(`.side [data-ab='object:${CSS.escape(cand.name)}']`);
+        if (row) return { el: row, caption: `Select ${cand.name} so you can rename it ${item.name}.` };
+      }
+    }
+    const add = find("[data-ab='add-object']");
+    if (add) return { el: add, caption: `Add ${item.label.replace(/ called (\w+)$/, ', then name it $1')}.` };
+    return null;
+  }
+
   // Has the running app shown what a try asks for? Its text, or (for an object) anything but how it was designed,
   // since students type their own numbers rather than the clip's.
   function checkTries() {
@@ -127,6 +177,9 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     });
     if (changed) { celebrate(); draw(); }
   }
+  // what the card shows that changes with the project: the ticks and this step's still-to-do list
+  const sig = () => at + ':' + done.join() + '|' + todo(tutorial.steps[at].check?.rules, getSheet()).map((i) => +i.ok).join('');
+  let lastSig = '';
   // a step that has just become complete gets the banner; a hidden card's Tutorial button turns green
   let wasComplete = complete(at), wasAt = at;
   function celebrate() {
@@ -170,9 +223,9 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
   draw();
   return {
     changed() {
-      const before = done.join();
       done = ticks(tutorial, getSheet());
-      if (done.join() !== before) { celebrate(); draw(); } else place();
+      const now = sig();
+      if (now !== lastSig) { lastSig = now; celebrate(); draw(); } else place();
     },
   };
 }

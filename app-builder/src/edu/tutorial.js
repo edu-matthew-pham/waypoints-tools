@@ -19,6 +19,7 @@
 // Steps with no App Builder (a quiz) stay on the website.
 // No DOM here, so tests run it in Node. Imports nothing from core/ or the editor.
 import yaml from 'js-yaml';
+import { COMPONENTS } from '../core/components.js';
 
 const STEP_RE = /```step[ \t]*\n([\s\S]*?)\n```[ \t]*\n?/;
 
@@ -95,6 +96,31 @@ export function evalRules(rules, text) {
   return out;
 }
 export const passes = (rules, text) => evalRules(rules, text).every((r) => r.ok);
+
+// A step's check as a "still to do" list in plain words, each with what kind of thing it asks for, so the tutorial can
+// show progress inside a step and point at the right control when the clip doesn't match what the student is doing:
+//   object SaveButton (button) -> { type: 'object', name: 'SaveButton', kind: 'button', label: 'a Button called SaveButton' }
+//   (text input)               -> { type: 'object', name: '', kind: 'input', label: 'a Text input' }
+//   variable Minutes =         -> { type: 'variable', name: 'Minutes', label: 'a variable called Minutes' }
+//   event: [a, b]              -> { type: 'event', frags: [a, b], label: 'an event: a → b' }
+const KIND_BY_LABEL = Object.fromEntries(Object.values(COMPONENTS).map((c) => [c.label.toLowerCase(), c]));
+export function todo(rules, text) {
+  if (!rules) return [];
+  const results = evalRules(rules, text);
+  const items = [
+    ...(rules.contains || []).map((f) => {
+      const m = String(f).trim().match(/^(?:object (\w+) )?\(([^)]+)\)$/);
+      const c = m && KIND_BY_LABEL[m[2].toLowerCase()];
+      if (c) return { type: 'object', name: m[1] || '', kind: c.id, label: `a ${c.label}${m[1] ? ` called ${m[1]}` : ''}` };
+      const v = String(f).trim().match(/^(variable|list|table) (\w+)( =)?$/);
+      if (v) return { type: v[1] === 'variable' ? 'variable' : 'other', name: v[2], label: `a ${v[1]} called ${v[2]}` };
+      return { type: 'other', label: String(f) };
+    }),
+    ...(rules.event || []).map((fs) => ({ type: 'event', frags: [].concat(fs).map(String), label: 'an event: ' + [].concat(fs).join(' \u2026 ') })),
+    ...(rules.lacks || []).map((f) => ({ type: 'other', label: `no longer: ${f}` })),
+  ];
+  return items.map((it, i) => ({ ...it, ok: results[i].ok }));
+}
 
 // lesson.md text -> { title, starter: 'app.json#start', level, steps: [{ title, body, check, targets }], files }
 export function parseLesson(raw) {

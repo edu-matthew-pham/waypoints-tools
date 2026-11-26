@@ -60,6 +60,10 @@ From the lesson it takes each build step (a `## Step` whose step block has `try:
 - **Try the finished app:** an App Builder step before the build starts, with its own starter, becomes step 1 with an
   "Open the finished app" button: it runs in a player over the editor, so the student's own app is never swapped.
   Its "Start building" button closes it and moves on.
+- **Still to do:** while a step is being built, its check is listed in plain words (a Text input, a Button called
+  SaveButton…), each ticking as it's done. For objects the ring follows this list rather than the clip, which may add
+  them in another order: Add object, the right tile, then renaming the newest default-named one (Button1 → SaveButton).
+  For variables and events the clip leads, then the list fills any gap;
 - **Step done:** when a step is complete, a green "Step done! Next: …" banner (with its own Next) and a glow; if the card
   is hidden, its Tutorial button turns green. Back and Next stay pinned at the bottom of the card;
 - **Stuck?** (closed until opened): the clip's captions as a short how-to, and "Watch how it's done", the lesson's own

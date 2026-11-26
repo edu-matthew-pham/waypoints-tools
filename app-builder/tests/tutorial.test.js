@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseLesson, parseSource, ticks, region, targetsOf, triesOf, mentionedVariables, clipUrls, hintsOf, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
+import { parseLesson, parseSource, ticks, region, targetsOf, triesOf, mentionedVariables, clipUrls, hintsOf, todo, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
 import { sheetText } from '../src/core/sheet-text.js';
 import { checkProject } from '../src/core/project.js';
 
@@ -72,6 +72,17 @@ test('Stuck? help: the clip captions as hints, and the step\u2019s video only fr
   assert.equal(clipUrls(t.steps[2], 'https://tutorials.learningwaypoints.com/code/apps/practice-tracker/source.json').video, 'https://tutorials.learningwaypoints.com/code/apps/practice-tracker/clips/step-3.mp4');
   assert.equal(clipUrls(t.steps[2], 'http://localhost:8000/lesson.md'), null);
   assert.equal(clipUrls(t.steps[4], 'https://tutorials.learningwaypoints.com/x/source.json'), null, 'a step with no clip has no video');
+});
+
+test('a step\u2019s check as a still-to-do list in plain words, ticking as the project grows', () => {
+  const t = parseLesson(lesson);
+  const items = todo(t.steps[1].check.rules, sheet('start'));
+  assert.deepEqual(items.map((i) => [i.type, i.kind, i.name, i.label, i.ok]), [
+    ['object', 'input', '', 'a Text input', false], ['object', 'button', 'SaveButton', 'a Button called SaveButton', false], ['object', 'text', 'TotalText', 'a Text called TotalText', false]]);
+  assert.ok(todo(t.steps[1].check.rules, sheet('sol-step-2')).every((i) => i.ok));
+  const b2 = todo(t.steps[2].check.rules, sheet('sol-step-2'));
+  assert.deepEqual(b2.map((i) => [i.type, i.name, i.ok]), [['variable', 'Minutes', false], ['event', undefined, false]]);
+  assert.deepEqual(todo(null, ''), []);
 });
 
 test('teacher notes, a second finished-app step and quizzes stay out', () => {
