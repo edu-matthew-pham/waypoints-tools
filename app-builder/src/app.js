@@ -172,11 +172,13 @@ function renderTop() {
         if (confirmTwice('Start again? Your changes to this lesson will be lost.')) loadProject(lessonStart());
       } }, icon('again'), 'Start again')
         : h('button', { class: 'btn', 'data-ab': 'new', title: 'Start a new app', onclick: () => loadProject(newProject()) }, icon('new'), 'New'),
-      h('button', { class: 'btn', 'data-ab': 'open', title: 'Open a saved app (.json or .zip)', onclick: openFile }, icon('open'), 'Open…'),
+      h('button', { class: 'btn', 'data-ab': 'open', title: Object.keys(drives).length ? 'Open a saved app: from this computer, or from your drive' : 'Open a saved app (.json or .zip)', 'aria-haspopup': Object.keys(drives).length ? 'menu' : null,
+        onclick: (e) => (Object.keys(drives).length ? openMenuAt(e.currentTarget) : openFile()) }, icon('open'), 'Open…'),
       S.locked ? '' : h('button', { class: 'btn', 'data-ab': 'recent', title: 'Apps you had before in this browser', 'aria-haspopup': 'menu', onclick: (e) => recentMenu(e.currentTarget) }, icon('recent'), 'Recent'),
-      h('button', { class: 'btn primary', 'data-ab': 'save', title: saveTo?.drive ? `Save to ${drives[saveTo.drive].name}: ${saveTo.name} (Ctrl+S)` : saveTo ? `Save to ${saveTo.handle.name} (Ctrl+S)` : 'Save this app as a file (Ctrl+S)', onclick: () => saveFile() }, icon('save'), 'Save'),
-      canPick ? h('button', { class: 'btn icon-only save-as', 'data-ab': 'save-as', title: 'Save as… a new file (Ctrl+Shift+S)', onclick: () => saveFile({ as: true }) }, h('span', { 'aria-hidden': 'true' }, '▾'), h('span', { class: 'lbl' }, 'Save as…')) : '',
-      Object.keys(drives).length ? h('button', { class: 'btn' + (Object.values(drives).some((d) => d.signedIn()) ? ' on' : ''), 'data-ab': 'drive', title: 'Save to, or open from, your own OneDrive or Google Drive', onclick: openDrive }, icon('cloud'), 'Drive') : '',
+      h('button', { class: 'btn primary', 'data-ab': 'save', title: saveTo?.drive ? `Save to ${drives[saveTo.drive].name}: ${saveTo.name} (Ctrl+S)` : saveTo ? `Save to ${saveTo.handle.name} (Ctrl+S)` : Object.keys(drives).length ? 'Save this app: to this computer or your drive (Ctrl+S)' : 'Save this app as a file (Ctrl+S)', onclick: () => saveFile() }, icon('save'), 'Save'),
+      (canPick || Object.keys(drives).length) ? h('button', { class: 'btn icon-only save-as', 'data-ab': 'save-as', 'aria-haspopup': Object.keys(drives).length ? 'menu' : null,
+        title: Object.keys(drives).length ? 'Save to… this computer or your drive (Ctrl+Shift+S)' : 'Save as… a new file (Ctrl+Shift+S)',
+        onclick: (e) => (Object.keys(drives).length ? saveMenuAt(e.currentTarget) : saveFile({ as: true })) }, h('span', { 'aria-hidden': 'true' }, '▾'), h('span', { class: 'lbl' }, 'Save to…')) : '',
       h('button', { class: 'btn', 'data-ab': 'share', title: 'Share a link to your working app', onclick: shareApp }, icon('share'), 'Share'),
       h('button', { class: 'btn', 'data-ab': 'continue', title: 'Carry on with this app (and your tutorial step) on another computer or tablet', onclick: continueElsewhere }, icon('carry'), 'Other device')),
     h('span', { class: 'grp' },
@@ -267,7 +269,14 @@ function rememberedNow() {
 const canPick = typeof window.showSaveFilePicker === 'function' && !window.claude;
 let saveTo = null;        // { handle, zip, kept } : the file the last Save went to, and whether it included kept data
 function saveFile({ as = false } = {}) {
-  if (!as && saveTo?.drive) { saveToDrive(drives[saveTo.drive]).catch((e) => { notify(e?.message || 'Couldn\u2019t save to your drive.'); if (e?.code === 'signin') openDrive(); }); return; }
+  // Save goes back to wherever this app was last saved or opened: a drive file, or a file on this computer
+  if (!as && saveTo?.drive) {
+    const d = drives[saveTo.drive];
+    saveToDrive(d, { id: saveTo.id }).catch((e) => { if (e?.code === 'signin') driveBox(d, 'save'); else notify(e?.message || 'Couldn\u2019t save to your drive.'); });
+    return;
+  }
+  // not saved anywhere yet, with drives on offer: ask where (the Save ▾ menu)
+  if (!saveTo && Object.keys(drives).length) { saveMenuAt(document.querySelector('[data-ab=save]')); return; }
   if (!as && saveTo && canPick) { writeTo(saveTo.handle, saveTo.kept ? rememberedNow() : null, saveTo); return; }
   const kept = rememberedNow(), n = Object.keys(kept).length;
   if (!n) { chooseAndSave(null); return; }
@@ -365,25 +374,45 @@ async function openRead({ project, remembered, progress, missing }, target) {
 // client ID is set in drive/config.js. A drive save holds everything, like Continue: the app, what it kept, the step.
 const drives = {};
 for (const id of configured()) drives[id] = id === 'microsoft' ? createOneDrive({ clientId: DRIVE.microsoft.clientId }) : createGoogleDrive({ clientId: DRIVE.google.clientId });
-function openDrive() {
-  driveDialog({ drives, current: saveTo?.drive ? saveTo : null, notify, save: saveToDrive,
-    removed: (d, it) => { if (saveTo?.drive === d.id && saveTo.id === it.id) { saveTo = null; renderTop(); } }, // the app stays open; Save asks where
-    open: async (d, it) => { await openRead(await readProjectFile(await d.open(it.id)), { drive: d.id, id: it.id, name: it.name, zip: /\.zip$/i.test(it.name) }); notify(`Opened ${it.name.replace(/\.app\.(json|zip)$/i, '')} from ${d.name}.`); } });
+// Save ▾ and Open ▾: this computer, or a drive (each drive's dialog signs in first if needed)
+const menuAt = (btn, items) => { const r = btn.getBoundingClientRect(); openMenu({ x: r.left, y: r.bottom + 4, returnFocus: btn, items }); };
+const signOuts = () => Object.values(drives).filter((d) => d.signedIn()).map((d) => ({ label: `Sign out of ${d.name}${d.account()?.email ? ' (' + d.account().email + ')' : ''}`, fn: () => { d.signOut(); renderTop(); notify(`Signed out of ${d.name}.`); } }));
+function saveMenuAt(btn) {
+  menuAt(btn, [...Object.values(drives).map((d) => ({ label: `Save to ${d.name}\u2026`, fn: () => driveBox(d, 'save') })),
+    { label: 'Save to this computer\u2026', fn: () => saveFile({ as: true }) }, ...signOuts()]);
 }
-async function saveToDrive(d) {
+function openMenuAt(btn) {
+  menuAt(btn, [{ label: 'Open from this computer\u2026', fn: openFile },
+    ...Object.values(drives).map((d) => ({ label: `Open from ${d.name}\u2026`, fn: () => driveBox(d, 'open') })), ...signOuts()]);
+}
+function driveBox(d, mode) {
+  driveDialog({ d, mode, name: S.project.name, current: saveTo?.drive ? saveTo : null, notify,
+    save: saveToDrive,
+    open: async (dd, it) => { await openRead(await readProjectFile(await dd.open(it.id)), { drive: dd.id, id: it.id, name: it.name, zip: /\.zip$/i.test(it.name) }); notify(`Opened ${it.name.replace(/\.app\.(json|zip)$/i, '')} from ${dd.name}.`); },
+    removed: (dd, it) => { if (saveTo?.drive === dd.id && saveTo.id === it.id) { saveTo = null; renderTop(); } } }); // the app stays open; Save asks where
+}
+// Save to a drive: over an app already there (id), or as a new one (name). A drive save holds everything, like Continue:
+// the app, what it kept, the tutorial step.
+async function saveToDrive(d, { id = null, name = null } = {}) {
   const kept = rememberedNow();
   const file = await buildSave(S.project, Object.keys(kept).length ? kept : null, progressNow());
   missingNote(file);
-  const zip = /\.zip$/.test(file.filename);
-  // the same drive file again, unless the app now needs the other kind (it gained or lost pictures): then a new one
-  const same = saveTo?.drive === d.id && saveTo.zip === zip ? saveTo : null;
-  let name = file.filename;
-  if (!same) {
-    const taken = new Set((await d.list()).map((it) => it.name.toLowerCase()));
-    for (let n = 2; taken.has(name.toLowerCase()); n++) name = file.filename.replace(/(\.app\.(json|zip))$/i, ` (${n})$1`);
+  const zip = /\.zip$/.test(file.filename), ext = zip ? '.app.zip' : '.app.json';
+  let target = id, filename;
+  if (id) {
+    const was = (saveTo?.drive === d.id && saveTo.id === id) ? saveTo.name : (name || '');
+    // the app now needs the other kind of file (it gained or lost pictures): a new file beside it, same name
+    if (was && !was.toLowerCase().endsWith(ext)) { target = null; name = was.replace(/\.app\.(json|zip)$/i, ''); }
+    else filename = was || null;
   }
-  const done = await d.save({ name, data: file.data, type: file.type, id: same?.id || null });
-  saveTo = { drive: d.id, id: done.id, name: done.name || name, zip, kept: true };
+  if (!target) {
+    const base = saveName({ name: name || S.project.name }, zip);
+    const taken = new Set((await d.list()).map((it) => it.name.toLowerCase()));
+    filename = base;
+    for (let n = 2; taken.has(filename.toLowerCase()); n++) filename = base.replace(/(\.app\.(json|zip))$/i, ` (${n})$1`);
+  }
+  const done = await d.save({ name: filename, data: file.data, type: file.type, id: target });
+  saveTo = { drive: d.id, id: done.id, name: done.name || filename, zip, kept: true };
   renderTop();
   notify(`Saved to ${d.name}: ${saveTo.name.replace(/\.app\.(json|zip)$/i, '')}`);
 }
@@ -521,7 +550,7 @@ document.addEventListener('keydown', (e) => {
   if (S.playing || !history) return;
   const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName);
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); undo(e.shiftKey ? 1 : -1); return; }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveFile({ as: e.shiftKey }); return; }
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (e.shiftKey && Object.keys(drives).length) saveMenuAt(document.querySelector('[data-ab=save]')); else saveFile({ as: e.shiftKey }); return; }
   if (S.tab === 'design' && !typing && design.onKey(e)) e.preventDefault();
 });
 

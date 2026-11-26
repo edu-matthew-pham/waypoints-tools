@@ -408,12 +408,17 @@ the app, what Remember between visits kept, and, in a guided tutorial, the step 
 
 Like Construct 3's cloud saving: students sign in with Microsoft or Google only to let App Builder use their own drive.
 No App Builder accounts, no server, nothing kept by App Builder (`privacy.html`).
-- **Drive** (toolbar) appears once a client ID is set in `src/drive/config.js` (each provider separately).
-  - Signed out, it offers Sign in with Microsoft and Sign in with Google.
-  - Signed in, it shows who, **Save this app to OneDrive / Google Drive**, and the apps saved there, each with
-    **Open**. A drive save holds everything Continue does: the app, what it kept, the tutorial step.
-  - After a drive save or open, **Save** and Ctrl+S go back to that drive file. Save as… still asks for a place on
-    the computer.
+- **Save ▾ and Open ▾** (toolbar) offer each drive that has a client ID in `src/drive/config.js`, beside this
+  computer: Save to OneDrive… / Save to Google Drive… / Save to this computer…, and Open from… the same. (No client
+  IDs: Save and Open work as before.) The account and **Sign out** are in both menus and the dialog.
+  - A drive's dialog signs in first if needed. **Save** mode: save as a new app (a name, the app's own by default;
+    a number is added if it's taken) or **Save over** one already there (asks first; the file keeps its name).
+    **Open** mode: the apps there, each with Open.
+  - Both list a 🗑 **Delete** for each app: it asks, then moves it to the drive's bin (OneDrive recycle bin, Google
+    Drive bin), never deleting it for good.
+  - **Save** (and Ctrl+S) goes back to wherever the app was last saved or opened: a drive file or a file on this
+    computer. Not saved anywhere yet, it opens the Save ▾ menu. Ctrl+Shift+S opens the menu.
+  - A drive save holds everything Continue does: the app, what it kept, the tutorial step.
 - **Where files go:** an App Builder folder in the student's own drive.
   - OneDrive asks for `Files.ReadWrite.AppFolder` (Apps/App Builder). Microsoft's docs disagree on whether school
     accounts allow it, so if one refuses, the dialog asks once more for `Files.ReadWrite` and uses the same folder by
