@@ -35,6 +35,30 @@ playground; a lesson link sets its own level. Embedding, stable labels and proje
 Each lesson link keeps its own saved work in the browser, so students carry on where they were; **Start again**
 (press twice) reloads the original. Save/Open still work for handing in a file.
 
+## Guided tutorials (1.1)
+
+`?lesson=code/apps/practice-tracker` opens App Builder with a step card beside the editor, read straight from that
+Waypoints lesson (`content/<course>/<lesson>/lesson.md` in waypoints-tutorials), so the lesson stays the one source.
+`?tutorial=<url of a lesson.md>` does the same for any lesson on learningwaypoints.com, the tutorials repo, or
+localhost (handy while writing one). With neither, nothing changes.
+
+From the lesson it takes each build step (a `## Step` whose step block has `try: { playground: appbuilder, keep }`;
+`### Tasks` become steps of their own) and shows:
+- **the step's text**, as on the website (simple Markdown, built as text, never as HTML);
+- **a tick** when the step's `check: { type: code, rules }` passes on the sheet text (the lesson page's rules: contains,
+  event, lacks). Ticks are worked out from the whole project after every change, so racing ahead ticks later steps and
+  undoing un-ticks. Steps without a code check just say "choose Next";
+- **an amber ring** on the control to use next, following the lesson clip's clicks and typing in order, with the clip's
+  caption beside it. It moves on when the student uses that control; if the control isn't showing, it points at its tab
+  or at the control that opens it. After the clip's part, no ring.
+
+Nothing is locked: Back, Next and the step dots always work. The tutorial starts from the first build step's starter
+(`app.json#start` beside the lesson), keeps its work and step in the browser under its own name, and uses the step's
+level. The card can be moved to the other side (it also moves itself off whatever the ring points at), made smaller, or
+hidden (a Tutorial button brings it back). On phones it's a strip along the bottom. Steps that need a different project
+(Try the finished app) or aren't App Builder (a quiz) stay on the website. Code: `src/edu/tutorial.js` (reading the
+lesson, ticks; no DOM, tested in Node against a copy of the practice tracker lesson) and `src/ui/tutorial-panel.js`.
+
 ## Layout
 
     src/core/expr.js        safe expression parser/evaluator (no eval) + static checker
@@ -51,6 +75,8 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
     src/player.js           Player: runs project JSON in a container; only core/ and the stage (a test checks)
     src/run-engine.js       Runner: the editor's Player, adding live values in the sidebar + Problems panel
     src/edu/features.js     levels and lesson allow lists (the education layer; core only carries project.features)
+    src/edu/tutorial.js     guided tutorials: a Waypoints lesson.md -> steps, ticks, pointers (no DOM)
+    src/ui/tutorial-panel.js  the tutorial's step card and pointer ring
     src/panels/side.js      project tree (screens > objects > copies) and variables
     src/views/design.js     Design tab: drag-and-drop stage + properties
     src/views/events.js     Events tab: editable sheet beside a live preview; on-screen picker

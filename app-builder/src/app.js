@@ -12,6 +12,9 @@ import { initMap } from './views/map.js';
 import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './edu/features.js';
 import { embed } from './embed.js';
+import { parseLesson, loadStarter, tutorialUrl } from './edu/tutorial.js';
+import { startTutorial } from './ui/tutorial-panel.js';
+import { sheetText } from './core/sheet-text.js';
 import { addBuiltinSounds, sources } from './core/assets.js';
 import { projectMedia, useMedia } from './player.js';
 // Where media comes from, set here rather than in core: built-in sound files beside App Builder, plus more listed in
@@ -34,7 +37,12 @@ const QS = new URLSearchParams(location.search);
 const lessonId = QS.get('sample');
 // ?store=<key>: a page that embeds App Builder (one per lesson step) keeps each copy's work apart.
 const storeId = QS.get('store') || QS.get('id'); // ?id= is a Waypoints lesson step
-const STORE_KEY = storeId ? 'appbuilder.store.' + storeId : lessonId ? 'appbuilder.lesson.' + lessonId : 'appbuilder.prototype.v1';
+// ?lesson=code/apps/practice-tracker (or ?tutorial=<url>): a guided tutorial read from that lesson (edu/tutorial.js).
+// Off without one of these, so nothing changes for normal use or in the lessons' own clips.
+const tutorialLink = tutorialUrl(QS, location.href);
+const STORE_KEY = storeId ? 'appbuilder.store.' + storeId : tutorialLink?.id ? 'appbuilder.tutorial.' + tutorialLink.id
+  : lessonId ? 'appbuilder.lesson.' + lessonId : 'appbuilder.prototype.v1';
+let tutorial = null; // the step card, once loaded
 const store = (fn) => { try { return fn(localStorage); } catch { return null; } };
 S.storeKey = STORE_KEY;
 let history;
@@ -88,8 +96,10 @@ function setProject(p, { resetHistory = true } = {}) {
 function commit(source) {
   if (history.push(JSON.stringify(S.project))) store((ls) => ls.setItem(STORE_KEY, history.current));
   refresh(source);
-  embed.report(S.project);
+  reportChange();
 }
+// after every change: the page embedding App Builder (embed.js) and the tutorial's ticks
+function reportChange() { embed.report(S.project); tutorial?.changed(); }
 function undo(d) {
   if (!history) return; // still starting
   const json = history.step(d);
@@ -97,7 +107,7 @@ function undo(d) {
   setProject(JSON.parse(json), { resetHistory: false });
   store((ls) => ls.setItem(STORE_KEY, json));
   refresh();
-  embed.report(S.project);
+  reportChange();
 }
 function select(id) { S.selId = id; design.select(); renderSide(els.side); }
 
@@ -226,7 +236,7 @@ async function loadProject(p, { toRecent = true } = {}) {
   if (before) history.push(JSON.stringify(S.project)); // Undo goes back to the app you had
   store((ls) => ls.setItem(STORE_KEY, JSON.stringify(S.project)));
   refresh();
-  embed.report(S.project);
+  reportChange();
 }
 // Save: a .json, or a .zip with a media/ folder when the app has pictures or recordings (project-file.js). When
 // "Remember between visits" kept anything, ask whether to include it (ticked: the whole app as it is; unticked: just
@@ -412,7 +422,7 @@ try { const saved = store((ls) => ls.getItem(STORE_KEY)); if (saved) initial = J
 // ?code=<project JSON>: a lesson step's starter (Waypoints playgrounds pass their starter this way)
 let codeStart = null;
 try { if (QS.get('code')) { const p = JSON.parse(QS.get('code')); codeStart = () => structuredClone(p); } } catch { queueMicrotask(() => notify('The starter project for this step could not be read.')); }
-const lessonStart = codeStart || (lessonId && sampleById(lessonId) ? () => sampleById(lessonId) : null);
+let lessonStart = codeStart || (lessonId && sampleById(lessonId) ? () => sampleById(lessonId) : null);
 if (lessonId && !lessonStart) queueMicrotask(() => notify(`There is no lesson called "${lessonId}". Opening your last project instead.`));
 // No lesson link: a playground, so everything is offered (Level 4), like MakeCode or Construct. Lessons set their own level.
 const playground = () => ({ ...SAMPLES['Minutes and goal (two screens)'](), features: { level: 4 } });
@@ -421,6 +431,20 @@ boot();
 async function boot() {
 // a shared link (#play=…): just the working app, no editor (play-page.js)
 if (location.hash.startsWith('#play=')) { S.playing = true; await startPlay(location.hash.slice(6), { soundBase: MEDIA_SOURCES.soundBase }); return; }
+let lesson = null;
+if (tutorialLink?.error) notify(tutorialLink.error);
+else if (tutorialLink) {
+  try {
+    const get = async (url) => { const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status === 404 ? 'There is no lesson at that address.' : 'The lesson couldn\u2019t be loaded.'); return r.text(); };
+    lesson = parseLesson(await get(tutorialLink.url));
+    const starter = await loadStarter(lesson, tutorialLink.url, get);
+    if (starter) lessonStart = () => structuredClone(starter);
+    if (!params.level && lesson.level) params.level = lesson.level;
+  } catch (e) {
+    lesson = null;
+    notify(`The tutorial couldn\u2019t be opened: ${/fetch|network/i.test(e.message) ? 'check the internet connection and reload.' : e.message}${hadSaved ? ' Your work on it is still here.' : ''}`);
+  }
+}
 initial = checkProject(initial || (lessonStart ? lessonStart() : playground()));
 applyParams(initial);
 const before = JSON.stringify(initial);
@@ -439,10 +463,11 @@ refresh();
 const tab = new URLSearchParams(location.search).get('tab');
 if (tab && tabViews[tab] !== undefined) setTab(tab);
 window.__app = { S, setTab, loadProject }; // handy for debugging and tests
+if (lesson) tutorial = startTutorial({ tutorial: lesson, id: tutorialLink.id, getSheet: () => sheetText(S.project), getTab: () => S.tab, store });
 
 // An embedding page (a lesson) can start, reset and read the project. See src/embed.js.
 embed.start({
-  start: (p) => { if (!hadSaved) loadProject(p); else embed.report(S.project); }, // a student's own work wins over the starter
+  start: (p) => { if (!hadSaved) loadProject(p); else reportChange(); }, // a student's own work wins over the starter
   reset: (p) => loadProject(p),
   get: () => S.project,
 });
@@ -459,7 +484,7 @@ window.addEventListener('storage', async (e) => {
     S.selId = null;
     refresh();
     setTab(tab); // restarts the open view's preview on the new project
-    embed.report(S.project);
+    reportChange();
   } catch { /* a broken copy elsewhere: keep ours */ }
 });
 }

@@ -336,6 +336,19 @@ Left, on purpose:
 - Lesson URL settings (`?level`, `?allow`, `?lock`, `?sample`) and the Waypoints embed messages stay in the app shell
   (`app.js`, `embed.js`), which is the education tool.
 
+## Guided tutorials *(built 26 Nov 2026, App Builder 1.1; README › Guided tutorials)*
+
+Was a later idea (Markdown tutorials like MakeCode's, waiting for class feedback). Matthew, 26 Nov 2026: build it now,
+and share the same source as the tutorials website. So there is no separate tutorial format: `?lesson=<course>/<lesson>`
+reads the lesson's own `lesson.md` (text, `check` rules for ticks, `clip` selectors for the pointer, `try` starter and
+level). One edit to a lesson changes the website, its clips and the guided tutorial together.
+Possible next steps, only if classes need them:
+- smaller steps: one per numbered line of a lesson step (today it is one per lesson step, with the ring walking
+  through the clip);
+- ticks from the running app (e.g. "TotalText shows 45"), beside the sheet-text rules;
+- a link from each App Builder lesson page on the tutorials site ("Open as a guided tutorial");
+- a generator that drafts a lesson's steps from a finished project, for a teacher to edit.
+
 ## Considered, not planned
 
 - **Editing media** (Matthew, 26 Nov 2026): picture editing fits (drawing on a picture is built; simple edits such as crop
@@ -355,12 +368,6 @@ Left, on purpose:
 
 ## Later ideas
 
-- **Guided tutorials as Markdown** (like MakeCode tutorials): `## Step` sections with text and hints, `@highlight <data-ab label>`
-  to point at a control, and a `wait for:` line matched against the sheet text so the step ticks itself. A generator could draft one
-  from any finished project (one step per object, then per event), for a teacher to edit.
-  *(26 Nov 2026, Matthew: wait for class feedback before building it. Construct's own guided tours are only a light entry
-  point, and the tutorials site does the guiding for now. Off unless a tutorial link opens it, so adding it later
-  changes nothing the lesson clips show.)*
 - **From Thunkable:** open the app being built on a phone (QR code beside the link, never instead of it), share a finished app as a
   play-only link, and screen templates for prototype lessons. Not native device APIs, app stores or a block editor.
 - **Code snippets (HTML/CSS/JS inside App Builder): speculative, probably never** (25 Nov 2026). Classes usually move to
