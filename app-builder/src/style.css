@@ -591,8 +591,10 @@ p.small, .muted.small { font-size: 12px; }
 .rec-row { display: flex; align-items: center; gap: 8px; }
 .rec-btn, .rec-play { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #d0d5dd; background: #fff; font-size: 16px; cursor: pointer; flex: none; }
 .rec-btn { color: #d92d20; }
+.rec-choose { flex: none; border: 1px solid #d0d5dd; background: #fff; border-radius: 99px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+.rec-choose:disabled { opacity: .5; cursor: default; }
 .rec.on .rec-btn { background: #d92d20; color: #fff; }
-.rec-msg { font-size: 13px; line-height: 1.3; color: #344054; }
+.rec-msg { flex: 1; min-width: 0; font-size: 13px; line-height: 1.3; color: #344054; }
 .rec-trim { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #667085; }
 .rec-trim input { flex: 1; min-width: 0; }
 .cell-snd { font-size: 13px; white-space: nowrap; }

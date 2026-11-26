@@ -237,16 +237,20 @@ export const RENDER = {
     make: (design) => {
       const rec = h('button', { type: 'button', class: 'rec-btn', 'aria-label': 'Record', disabled: design ? true : null }, '●');
       const play = h('button', { type: 'button', class: 'rec-play', 'aria-label': 'Play the recording', disabled: true }, '▶');
-      const msg = h('div', { class: 'rec-msg' }, design ? '🎙 Records when the app runs' : '🎙 Tap ● to record');
+      const msg = h('div', { class: 'rec-msg' }, design ? '🎙 Records when the app runs, or chooses a sound' : '🎙 Tap ● to record');
+      // Choose a sound: a sound file from the device instead of the microphone (like Photo's Choose a photo). Always
+      // there, so it is the way in where microphones are blocked or Allow microphone is off.
+      const choose = h('button', { type: 'button', class: 'rec-choose', 'data-ab': 'recorder-choose', title: 'Choose a sound file from this device', disabled: design ? true : null }, '\u{1F3B5} Choose');
       const from = h('input', { type: 'range', min: 0, max: 1, step: 0.1, value: 0, 'aria-label': 'Start' });
       const to = h('input', { type: 'range', min: 0, max: 1, step: 0.1, value: 1, 'aria-label': 'End' });
       const trim = h('div', { class: 'rec-trim', hidden: true }, h('span', {}, 'Trim'), from, to);
-      const el = h('div', { class: 'rec' }, h('div', { class: 'rec-row' }, rec, play, msg), trim);
+      const el = h('div', { class: 'rec' }, h('div', { class: 'rec-row' }, rec, play, msg, choose), trim);
       Object.assign(el, { _rec: rec, _play: play, _msg: msg, _from: from, _to: to, _trim: trim, _len: 0 });
       if (design) return el;
       const audio = h('audio', { preload: 'auto' });
       el.append(audio); el._audio = audio;
       rec.addEventListener('click', () => (el._mr ? el._mr.stop() : startRecording(el)));
+      choose.addEventListener('click', (e) => { e.stopPropagation(); if (!el._mr) chooseSound(el); });
       play.addEventListener('click', () => {
         if (!audio.paused) { audio.pause(); return; }
         audio.currentTime = Number(from.value); audio.play().catch(() => {});
@@ -264,7 +268,7 @@ export const RENDER = {
     },
     write: (el) => {
       if (!el._audio || el._mr || el._failed || el._audio.getAttribute('src')) return; // no audio: in Design, keep its note
-      el._msg.textContent = media.mic() ? '🎙 Tap ● to record' : '🎙 The microphone is off for this app. To use it, tick Allow microphone in the Recorder\u2019s properties (Design).';
+      el._msg.textContent = media.mic() ? '🎙 Tap ● to record, or choose a sound' : '🎙 The microphone is off for this app: choose a sound instead. (To record, tick Allow microphone in the Recorder\u2019s properties.)';
     },
     // what the stage reports: a finished recording, the recording starting, or the trim handles moved
     read: (t) => { const el = t.closest('.rec'); return t === el ? el._value : { trim: [Number(el._from.value), Number(el._to.value)] }; },
@@ -377,6 +381,37 @@ async function startCamera(el) {
 const MAX_REC = 20; // seconds
 const trimText = (el) => `${Number(el._from.value).toFixed(1)}–${Number(el._to.value).toFixed(1)} s of ${el._len.toFixed(1)} s`;
 function report(el, value) { el._value = value; el.dispatchEvent(new Event('input', { bubbles: true })); }
+// Choose a sound: a sound file (about 5 MB at most, like uploads; no 20-second limit, so a whole song is fine).
+// It is handled like a finished recording: the trim handles, ▶, Recorder.sound and Recorder.length, then
+// "finishes a recording" runs.
+const CHOOSE_SOUND_CAP = 5_000_000;
+function chooseSound(el) {
+  const input = h('input', { type: 'file', accept: 'audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,.mp3,.m4a,.ogg,.wav' });
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const say = (t) => { el._msg.textContent = t; };
+    if (file.type && !file.type.startsWith('audio/')) { say('🎵 That isn\u2019t a sound file. Try an MP3, M4A, OGG or WAV.'); return; }
+    if (file.size > CHOOSE_SOUND_CAP) { say('🎵 That sound is too big. Try a shorter one (under about 5 MB).'); return; }
+    const url = URL.createObjectURL(file);
+    const probe = h('audio', { preload: 'metadata' });
+    const len = await new Promise((ok) => {
+      probe.onloadedmetadata = () => ok(Number.isFinite(probe.duration) ? probe.duration : 0);
+      probe.onerror = () => ok(-1);
+      probe.src = url;
+    });
+    if (len < 0) { URL.revokeObjectURL(url); say('🎵 That sound couldn\u2019t be played here. Try an MP3.'); return; }
+    el._len = len;
+    for (const r of [el._from, el._to]) r.max = len.toFixed(1);
+    el._from.value = 0; el._to.value = len.toFixed(1);
+    el._trim.hidden = false; el._play.disabled = false;
+    if (el._audio.src) URL.revokeObjectURL(el._audio.src);
+    el._audio.src = url;
+    say(`Chose ${len.toFixed(1)} s. Drag the handles to trim.`);
+    report(el, { blob: file, length: len });
+  });
+  input.click();
+}
 async function startRecording(el) {
   const say = (t) => { el._msg.textContent = t; };
   if (!media.mic()) return; // write() already says how to turn it on

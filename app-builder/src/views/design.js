@@ -157,7 +157,7 @@ export function initDesign(root) {
         h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: !!S.project.allowMic, 'data-ab': 'allow-mic',
           onchange: (e) => { S.project.allowMic = e.target.checked; hooks.commit(); } }),
           h('span', {}, 'Allow microphone in this app (off by default; the browser also asks the user, and some school devices block microphones)')),
-        h('p', { class: 'muted small' }, 'Users tap ● to record and ■ to stop (up to 20 seconds), then can trim the start and end. Recorder.sound is the recording, ready for a Sound (Set sound to the one named) or a table. Recordings stay in this browser.'));
+        h('p', { class: 'muted small' }, 'Users tap ● to record and ■ to stop (up to 20 seconds), or Choose a sound file from their device (always there, so it works where microphones are blocked), then can trim the start and end. Recorder.sound is the recording, ready for a Sound (Set sound to the one named) or a table. Recordings stay in this browser.'));
     }
     if (obj.kind === 'photo') {
       extra.push(

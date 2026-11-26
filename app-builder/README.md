@@ -290,6 +290,12 @@ only, up to about 5 MB like uploads). The picture is shrunk like the camera's ph
 the media store, shown in the Photo, set as `Photo.picture`, and runs *A photo is taken with*, just like the shutter.
 It works with Allow camera off, so it is the way in where cameras are blocked.
 
+**Choose a sound** (1.7): the Recorder's match for Choose a photo. A button in the Recorder's row opens the device's
+file picker (MP3, M4A, OGG, WAV, WebM; up to about 5 MB like uploads, and no 20-second limit, so a whole song is fine).
+The file is handled like a finished recording: kept in the media store, the trim handles and ▶ appear, `Recorder.sound`
+and `Recorder.length` are set, and *finishes a recording* runs. It works with Allow microphone off, so it is the way in
+where microphones are blocked.
+
 Pictures made while the app runs. Like an upload, each one is a file in the media store, and the app holds a reference
 (`media:7f3a09c2`) that can go in a variable, a list or a table, and is shown by an Image.
 
