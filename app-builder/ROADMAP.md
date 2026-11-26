@@ -359,7 +359,8 @@ one shape in `src/carry.js`, so a drive can be added later as one more place for
 
 ## Sign in to save to your drive *(live 26 Nov 2026: 1.3–1.6; README › Your drive)*
 
-Status, 26 Nov 2026:
+Status, 26 Nov 2026 (Matthew tested sign-in and saving on the live site with personal Microsoft and Google accounts:
+both work):
 - **Microsoft:** registered in Matthew's own directory (client ID in `src/drive/config.js`).
   - learningwaypoints.com is DNS-verified there and set as the app's publisher domain.
   - Not yet a verified publisher (needs the Microsoft AI Cloud Partner Program: an @learningwaypoints.com email,
