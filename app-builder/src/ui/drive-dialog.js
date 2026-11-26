@@ -9,10 +9,11 @@ import { modal } from './sheet-dialogs.js';
 const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 const shown = (name) => name.replace(/\.app\.(json|zip)$/i, '');
 
-// d: one drive (src/drive). save(d, { id, name }) / open(d, item) / removed(d, item): the shell's.
+// d: one drive (src/drive). save(d, { id, name }) / open(d, item) / removed(d, item): the shell's; here(): Save to /
+// Open from this computer instead (offered when a sign-in doesn't finish).
 // current: the drive file this app is saved to, if any ({ drive, id, name }); name: the app's name, for a new save
 export function driveDialog(opts) {
-  const { d, mode, save, open, removed, current, notify, name } = opts;
+  const { d, mode, save, open, removed, current, notify, name, here: onThisComputer } = opts;
   const here = current?.drive === d.id ? current : null;
   const body = h('div', { class: 'drive' });
   const { close } = modal(mode === 'save' ? `Save to ${d.name}` : `Open from ${d.name}`, body,
@@ -27,7 +28,15 @@ export function driveDialog(opts) {
       return;
     }
     if (e?.code === 'signin') { d.signOut(); again(); return; }
-    if (e?.code === 'closed') return; // the student closed the sign-in window
+    // The sign-in window was closed without finishing: most often at the school's "Approval required" screen. Say so,
+    // and point back to this computer (a file in the school drive folder needs no approval).
+    if (e?.code === 'closed' || e?.code === 'popup_closed') {
+      body.querySelector('.drive-err')?.remove();
+      body.prepend(h('div', { class: 'drive-err', role: 'alert', 'data-ab': 'drive-unfinished' },
+        h('p', {}, `Sign-in didn\u2019t finish. If your school hasn\u2019t approved App Builder yet, ${mode === 'save' ? `use Save to this computer instead and keep the file in your school ${d.name} folder` : `open the file from your school ${d.name} folder with Open from this computer`}.`),
+        onThisComputer ? h('button', { class: 'btn', type: 'button', 'data-ab': 'drive-here', onclick: () => { close(); onThisComputer(); } }, mode === 'save' ? 'Save to this computer\u2026' : 'Open from this computer\u2026') : null));
+      return;
+    }
     const admin = /consent|admin|AADSTS65001|AADSTS90094|access_denied|admin_policy_enforced|org_internal/i.test(`${e?.code} ${e?.message}`);
     body.querySelector('.drive-err')?.remove();
     body.prepend(h('p', { class: 'drive-err', role: 'alert' }, (e?.message || 'Something went wrong.') +

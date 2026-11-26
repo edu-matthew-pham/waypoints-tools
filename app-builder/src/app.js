@@ -387,6 +387,7 @@ function openMenuAt(btn) {
 }
 function driveBox(d, mode) {
   driveDialog({ d, mode, name: S.project.name, current: saveTo?.drive ? saveTo : null, notify,
+    here: mode === 'save' ? () => saveFile({ as: true }) : openFile,
     save: saveToDrive,
     open: async (dd, it) => { await openRead(await readProjectFile(await dd.open(it.id)), { drive: dd.id, id: it.id, name: it.name, zip: /\.zip$/i.test(it.name) }); notify(`Opened ${it.name.replace(/\.app\.(json|zip)$/i, '')} from ${dd.name}.`); },
     removed: (dd, it) => { if (saveTo?.drive === dd.id && saveTo.id === it.id) { saveTo = null; renderTop(); } } }); // the app stays open; Save asks where

@@ -763,6 +763,7 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
 .drive-ask { flex: 1 1 100%; font-size: 14px; padding: 2px 0 4px; }
 .drive-del { padding: 6px 8px; }
 .btn.danger { background: #b42318; color: #fff; border-color: #b42318; }
+.drive-err p { margin: 0 0 8px; } .drive-err p:last-child { margin: 0; }
 .drive-err { color: #b42318; background: #fef3f2; border-radius: 8px; padding: 8px 10px; }
 #app.play-page { display: flex; flex-direction: column; height: 100vh; padding: 0; gap: 0; }
 .play-bar { margin: 0; flex: none; }
