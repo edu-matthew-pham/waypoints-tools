@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseLesson, ticks, region, targetsOf, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
+import { parseLesson, parseSource, ticks, region, targetsOf, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
 import { sheetText } from '../src/core/sheet-text.js';
 import { checkProject } from '../src/core/project.js';
 
@@ -69,9 +69,20 @@ test('the starter comes from beside the lesson, or from inside it', async () => 
   assert.equal(region(files['a.json'], 's'), '{"version":1}');
 });
 
+test('a lesson\u2019s source.json (the tutorials site) works like its lesson.md, starter included', async () => {
+  const t = parseSource(JSON.stringify({ title: 'A practice tracker', files: { 'lesson.md': lesson, 'app.json': app } }));
+  assert.equal(t.steps.length, 5);
+  const p = await loadStarter(t, 'https://tutorials.learningwaypoints.com/x/source.json', async () => { throw new Error('should not fetch'); });
+  assert.equal(p.name, 'Practice tracker');
+  assert.throws(() => parseSource('{"files":{}}'), /isn.t a lesson/);
+  assert.equal(parseSource(lesson).steps.length, 5);
+});
+
 test('tutorial links: ?lesson= names a lesson in the tutorials repo; ?tutorial= only from allowed sites', () => {
   const q = (s) => tutorialUrl(new URLSearchParams(s), 'https://tools.learningwaypoints.com/app-builder/');
-  assert.equal(q('lesson=code/apps/practice-tracker').url, 'https://raw.githubusercontent.com/edu-matthew-pham/waypoints-tutorials/main/content/code/apps/practice-tracker/lesson.md');
+  assert.equal(q('lesson=code/apps/practice-tracker').url, 'https://tutorials.learningwaypoints.com/code/apps/practice-tracker/source.json');
+  assert.equal(q('tutorial=https://tutorials.learningwaypoints.com/code/apps/practice-tracker/').url, 'https://tutorials.learningwaypoints.com/code/apps/practice-tracker/source.json');
+  assert.ok(q('tutorial=https://raw.githubusercontent.com/edu-matthew-pham/waypoints-tutorials/main/content/code/apps/practice-tracker/lesson.md').url);
   assert.ok(q('lesson=../../etc').error);
   assert.ok(q('tutorial=http://localhost:8000/l/lesson.md').url);
   assert.ok(q('tutorial=https://tutorials.learningwaypoints.com/a/lesson.md').url);

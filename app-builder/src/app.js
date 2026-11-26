@@ -12,7 +12,7 @@ import { initMap } from './views/map.js';
 import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './edu/features.js';
 import { embed } from './embed.js';
-import { parseLesson, loadStarter, tutorialUrl } from './edu/tutorial.js';
+import { parseSource, loadStarter, tutorialUrl } from './edu/tutorial.js';
 import { startTutorial } from './ui/tutorial-panel.js';
 import { sheetText } from './core/sheet-text.js';
 import { addBuiltinSounds, sources } from './core/assets.js';
@@ -436,7 +436,7 @@ if (tutorialLink?.error) notify(tutorialLink.error);
 else if (tutorialLink) {
   try {
     const get = async (url) => { const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status === 404 ? 'There is no lesson at that address.' : 'The lesson couldn\u2019t be loaded.'); return r.text(); };
-    lesson = parseLesson(await get(tutorialLink.url));
+    lesson = parseSource(await get(tutorialLink.url));
     const starter = await loadStarter(lesson, tutorialLink.url, get);
     if (starter) lessonStart = () => structuredClone(starter);
     if (!params.level && lesson.level) params.level = lesson.level;

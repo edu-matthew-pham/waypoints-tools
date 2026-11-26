@@ -38,9 +38,10 @@ Each lesson link keeps its own saved work in the browser, so students carry on w
 ## Guided tutorials (1.1)
 
 `?lesson=code/apps/practice-tracker` opens App Builder with a step card beside the editor, read straight from that
-Waypoints lesson (`content/<course>/<lesson>/lesson.md` in waypoints-tutorials), so the lesson stays the one source.
-`?tutorial=<url of a lesson.md>` does the same for any lesson on learningwaypoints.com, the tutorials repo, or
-localhost (handy while writing one). With neither, nothing changes.
+Waypoints lesson as published on the tutorials site (`<lesson>/source.json`, the file Create's "Make your own version"
+reads: `lesson.md` plus `app.json`), so the lesson stays the one source. `?tutorial=<url>` does the same for a lesson
+page's address, a `source.json` or a `lesson.md` on learningwaypoints.com, the tutorials repo on GitHub, or localhost
+(handy while writing one). With neither, nothing changes.
 
 From the lesson it takes each build step (a `## Step` whose step block has `try: { playground: appbuilder, keep }`;
 `### Tasks` become steps of their own) and shows:

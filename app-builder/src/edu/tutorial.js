@@ -1,6 +1,6 @@
 // Guided tutorials, read straight from a Waypoints lesson (waypoints-tutorials content/<course>/<lesson>/lesson.md).
 // The lesson stays the one source: the website shows it as a page, and App Builder shows the same steps beside the
-// editor when a link opens it with ?lesson=<course>/<lesson> (or ?tutorial=<url of a lesson.md>). Off otherwise.
+// editor when a link opens it with ?lesson=<course>/<lesson> (or ?tutorial=<url>). Off otherwise.
 //
 // What App Builder takes from the lesson (the tutorials' own format, tools/lesson-core.mjs there):
 //   ## Step title              one tutorial step per section whose ```step block has try: { playground: appbuilder, keep }
@@ -113,25 +113,41 @@ export function parseLesson(raw) {
 }
 const codeCheck = (c) => (c && c.type === 'code' && c.rules ? { text: String(c.text || ''), rules: c.rules } : null);
 
+// What a tutorial link fetches: a lesson.md, or the lesson's source.json from the tutorials site ({ title, files },
+// written beside each lesson page for Create's "Make your own version"), whose files hold lesson.md and app.json.
+export function parseSource(text) {
+  const t = String(text);
+  if (!t.trimStart().startsWith('{')) return parseLesson(t);
+  let src;
+  try { src = JSON.parse(t); } catch { throw new Error('The lesson file couldn\u2019t be read.'); }
+  const md = src?.files?.['lesson.md'];
+  if (typeof md !== 'string') throw new Error('That isn\u2019t a lesson.');
+  const tut = parseLesson(md);
+  for (const [name, body] of Object.entries(src.files)) if (name !== 'lesson.md' && typeof body === 'string' && !(name in tut.files)) tut.files[name] = body;
+  return tut;
+}
+
 // Which steps are done: a step with a check is done while its rules pass (so undoing un-ticks it).
 export const ticks = (tutorial, text) => tutorial.steps.map((s) => (s.check ? passes(s.check.rules, text) : null));
 
-// Where a tutorial comes from. ?lesson=code/apps/practice-tracker reads the lesson from the tutorials repo;
-// ?tutorial=<url> any lesson.md on an allowed site (Waypoints, the tutorials repo, or a local copy while writing one).
-export const LESSON_BASE = 'https://raw.githubusercontent.com/edu-matthew-pham/waypoints-tutorials/main/content/';
+// Where a tutorial comes from. ?lesson=code/apps/practice-tracker reads that lesson as published on the tutorials site
+// (its source.json), so the tutorial matches the page students see. ?tutorial=<url>: a lesson.md or source.json on an
+// allowed site (Waypoints, the tutorials repo on GitHub, or a local copy while writing one); a lesson page's own
+// address (ending in /) means its source.json.
+export const LESSON_BASE = 'https://tutorials.learningwaypoints.com/';
 const ALLOWED = [/^https:\/\/([a-z0-9-]+\.)*learningwaypoints\.com\//, /^https:\/\/raw\.githubusercontent\.com\/edu-matthew-pham\//, /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?\//];
 export function tutorialUrl(params, here) {
   const lesson = params.get('lesson');
   if (lesson) {
     if (!/^[\w-]+(\/[\w-]+)+$/.test(lesson)) return { error: `"${lesson}" isn’t a lesson name like code/apps/practice-tracker.` };
-    return { url: LESSON_BASE + lesson + '/lesson.md', id: lesson };
+    return { url: LESSON_BASE + lesson + '/source.json', id: lesson };
   }
   const t = params.get('tutorial');
   if (!t) return null;
   let url;
-  try { url = new URL(t, here).href; } catch { return { error: 'That tutorial link couldn’t be read.' }; }
+  try { url = new URL(t, here).href; if (url.endsWith('/')) url += 'source.json'; } catch { return { error: 'That tutorial link couldn’t be read.' }; }
   if (!ALLOWED.some((re) => re.test(url))) return { error: 'Tutorials open only from Learning Waypoints or its tutorials repo.' };
-  return { url, id: url.replace(/^https?:\/\//, '').replace(/\/lesson\.md$/, '') };
+  return { url, id: url.replace(/^https?:\/\//, '').replace(/\/(lesson\.md|source\.json)$/, '') };
 }
 
 // The starter project: `file#region` beside the lesson (or inline in it).
