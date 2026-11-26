@@ -222,6 +222,16 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
 
   draw();
   return {
+    // progress brought from another device (a Continue link or a saved file, carry.js) was just written to the keys
+    reload() {
+      try { tried = new Set(JSON.parse(store((ls) => ls.getItem(TRIED)) || '[]')); } catch { tried = new Set(); }
+      const n = Number(store((ls) => ls.getItem(KEY)));
+      at = Number.isInteger(n) && n >= 0 && n < tutorial.steps.length ? n : at;
+      ptr = 0; finished = false; open = true; cheer = -1;
+      done = ticks(tutorial, getSheet());
+      wasAt = at; wasComplete = complete(at); lastSig = sig(); // no "Step done" banner for progress that just arrived
+      draw();
+    },
     changed() {
       done = ticks(tutorial, getSheet());
       const now = sig();

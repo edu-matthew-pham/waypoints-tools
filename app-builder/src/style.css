@@ -735,6 +735,9 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
 
 /* share by link, and the play-only page a link opens */
 .share-link { width: 100%; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; margin: 6px 0; }
+.carry-qr { display: flex; flex-direction: column; align-items: center; margin: 10px 0 4px; }
+.carry-qr .qr { width: min(240px, 70vw); background: #fff; padding: 0; border-radius: 6px; line-height: 0; }
+.carry-qr .qr svg { width: 100%; height: auto; }
 #app.play-page { display: flex; flex-direction: column; height: 100vh; padding: 0; gap: 0; }
 .play-bar { margin: 0; flex: none; }
 .play-made { font-size: 12px; opacity: .8; margin-left: 4px; }

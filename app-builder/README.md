@@ -104,6 +104,7 @@ lesson, ticks; no DOM, tested in Node against a copy of the practice tracker les
     src/core/media.js       media references (media:7f3a09c2): finding them, ref -> loaded URL, data: URL <-> bytes
     src/media-store.js      the media store in IndexedDB: keep, load on start, move old uploads, tidy, forget
     src/project-file.js     Save and Open: .json, or a .zip with project.json + media/
+    src/carry.js            Continue on another device: { project, remembered, progress } in a link or a file (no DOM)
     src/core/zip.js         small zip writer (stored) and reader (stored or deflated)
     src/ui/screen-items.js  what the stage draws for one screen (shared by Design and Map)
     src/app.js              shell: top bar, tabs, save/open, wiring
@@ -365,4 +366,23 @@ app needs a new link. A shared app's Remember between visits data stays in each 
 Apps with their own pictures or sounds (uploads, recordings) are too big for a link: Share says so and offers Save.
 Typical links are 1–3k characters; over 8k, the dialog warns that some chat apps cut long links. Inside the tutorials,
 the link points at the tutorials site's copy of App Builder, so a student can send a teacher their app from a lesson.
+
+## Continue on another device (26 Nov 2026)
+
+For carrying on at home or on another computer, with no accounts and no server (`src/carry.js`). One shape travels:
+the app, what Remember between visits kept, and, in a guided tutorial, the step and what's been tried
+(`progress`: `{ tutorial, link, step, tried, title }`, read from the tutorial panel's own keys).
+- **Other device** (toolbar) makes a link, `<the tutorial's address>#continue=…`, plus a QR code for tablets (links up
+  to 2,000 characters; `qrcode-generator`, MIT, bundled). Opening it loads the app as the student's own (the app they
+  had on that computer goes to Recent), puts back what it kept, and carries on at the same tutorial step. It's a copy
+  made at that moment: nothing syncs back.
+- Apps with their own pictures or recordings (or kept data holding them) don't fit in a link: Other device offers Save,
+  suggesting the student's OneDrive or Google Drive folder, then Open… on the other computer.
+- **Saved files carry the step too** (`progress` in `project.json`, beside `remembered`). Opening one in the same
+  tutorial carries on at that step. Opened anywhere else (plain App Builder at home, say), App Builder asks: **Go to the
+  tutorial** (the app, its kept data and the step are put in place for that tutorial's page first, and anything already
+  being built there goes to that page's Recent) or **Just the app**. Older files and links without progress open as
+  before.
+- Signing in to save straight to a student's own drive could come later as one more place for the same shape
+  (ROADMAP › Sign in to save to your drive).
 

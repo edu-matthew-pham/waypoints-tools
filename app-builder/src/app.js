@@ -30,6 +30,8 @@ import { modal } from './ui/sheet-dialogs.js';
 import { openMenu } from './ui/menu.js';
 import { encodeApp, decodeApp, canShareByLink } from './core/share-link.js';
 import { startPlay } from './play-page.js';
+import { storeKeyFor, readProgress, writeProgress, fitsInLink, encodeCarry, decodeCarry, tutorialLinkPart } from './carry.js';
+import qrcode from 'qrcode-generator';
 
 // ?sample=water opens that lesson project. Each lesson link keeps its own saved work, so a student who
 // comes back (or refreshes) carries on where they were; "Start again" reloads the original.
@@ -40,8 +42,7 @@ const storeId = QS.get('store') || QS.get('id'); // ?id= is a Waypoints lesson s
 // ?lesson=code/apps/practice-tracker (or ?tutorial=<url>): a guided tutorial read from that lesson (edu/tutorial.js).
 // Off without one of these, so nothing changes for normal use or in the lessons' own clips.
 const tutorialLink = tutorialUrl(QS, location.href);
-const STORE_KEY = storeId ? 'appbuilder.store.' + storeId : tutorialLink?.id ? 'appbuilder.tutorial.' + tutorialLink.id
-  : lessonId ? 'appbuilder.lesson.' + lessonId : 'appbuilder.prototype.v1';
+const STORE_KEY = storeKeyFor(location.search, location.href); // ?store=, then a tutorial, then ?sample=, else the playground
 let tutorial = null; // the step card, once loaded
 const store = (fn) => { try { return fn(localStorage); } catch { return null; } };
 S.storeKey = STORE_KEY;
@@ -154,6 +155,7 @@ function renderTop() {
     again: '<path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5"/>',
     new: '<path d="M12 5v14M5 12h14"/>',
     recent: '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+    carry: '<rect x="3" y="5" width="13" height="10" rx="1"/><path d="M1 18h17"/><rect x="18" y="9" width="5" height="10" rx="1"/>',
     share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
   };
   const icon = (k) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.setAttribute('fill', 'none'); s.setAttribute('stroke', 'currentColor'); s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round'); s.setAttribute('aria-hidden', 'true'); s.innerHTML = ICON[k]; return s; };
@@ -169,7 +171,8 @@ function renderTop() {
       S.locked ? '' : h('button', { class: 'btn', 'data-ab': 'recent', title: 'Apps you had before in this browser', 'aria-haspopup': 'menu', onclick: (e) => recentMenu(e.currentTarget) }, icon('recent'), 'Recent'),
       h('button', { class: 'btn primary', 'data-ab': 'save', title: saveTo ? `Save to ${saveTo.handle.name} (Ctrl+S)` : 'Save this app as a file (Ctrl+S)', onclick: () => saveFile() }, icon('save'), 'Save'),
       h('button', { class: 'btn', 'data-ab': 'share', title: 'Share a link to your working app', onclick: shareApp }, icon('share'), 'Share'),
-      canPick ? h('button', { class: 'btn icon-only save-as', 'data-ab': 'save-as', title: 'Save as… a new file (Ctrl+Shift+S)', onclick: () => saveFile({ as: true }) }, h('span', { 'aria-hidden': 'true' }, '▾'), h('span', { class: 'lbl' }, 'Save as…')) : ''),
+      canPick ? h('button', { class: 'btn icon-only save-as', 'data-ab': 'save-as', title: 'Save as… a new file (Ctrl+Shift+S)', onclick: () => saveFile({ as: true }) }, h('span', { 'aria-hidden': 'true' }, '▾'), h('span', { class: 'lbl' }, 'Save as…')) : '',
+      h('button', { class: 'btn', 'data-ab': 'continue', title: 'Carry on with this app (and your tutorial step) on another computer or tablet', onclick: continueElsewhere }, icon('carry'), 'Other device')),
     h('span', { class: 'grp' },
       h('button', { class: 'btn icon-only', 'data-ab': 'undo', disabled: !history.canUndo, title: 'Undo (Ctrl+Z)', onclick: () => undo(-1) }, icon('undo'), h('span', { class: 'lbl' }, 'Undo')),
       h('button', { class: 'btn icon-only', 'data-ab': 'redo', disabled: !history.canRedo, title: 'Redo (Ctrl+Shift+Z)', onclick: () => undo(1) }, icon('redo'), h('span', { class: 'lbl' }, 'Redo'))),
@@ -201,14 +204,14 @@ function recentApps() {
 }
 const emptyApp = (p) => p.screens.length <= 1 && !p.variables.length && !(p.assets || []).length && !(p.sounds || []).length
   && p.screens.every((s) => !s.events.length) && !(p.allScreens?.events || []).length && !(p.functions || []).length;
-function keepInRecent(p) {
+function keepInRecent(p, key = RECENT_KEY) {
   if (!p || emptyApp(p)) return;
   const json = JSON.stringify(p);
-  let list = recentApps().filter((r) => r.json !== json);
+  let list = (key === RECENT_KEY ? recentApps() : (() => { try { return JSON.parse(store((ls) => ls.getItem(key)) || '[]'); } catch { return []; } })()).filter((r) => r.json !== json);
   list.unshift({ name: p.name || 'Untitled app', at: Date.now(), json });
   list = list.slice(0, RECENT_MAX);
   // full storage: drop the oldest until it fits (the app itself is already saved separately)
-  while (list.length && !store((ls) => { ls.setItem(RECENT_KEY, JSON.stringify(list)); return true; })) list.pop();
+  while (list.length && !store((ls) => { ls.setItem(key, JSON.stringify(list)); return true; })) list.pop();
 }
 const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`; };
 function recentMenu(btn) {
@@ -289,7 +292,7 @@ async function writeTo(handle, remembered, target) {
   // the app gained its first picture or recording since: a .json file can't hold it, so ask for a new place
   if (savesAsZip(S.project, remembered) !== target.zip) { saveTo = null; notify('This app now has pictures or sounds, so it saves as a .zip: choose where.'); saveFile({ as: true }); return; }
   let file;
-  try { file = await buildSave(S.project, remembered); } catch (e) { notify('Could not save: ' + (e?.message || 'unknown problem')); return; }
+  try { file = await buildSave(S.project, remembered, progressNow()); } catch (e) { notify('Could not save: ' + (e?.message || 'unknown problem')); return; }
   missingNote(file);
   try {
     if ((await handle.queryPermission?.({ mode: 'readwrite' })) === 'prompt') await handle.requestPermission({ mode: 'readwrite' });
@@ -309,7 +312,7 @@ function missingNote(file) {
 }
 async function download(remembered) {
   let file;
-  try { file = await buildSave(S.project, remembered); } catch (e) { notify('Could not save: ' + (e?.message || 'unknown problem')); return; }
+  try { file = await buildSave(S.project, remembered, progressNow()); } catch (e) { notify('Could not save: ' + (e?.message || 'unknown problem')); return; }
   missingNote(file);
   // Hosted pages can't start downloads themselves; use the page-download feature when it exists.
   try {
@@ -338,13 +341,86 @@ async function openFile() {
 }
 async function openFrom(fileObj, handle) {
   try {
-    const { project, remembered, missing } = await readProjectFile(fileObj);
+    const { project, remembered, progress, missing } = await readProjectFile(fileObj);
     // what the app kept while running goes back first, so its pictures and recordings load with the project
     if (remembered) store((ls) => { for (const [k, v] of Object.entries(remembered)) ls.setItem(`${STORE_KEY}.remember.${k}`, JSON.stringify(v)); });
     await loadProject(project);
     if (handle) { saveTo = { handle, zip: /\.zip$/i.test(handle.name), kept: !!remembered }; renderTop(); }
     if (missing) notify(`${missing} picture${missing === 1 ? '' : 's'} or recording${missing === 1 ? '' : 's'} weren’t in the file.`);
+    if (progress) carryOn({ project, remembered, progress });
   } catch (e) { notify('Could not open that file: ' + e.message); }
+}
+
+// ---------------- continue on another device (carry.js) ----------------
+// Where the student is in this page's guided tutorial (null without one): it goes into saved files and Continue links.
+function progressNow() {
+  if (!tutorial || !tutorialLink?.id) return null;
+  const p = readProgress(store, tutorialLink.id, location.search);
+  return p && tutorialTitle ? { ...p, title: tutorialTitle } : p;
+}
+let tutorialTitle = '';
+// Progress that came with a file or link. This page's tutorial: carry on at that step. Another tutorial (or none open,
+// e.g. plain App Builder at home): offer to go to it, with the app, what it kept and the step already in place there.
+function carryOn({ project, remembered, progress }) {
+  if (tutorial && progress.tutorial === tutorialLink?.id) {
+    writeProgress(store, progress); tutorial.reload();
+    notify(`Carrying on with the tutorial at step ${progress.step + 1}.`);
+    return;
+  }
+  const name = progress.title ? `“${progress.title}”` : 'a guided tutorial';
+  const { close } = modal('Carry on with the tutorial?',
+    h('p', {}, `This app comes from ${name}, where you were at step ${progress.step + 1}. Go to the tutorial to carry on there, or keep the app open here without it.`),
+    [h('button', { class: 'btn', type: 'button', 'data-ab': 'carry-stay', onclick: () => close() }, 'Just the app'),
+      h('button', { class: 'btn primary', type: 'button', 'data-ab': 'carry-go', onclick: () => {
+        const key = storeKeyFor(progress.link, location.href);
+        if (key !== STORE_KEY) {
+          // anything already being built there on this computer goes into that page's Recent, never lost
+          try { keepInRecent(JSON.parse(store((ls) => ls.getItem(key)) || 'null'), key + '.recent'); } catch { /* none */ }
+          store((ls) => ls.setItem(key, JSON.stringify(project)));
+          if (remembered) store((ls) => { for (const [k, v] of Object.entries(remembered)) ls.setItem(`${key}.remember.${k}`, JSON.stringify(v)); });
+        }
+        writeProgress(store, progress);
+        location.href = location.pathname + progress.link;
+      } }, 'Go to the tutorial')]);
+}
+async function continueElsewhere() {
+  const remembered = rememberedNow(), progress = progressNow();
+  const carry = { project: S.project, remembered: Object.keys(remembered).length ? remembered : null, progress };
+  const what = 'this app' + (carry.remembered ? ', what it has kept,' : '') + (progress ? ' and your tutorial step' : '');
+  if (!fitsInLink(carry)) {
+    const { close } = modal('Continue on another device',
+      h('div', {},
+        h('p', {}, `This app has pictures or recordings of its own, which are too big for a link. Save it as a file instead: it holds ${what}.`),
+        h('p', {}, 'Save it somewhere you can reach from the other computer, like your OneDrive or Google Drive, then use Open… in App Builder there.')),
+      [h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close'), h('button', { class: 'btn primary', type: 'button', 'data-ab': 'continue-save', onclick: () => { close(); saveFile(); } }, 'Save the file')]);
+    return;
+  }
+  let url;
+  try { url = location.origin + location.pathname + tutorialLinkPart(location.search) + '#continue=' + await encodeCarry(carry); } catch (e) { notify('Could not make a link: ' + (e?.message || 'unknown problem')); return; }
+  const box = h('input', { class: 'ctl share-link', readonly: '', value: url, 'aria-label': 'Link to carry on with your app', 'data-ab': 'continue-link', onfocus: (e) => e.target.select() });
+  const copy = h('button', { class: 'btn primary', type: 'button', 'data-ab': 'continue-copy', onclick: async () => {
+    try { await navigator.clipboard.writeText(url); copy.textContent = 'Copied'; } catch { box.focus(); box.select(); copy.textContent = 'Press Ctrl+C to copy'; }
+  } }, 'Copy link');
+  const qr = qrFor(url);
+  const { close } = modal('Continue on another device',
+    h('div', {},
+      h('p', {}, `Open this link on the other computer to carry on: it brings ${what}. Email it to yourself, or put it somewhere you can reach from there.`),
+      box,
+      qr ? h('div', { class: 'carry-qr' }, qr, h('p', { class: 'muted small' }, 'Or scan this with a tablet or phone camera.'))
+        : h('p', { class: 'muted small' }, 'This app is too big for a QR code: copy the link instead.'),
+      h('p', { class: 'muted small' }, 'The link is a copy, made now: changes on the other device don’t come back here. Carry on in one place at a time, and make a new link when you move again. Nothing is uploaded: everything is inside the link.')),
+    [h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close'), copy]);
+}
+// a QR code for the link (an <svg>), or null when the link is too long to scan easily from a screen
+const QR_MAX = 2000;
+function qrFor(url) {
+  if (url.length > QR_MAX) return null;
+  try {
+    const q = qrcode(0, 'L'); q.addData(url, 'Byte'); q.make();
+    const box = h('div', { class: 'qr', 'data-ab': 'continue-qr', role: 'img', 'aria-label': 'QR code of the link' });
+    box.innerHTML = q.createSvgTag({ cellSize: 4, margin: 4, scalable: true });
+    return box;
+  } catch { return null; }
 }
 
 // Share by link (core/share-link.js): the whole app inside the link; it opens just the working app (#play=), with a
@@ -413,7 +489,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // a shared link pasted into this same tab only changes the # part, which doesn't reload the page: start again
-addEventListener('hashchange', () => { if (/^#(play|open)=/.test(location.hash)) location.reload(); });
+addEventListener('hashchange', () => { if (/^#(play|open|continue)=/.test(location.hash)) location.reload(); });
 
 // ---------------- guided tutorial: Try the finished app ----------------
 // The lesson's finished app, running in a player over the editor: the student's own app is never swapped out.
@@ -482,10 +558,26 @@ if (location.hash.startsWith('#open=')) {
   try { await loadProject(await decodeApp(code)); notify('This is your own copy of the shared app. The app you had before is in Recent.'); }
   catch { notify('That link couldn\u2019t be opened: it may have been cut short.'); }
 }
+// #continue=…: "Continue on another device" from this student's own app (carry.js): the app, what it kept, and the
+// tutorial step. The tutorial (started below) reads the step it brought. Your current app goes to Recent.
+let carried = null;
+if (location.hash.startsWith('#continue=')) {
+  const code = location.hash.slice(10);
+  window.history.replaceState(null, '', location.pathname + location.search);
+  try {
+    carried = await decodeCarry(code);
+    if (carried.remembered) store((ls) => { for (const [k, v] of Object.entries(carried.remembered)) ls.setItem(`${STORE_KEY}.remember.${k}`, JSON.stringify(v)); });
+    await loadProject(carried.project);
+    if (carried.progress && lesson && carried.progress.tutorial === tutorialLink.id) { writeProgress(store, carried.progress); carried = null; }
+    notify('Carrying on from the other device. The app you had here before is in Recent.');
+  } catch { carried = null; notify('That link couldn\u2019t be opened: it may have been cut short.'); }
+}
 refresh();
 const tab = new URLSearchParams(location.search).get('tab');
 if (tab && tabViews[tab] !== undefined) setTab(tab);
 window.__app = { S, setTab, loadProject }; // handy for debugging and tests
+if (lesson) tutorialTitle = lesson.title || '';
+if (carried?.progress) carryOn(carried); // a step for a tutorial that isn't open here
 if (lesson) tutorial = startTutorial({ tutorial: lesson, id: tutorialLink.id, lessonUrl: tutorialLink.url, getSheet: () => sheetText(S.project), getTab: () => S.tab, getProject: () => S.project, store,
   onPlay: (ref, opts) => playFinished(lesson, ref, opts) });
 

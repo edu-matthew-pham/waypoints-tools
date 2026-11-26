@@ -351,6 +351,27 @@ Possible next steps, only if classes need them:
 - a link from each App Builder lesson page on the tutorials site ("Open as a guided tutorial");
 - a generator that drafts a lesson's steps from a finished project, for a teacher to edit.
 
+## Continue on another device *(built 26 Nov 2026; README › Continue on another device)*
+
+Matthew, 26 Nov 2026: guided progress should carry across devices. Chosen: no accounts for now (option 3 of the Project
+doc handoff-app-builder-accounts), a Continue link with a QR code, and the tutorial step inside saved files, all through
+one shape in `src/carry.js`, so a drive can be added later as one more place for it.
+
+## Sign in to save to your drive *(aim, not built; 26 Nov 2026, Matthew)*
+
+Optional, never required: "Sign in to save to your drive", Microsoft (MSAL, the OneDrive app folder) and Google
+(Identity Services, `drive.file`), entirely in the browser, as new places for `carry.js`'s shape. Data stays in the
+student's own school drive; App Builder stores nothing. One provider first: whichever a trial school uses.
+- Costs: free app registrations; Microsoft publisher verification (free Partner ID); Google brand verification; a
+  privacy page; upkeep as the sign-in libraries change.
+- Each school's admin has to allow it: Microsoft school tenants usually need admin consent, and Google Workspace for
+  Education blocks unconfigured apps for under-18 accounts. Schools that don't still have Continue and files.
+- Pictures and recordings (IndexedDB) must go to the drive too; plan for a drive copy and a browser copy drifting
+  apart (last saved wins, with a warning).
+- The providers' file pickers need the same registration and sign-in, so they belong here too.
+- Start when a school asks, or class trials show links and files aren't enough. Not planned: App Builder's own
+  accounts on a server (minors' data, privacy obligations, running costs).
+
 ## Considered, not planned
 
 - **Editing media** (Matthew, 26 Nov 2026): picture editing fits (drawing on a picture is built; simple edits such as crop

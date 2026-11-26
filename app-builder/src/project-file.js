@@ -6,10 +6,12 @@
 // ordinary zip someone can look inside.
 // "Data made while running" (what Remember between visits kept: rows, lists, drawings, photos, recordings) is included
 // when asked, as project.json's "remembered": { name: value }; Open puts it back for this App Builder.
+// Where the student is in a guided tutorial goes in as "progress" (see carry.js), so they can carry on elsewhere.
 import { collectRefs, refFile, bytesToDataUrl } from './core/media.js';
 import { makeZip, readZip, isZip } from './core/zip.js';
 import { getFile, keepAs, available } from './media-store.js';
 import { VERSION } from './version.js';
+import { validProgress } from './carry.js';
 
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
   'audio/mpeg': 'mp3', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
@@ -18,9 +20,10 @@ const baseType = (t) => String(t || '').split(';')[0];
 const fileName = (name, ext) => (name || 'app').replace(/[^\w-]+/g, '-') + ext;
 
 // -> { filename, data (string or Uint8Array), type, missing }
-export async function buildSave(project, remembered = null) {
+export async function buildSave(project, remembered = null, progress = null) {
   const out = { appBuilder: VERSION, ...structuredClone(project) }; // which version saved it, for later upgrades
   if (remembered && Object.keys(remembered).length) out.remembered = remembered;
+  if (progress) out.progress = progress;
   const refs = [...collectRefs(out)];
   if (!refs.length) return { filename: fileName(project.name, '.app.json'), data: JSON.stringify(out, null, 2), type: 'application/json', missing: 0 };
   const files = [], media = {};
@@ -41,7 +44,7 @@ export async function buildSave(project, remembered = null) {
 export const savesAsZip = (project, remembered = null) => collectRefs([project, remembered]).size > 0;
 export const saveName = (project, zip) => fileName(project.name, zip ? '.app.zip' : '.app.json');
 
-// a File (or bytes) -> { project, remembered, missing }
+// a File (or bytes) -> { project, remembered, progress, missing }
 export async function readProjectFile(file) {
   const bytes = file instanceof Uint8Array ? file : new Uint8Array(await file.arrayBuffer());
   if (!isZip(bytes)) return split(JSON.parse(new TextDecoder().decode(bytes)), 0);
@@ -73,7 +76,8 @@ export async function readProjectFile(file) {
 }
 function split(p, missing) {
   const remembered = p.remembered && typeof p.remembered === 'object' ? p.remembered : null;
-  delete p.remembered; delete p.mediaFiles; delete p.appBuilder;
-  return { project: p, remembered, missing };
+  const progress = validProgress(p.progress) ? p.progress : null;
+  delete p.remembered; delete p.mediaFiles; delete p.appBuilder; delete p.progress;
+  return { project: p, remembered, progress, missing };
 }
 export { refFile };
