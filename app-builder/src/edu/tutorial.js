@@ -57,8 +57,12 @@ export function targetsOf(clip) {
   for (const a of Array.isArray(clip) ? clip : []) {
     if (!a || typeof a !== 'object') continue;
     if (a.caption) caption = typeof a.caption === 'string' ? a.caption : a.caption.text || '';
+    // a single letter pressed straight after a click picks a dropdown's option by its first letter
+    if (typeof a.press === 'string' && a.press.length === 1 && out.length && out[out.length - 1].action === 'click' && !out[out.length - 1].key) { out[out.length - 1].key = a.press; continue; }
+    // Escape in a clip closes a dialog without choosing (e.g. clicking a condition to select its event): Cancel
+    if (a.press === 'Escape') { out.push({ selector: "dialog[open] [data-ab='cancel']", action: 'click', caption: 'Close this (Cancel): the event stays selected.', closes: true }); continue; }
     const sel = a.click?.selector || a.type?.selector;
-    if (sel) out.push({ selector: sel, action: a.click ? 'click' : 'type', caption });
+    if (sel) out.push({ selector: sel, action: a.click ? 'click' : 'type', caption, ...(a.type ? { text: String(a.type.text ?? '') } : {}) });
   }
   return out;
 }
@@ -112,8 +116,11 @@ export function todo(rules, text) {
       const m = String(f).trim().match(/^(?:object (\w+) )?\(([^)]+)\)$/);
       const c = m && KIND_BY_LABEL[m[2].toLowerCase()];
       if (c) return { type: 'object', name: m[1] || '', kind: c.id, label: `a ${c.label}${m[1] ? ` called ${m[1]}` : ''}` };
-      const v = String(f).trim().match(/^(variable|list|table) (\w+)( =)?$/);
-      if (v) return { type: v[1] === 'variable' ? 'variable' : 'other', name: v[2], label: `a ${v[1]} called ${v[2]}` };
+      const v = String(f).trim().match(/^(variable|list|table) (\w+)(?: =\s*(.*))?$/);
+      if (v) {
+        let value = v[3] ?? ''; try { if (value) value = String(JSON.parse(value)); } catch { /* as written */ }
+        return { type: v[1] === 'variable' ? 'variable' : 'other', name: v[2], value, label: `a ${v[1]} called ${v[2]}${value !== '' ? `, starting at ${value}` : ''}` };
+      }
       return { type: 'other', label: String(f) };
     }),
     ...(rules.event || []).map((fs) => ({ type: 'event', frags: [].concat(fs).map(String), label: 'an event: ' + [].concat(fs).join(' \u2026 ') })),
@@ -162,9 +169,9 @@ export function parseLesson(raw) {
         const nl2 = s.indexOf('\n');
         const task = Array.isArray(config.tasks) ? config.tasks[n] || {} : {};
         steps.push({ title: (nl2 === -1 ? s : s.slice(0, nl2)).trim(), part: title, body: [n === 0 ? lead : '', nl2 === -1 ? '' : s.slice(nl2 + 1).trim()].filter(Boolean).join('\n\n'),
-          check: codeCheck(task.check), targets: n === 0 ? targets : targetsOf(task.clip), tries: n === 0 ? triesOf(config.clip) : triesOf(task.clip), clip: n === 0 ? clip : '' });
+          check: codeCheck(task.check), targets: n === 0 ? targets : targetsOf(task.clip), tries: n === 0 ? triesOf(config.clip) : triesOf(task.clip), clip: n === 0 ? clip : '', start: String(t.starter || '') });
       });
-    } else steps.push({ title, body: body.trim(), check: codeCheck(config.check), targets, tries: triesOf(config.clip), clip });
+    } else steps.push({ title, body: body.trim(), check: codeCheck(config.check), targets, tries: triesOf(config.clip), clip, start: String(t.starter || '') }); // start: the lesson's starter for this step
   }
   if (keep === undefined) throw new Error('This lesson has no App Builder build steps to guide.');
   return { title: meta.title ? String(meta.title) : 'Tutorial', starter: starter || '', level: Number(level) || null, steps, files };
