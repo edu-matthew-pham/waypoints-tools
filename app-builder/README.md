@@ -253,6 +253,11 @@ Level 4 (or a lesson allow-list that names a table action). Plan: tutorials Proj
 - Sheet text: `object Music (sound) text "" sound calm`, `object Clip (video) text "" link "https://…"`.
 - Tests: `tests/media.test.js`.
 
+**Show a player** (1.5): a Sound's Properties tick, on by default. Untick it for background music or sound effects: the
+Sound takes no space while the app runs and still plays from events (Play, Stop), like Construct's Audio. In Design it
+shows faded, labelled "no player: plays from events", so it can still be found and selected. Its credit (the open
+licences ask for one) then shows in a line under the running app. The sheet text adds "(no player)".
+
 ## Media store (ROADMAP §10, step 1, 26 Nov 2026)
 
 Uploaded pictures and sounds are kept as files in the browser's IndexedDB (database `appbuilder-media`): this site's
@@ -279,6 +284,11 @@ files have a `data:` URL there instead, which still works.
   Open in a fresh browser, tidy keeps another lesson's file, missing-file notice). See ROADMAP › Testing.
 
 ## Drawing and Photo (ROADMAP §10, step 2, 26 Nov 2026; Level 3)
+
+**Choose a photo** (1.5): a button on every Photo, beside the shutter, that opens the device's file picker (images
+only, up to about 5 MB like uploads). The picture is shrunk like the camera's photos (at most 1280 px, JPEG), kept in
+the media store, shown in the Photo, set as `Photo.picture`, and runs *A photo is taken with*, just like the shutter.
+It works with Allow camera off, so it is the way in where cameras are blocked.
 
 Pictures made while the app runs. Like an upload, each one is a file in the media store, and the app holds a reference
 (`media:7f3a09c2`) that can go in a variable, a list or a table, and is shown by an Image.

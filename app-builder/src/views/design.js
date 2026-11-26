@@ -123,6 +123,9 @@ export function initDesign(root) {
             S.project.sounds.push({ name, ...await keep(data), title: fileName.replace(/\.[^.]*$/, '') });
             inst.sound = name; hooks.commit();
           }, hooks.notify) }, '+ Upload sound')),
+        h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: inst.player !== false, 'data-ab': 'prop:player',
+          onchange: (e) => { inst.player = e.target.checked; hooks.commit(); } }),
+          h('span', {}, 'Show a player (▶ and the title). Untick for background music or sound effects: it takes no space while the app runs and still plays from events, and its credit shows under the app.')),
         h('p', { class: 'muted small' }, info ? `${info.title}: ${info.credit}. ` : '', 'Leave Text empty to show the sound\u2019s title.'));
     }
     if (obj.kind === 'video') {
@@ -164,7 +167,7 @@ export function initDesign(root) {
         h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: inst.shutter !== false, 'data-ab': 'prop:shutter',
           onchange: (e) => { inst.shutter = e.target.checked; hooks.commit(); } }),
           h('span', {}, 'Show a take-photo button (or hide it and take photos with your own button: Take a photo with)')),
-        h('p', { class: 'muted small' }, 'The camera starts when the user taps the Photo. "A photo is taken with" runs when they tap its take-photo button; Photo.picture is the photo, ready for an Image or a table. Photos stay in this browser.'));
+        h('p', { class: 'muted small' }, 'The camera starts when the user taps the Photo. "A photo is taken with" runs when they tap its take-photo button, or choose a photo from the device with Choose a photo (always there, so it works where cameras are blocked). Photo.picture is the photo, ready for an Image or a table. Photos stay in this browser.'));
     }
     if (obj.kind === 'list') {
       const lists = S.project.variables.filter(isList).map((v) => v.name);

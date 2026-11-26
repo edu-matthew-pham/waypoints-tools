@@ -65,7 +65,9 @@ export class Player {
     });
     // shown under the app when its events use the keyboard, until the app has focus
     this.hint = h('p', { class: 'kb-hint', hidden: true }, 'This app uses the keyboard: click it first, then press keys.');
-    host.append(this.hint);
+    // credits for sounds that play without a player (their ▶ and credit aren't on the screen), as the open licences ask
+    this.credits = h('p', { class: 'app-credits', hidden: true });
+    host.append(this.hint, this.credits);
     this.store = store;
     this.on = { onDraw, onEventRan, onScreen, onStop };
     this.openLink = openLink || ((link) => { try { window.open(link, '_blank', 'noopener'); } catch { /* blocked */ } });
@@ -87,9 +89,11 @@ export class Player {
         onScreen: (scr) => this.on.onScreen?.(scr, rt.project),
         openLink: (link) => this.openLink(link),
         snapshot: (id) => { const d = this.stage.snapshot(id); return d ? this.keepMedia(d) : null; },
+        keepPicture: (dataUrl) => this.keepMedia(dataUrl), // Choose a photo
       },
     });
     this.rt = rt;
+    this.#credits(project);
     rt.start(screenId);
     this.draw();
     let last = performance.now();
@@ -102,6 +106,21 @@ export class Player {
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
+  }
+
+  #credits(project) {
+    const seen = new Set(), lines = [];
+    for (const sc of project.screens || []) for (const o of sc.objects || []) {
+      if (o.kind !== 'sound') continue;
+      for (const i of o.instances || []) {
+        if (i.player !== false || seen.has(i.sound)) continue;
+        seen.add(i.sound);
+        const info = mediaLookups.sound(i.sound);
+        if (info?.credit) lines.push(`${info.title}: ${info.credit}`);
+      }
+    }
+    this.credits.textContent = lines.length ? '\u266A ' + lines.join(' \u00B7 ') : '';
+    this.credits.hidden = !lines.length;
   }
 
   focus() { this.stage.el.focus({ preventScroll: true }); }

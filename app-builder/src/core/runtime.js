@@ -165,6 +165,8 @@ export class Runtime {
     } else if (inst.kind === 'photo') {
       if (value?.shoot) { // the Photo's own take-photo button: take it, then "a photo is taken" runs
         try { this.takePhoto(inst); } catch (e) { this.#error(null, e.message); return; }
+      } else if (typeof value?.chosen === 'string') { // Choose a photo: a picture from the device, then the same event
+        this.setProp(inst, 'picture', this.hooks.keepPicture?.(value.chosen) || value.chosen);
       } else {
         inst.props.ready = !!value; // the camera started (or stopped); not an event of its own
         this.#changed();

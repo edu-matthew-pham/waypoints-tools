@@ -204,15 +204,19 @@ export const RENDER = {
       // nothing to latch onto before that (and never in Design)
       const el = h('div', { class: 'pho' }), msg = h('div', { class: 'pho-msg' });
       const shutter = h('button', { type: 'button', class: 'pho-shutter', 'aria-label': 'Take a photo', title: 'Take a photo', hidden: true });
-      el.append(msg, shutter);
+      // Choose a photo: a picture from the device instead of the camera. Always there, so it is the way in where cameras
+      // are blocked or Allow camera is off. Like the shutter, it sets Photo.picture and runs "A photo is taken with".
+      const choose = h('button', { type: 'button', class: 'pho-choose', 'data-ab': 'photo-choose', 'aria-label': 'Choose a photo', title: 'Choose a photo from this device', disabled: design ? true : null }, '\u{1F5BC} Choose a photo');
+      el.append(msg, shutter, choose);
       Object.assign(el, { _v: null, _msg: msg, _design: design, _shutter: shutter, _shutterOn: true });
       shutter.addEventListener('click', () => { if (el._stream) report(el, { shoot: true }); });
-      msg.textContent = design ? '📷 Camera: the user taps here to start it when the app runs' : '📷 Tap to start the camera';
+      choose.addEventListener('click', (e) => { e.stopPropagation(); choosePhoto(el); });
+      msg.textContent = design ? '📷 Camera: the user taps here to start it when the app runs, or chooses a photo' : '📷 Tap to start the camera';
       if (design) return el;
       el.addEventListener('click', () => { if (!el._stream) startCamera(el); });
       return el;
     },
-    write: (el, p) => { el._shutterOn = p.shutter !== false; el._shutter.hidden = !(el._stream && el._shutterOn); if (el._design) return; if (!el._stream && !el._starting && !media.camera()) el._msg.textContent = '📷 The camera is off for this app. To use it, tick Allow camera in the Photo\u2019s properties (Design).'; else if (!el._stream && !el._starting && !el._failed) el._msg.textContent = '📷 Tap to start the camera'; },
+    write: (el, p) => { el._shutterOn = p.shutter !== false; el._shutter.hidden = !(el._stream && el._shutterOn); if (el._design) return; if (el._chosen) return; if (!el._stream && !el._starting && !media.camera()) el._msg.textContent = '📷 The camera is off for this app: choose a photo instead. (To use the camera, tick Allow camera in the Photo\u2019s properties.)'; else if (!el._stream && !el._starting && !el._failed) el._msg.textContent = '📷 Tap to start the camera'; },
     read: (t) => (t.classList?.contains('pho') ? t._value : !!t.srcObject?.active),
     snapshot: (el) => {
       const v = el._v;
@@ -312,6 +316,37 @@ function paint(el) {
   }
   for (const line of el._lines) drawLine(ctx, line);
 }
+// Choose a photo: read a picture file, shrink it like the camera's photos (at most 1280 px, JPEG), show it in the Photo,
+// and hand it to the runtime as a data: URL (the Player keeps it in the media store and passes on its reference).
+// The same size limit as uploads (about 5 MB).
+const CHOOSE_CAP = 5_000_000;
+function choosePhoto(el) {
+  const input = h('input', { type: 'file', accept: 'image/*' });
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    const say = (t) => { el._msg.textContent = t; };
+    if (!file.type.startsWith('image/')) { say('🖼 That isn\u2019t a picture. Choose a photo or another image.'); return; }
+    if (file.size > CHOOSE_CAP) { say('🖼 That picture is too big. Try a smaller one (under about 5 MB).'); return; }
+    try {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      await new Promise((ok, fail) => { img.onload = ok; img.onerror = fail; img.src = url; });
+      const s = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = h('canvas', {});
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      const data = c.toDataURL('image/jpeg', 0.85);
+      if (!el._stream) { // show what was chosen (with the camera on, the camera stays the picture)
+        if (!el._pic) { el._pic = h('img', { class: 'pho-pic', alt: 'The chosen photo' }); el.prepend(el._pic); }
+        el._pic.src = data; el._chosen = true; say('');
+      }
+      report(el, { chosen: data });
+    } catch { say('🖼 That picture couldn\u2019t be read. Try another one.'); }
+  });
+  input.click();
+}
 async function startCamera(el) {
   const say = (t) => { el._msg.textContent = t; };
   if (!media.camera()) return; // write() already says how to turn it on
@@ -322,6 +357,7 @@ async function startCamera(el) {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } }, audio: false });
     if (!el.isConnected) { stream.getTracks().forEach((t) => t.stop()); return; }
     el._stream = stream;
+    if (el._pic) { el._pic.remove(); el._pic = null; el._chosen = false; } // the camera replaces a chosen photo on screen
     if (!el._v) { el._v = h('video', { playsinline: '', muted: '', autoplay: '' }); el._v.muted = true; el.prepend(el._v); }
     el._v.srcObject = stream;
     await el._v.play().catch(() => {});

@@ -123,6 +123,7 @@ export class Stage {
       const p = it.props, s = n.wrap.style;
       s.left = p.x + 'px'; s.top = p.y + 'px'; s.width = p.w + 'px'; s.height = p.h + 'px';
       n.wrap.classList.toggle('hidden', p.visible === false);
+      n.wrap.classList.toggle('noplayer', it.kind === 'sound' && p.player === false); // plays from events, takes no space
       (RENDER[it.kind] || RENDER.text).write(n.inner, p);
     }
     for (const [id, n] of this.nodes) {

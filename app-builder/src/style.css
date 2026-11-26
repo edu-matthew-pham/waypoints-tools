@@ -83,6 +83,11 @@ h4 { font-size: 13px; margin: 18px 0 6px; }
 .design .w { cursor: move; user-select: none; }
 .design .w > * { pointer-events: none; }
 .design .w.hidden { display: block; opacity: .35; }
+.w.noplayer { display: none; }
+.design .w.noplayer { display: block; opacity: .45; outline: 1px dashed #9aa6c4; border-radius: 10px; }
+.design .w.noplayer::after { content: 'no player: plays from events'; position: absolute; right: 6px; bottom: -18px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+.app-credits { margin: 6px 0 0; font-size: 12px; color: var(--muted); text-align: center; }
+.app-credits[hidden] { display: none; }
 .design .w.sel { outline: 2px solid var(--accent); outline-offset: 2px; }
 .design .w:not(.sel):hover { outline: 1px dashed #9aa6c4; outline-offset: 2px; }
 .handle { position: absolute; right: -6px; bottom: -6px; width: 14px; height: 14px; border-radius: 4px; background: var(--accent); border: 2px solid #fff; cursor: nwse-resize; pointer-events: auto !important; }
@@ -728,6 +733,9 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
 .pho-shutter:hover { background: #f2f4f7; }
 .pho-shutter:active { transform: translateX(-50%) scale(.94); }
 .pho-shutter[hidden] { display: none; }
+.pho-choose { position: absolute; right: 8px; bottom: 14px; border: 0; border-radius: 99px; padding: 6px 10px; font-size: 13px; background: rgba(255, 255, 255, .92); color: #1c2333; cursor: pointer; box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
+.pho-choose:hover:not(:disabled) { background: #fff; }
+.pho-pic { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #1d2433; }
 .tab.stop.on { background: #fde8e7; color: #b42318; }
 .pic-row .snd-ico { width: 28px; text-align: center; font-size: 16px; flex: none; }
 .side .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }

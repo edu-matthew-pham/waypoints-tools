@@ -128,3 +128,34 @@ test('the Photo\'s own take-photo button takes the photo and runs "a photo is ta
   assert.equal(one(rt, 'Msg').props.text, 'taken media:00000001', 'the action does not run "a photo is taken"');
   assert.equal(cam.props.picture, 'media:00000002');
 });
+
+test('Choose a photo: a picture from the device sets Photo.picture and runs "a photo is taken", with no camera', () => {
+  const p = app();
+  p.screens[0].events.push(newEvent({ conds: [{ type: 'onPhotoTaken', target: 'Cam' }], actions: [{ type: 'setText', target: 'Msg', value: '"chosen " & Cam.picture' }] }));
+  const kept = [];
+  const rt = new Runtime(p, { hooks: { keepPicture: (d) => { kept.push(d); return 'media:0000000a'; } } });
+  rt.start();
+  const cam = one(rt, 'Cam');
+  assert.ok(!cam.props.ready, 'the camera never started');
+  rt.userChange(cam.id, { chosen: 'data:image/jpeg;base64,AAAA' });
+  assert.deepEqual(kept, ['data:image/jpeg;base64,AAAA'], 'the page keeps it in the media store');
+  assert.equal(cam.props.picture, 'media:0000000a');
+  assert.equal(one(rt, 'Msg').props.text, 'chosen media:0000000a');
+  // with nowhere to keep files (no hook), the picture itself is used
+  const rt2 = new Runtime(app(), {}); rt2.start();
+  rt2.userChange(one(rt2, 'Cam').id, { chosen: 'data:image/jpeg;base64,BBBB' });
+  assert.equal(one(rt2, 'Cam').props.picture, 'data:image/jpeg;base64,BBBB');
+});
+
+test('a Sound without a player still plays from events; the sheet text says so', () => {
+  const p = checkProject(newProject('Music'));
+  const s = p.screens[0];
+  const snd = addObject(s, 'sound').obj; snd.name = 'Cheer'; snd.instances[0].player = false;
+  addObject(s, 'button').obj.name = 'Go';
+  s.events.push(newEvent({ conds: [{ type: 'onClicked', target: 'Go' }], actions: [{ type: 'playSound', target: 'Cheer' }] }));
+  assert.match(sheetText(p), /object Cheer \(sound\) text "" sound \S+ \(no player\)/);
+  const rt = new Runtime(p, {}); rt.start();
+  rt.click(one(rt, 'Go').id);
+  assert.equal(one(rt, 'Cheer').props.playing, true);
+  assert.equal(one(rt, 'Cheer').props.player, false);
+});
