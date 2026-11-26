@@ -113,6 +113,8 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       const v = items.find((i) => i.type === 'variable' && !names.has(i.name));
       if (v && !document.querySelector('dialog[open]')) { const el = find("[data-ab='new-variable-name']"); if (el) return { el, caption: `Make a variable called ${v.name}${v.value !== '' ? `, starting at ${v.value}` : ''}: type its name here${v.value !== '' ? ` and ${v.value} in the box beside it` : ''}, then press Enter.` }; }
       if (ptr < t.length && t[ptr].closes && !document.querySelector('dialog[open]')) ptr++; // closed with Esc or ✕: same thing
+      // a box that already holds what the clip types (a starter that set it): nothing to do, so move on
+      while (ptr < t.length && t[ptr].action === 'type') { const el = find(t[ptr].selector); if (!el || el.value === undefined || String(el.value).trim() !== String(t[ptr].text ?? '').trim()) break; ptr++; }
       while (ptr < t.length && ((!obj && OBJECTISH.test(t[ptr].selector)) || (!v && VARISH.test(t[ptr].selector)))) ptr++; // done another way: skip that part
       if (ptr < t.length) {
         const el = find(t[ptr].selector);
@@ -219,8 +221,8 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     const t = tutorial.steps[at].targets;
     if (!(e.target instanceof Element)) return;
     for (let k = ptr; k < t.length; k++) {
-      if (t[k].action !== action && !(action === 'change' && (t[k].action === 'type' || t[k].key))) continue;
-      if (action === 'click' && t[k].key) continue; // a dropdown: wait for the choice
+      if (t[k].action !== action && !(action === 'change' && (t[k].action === 'type' || t[k].key || t[k].arrows))) continue;
+      if (action === 'click' && (t[k].key || t[k].arrows)) continue; // a dropdown: wait for the choice
       let hit = false; try { hit = !!e.target.closest(parseSel(t[k].selector).css); } catch { /* not a selector */ }
       if (hit) { ptr = k + 1; card.dataset.next = t[ptr]?.selector || ''; setTimeout(place, 0); return; }
     }
@@ -282,6 +284,10 @@ function parseSel(sel) {
 // What the ring's bubble says for a clip move: its caption, plus what to type or which option to choose.
 function captionFor(t, el) {
   if (t.action === 'type') return t.text ? `${t.caption} Type: ${t.text}` : `${t.caption} Leave it empty.`;
+  if (t.arrows && el.tagName === 'SELECT') {
+    const o = el.options[Math.max(0, Math.min(el.options.length - 1, el.selectedIndex + t.arrows))];
+    if (o && o.index !== el.selectedIndex) return `${t.caption} Choose: ${o.text.trim()}`;
+  }
   if (t.key && el.tagName === 'SELECT') {
     const o = [...el.options].find((x) => x.text.trim().toUpperCase().startsWith(t.key.toUpperCase()));
     if (o) return `${t.caption} Choose: ${o.text.trim()}`;

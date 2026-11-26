@@ -59,6 +59,9 @@ export function targetsOf(clip) {
     if (a.caption) caption = typeof a.caption === 'string' ? a.caption : a.caption.text || '';
     // a single letter pressed straight after a click picks a dropdown's option by its first letter
     if (typeof a.press === 'string' && a.press.length === 1 && out.length && out[out.length - 1].action === 'click' && !out[out.length - 1].key) { out[out.length - 1].key = a.press; continue; }
+    // arrow keys straight after a click move a dropdown's choice up or down from where it was
+    const last = out[out.length - 1];
+    if ((a.press === 'ArrowUp' || a.press === 'ArrowDown') && last?.action === 'click' && !last.key) { last.arrows = (last.arrows || 0) + (a.press === 'ArrowDown' ? 1 : -1); continue; }
     // Escape in a clip closes a dialog without choosing (e.g. clicking a condition to select its event): Cancel
     if (a.press === 'Escape') { out.push({ selector: "dialog[open] [data-ab='cancel']", action: 'click', caption: 'Close this (Cancel): the event stays selected.', closes: true }); continue; }
     const sel = a.click?.selector || a.type?.selector;
