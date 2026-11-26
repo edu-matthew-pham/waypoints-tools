@@ -5,7 +5,7 @@
 // is simply not offered, and with neither, the Drive button doesn't show. See README › Your drive for registering.
 export const DRIVE = {
   microsoft: {
-    clientId: '',
+    clientId: '5fc6e54b-6e3d-47f1-ac2d-31fb391d2d55',
     // the address Microsoft sends the student back to after signing in: auth.html beside App Builder
     // (each address App Builder is served from must be listed in the app registration)
   },
