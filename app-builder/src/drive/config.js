@@ -10,7 +10,7 @@ export const DRIVE = {
     // (each address App Builder is served from must be listed in the app registration)
   },
   google: {
-    clientId: '',
+    clientId: '428985003790-8h2ejp4v518rdf2qfd87pqvi4arjep4k.apps.googleusercontent.com',
   },
 };
 export const configured = () => Object.entries(DRIVE).filter(([, c]) => c.clientId).map(([id]) => id);

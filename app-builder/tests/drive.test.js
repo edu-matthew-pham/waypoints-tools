@@ -35,7 +35,7 @@ test('sign-in helpers: PKCE challenge, the return page beside App Builder, who s
 });
 
 test('only drives with a client ID are offered (none: the Drive button stays hidden)', () => {
-  assert.deepEqual(configured(), ['microsoft']);
+  assert.deepEqual(configured(), ['microsoft', 'google']);
 });
 
 test('OneDrive: lists only App Builder files, newest first; nothing saved yet is an empty list', async () => {
