@@ -11,7 +11,7 @@ import { h } from './dom.js';
 import { ticks, mentionedVariables, clipUrls, hintsOf, todo } from '../edu/tutorial.js';
 import { COMPONENTS } from '../core/components.js';
 
-const OBJECTISH = /add-object|kind:|object-menu|menu:rename|input\.rename/; // clip moves that add or rename objects
+const OBJECTISH = /add-object|kind:|object-menu|menu:rename/; // clip moves that add or rename objects (a rename box only after menu:rename: functions are renamed in it too)
 const VARISH = /new-variable-/; // clip moves that make a variable
 const APP = (sel) => `.view-events .preview-col ${sel}, .view-run ${sel}`; // the running app: preview or Run tab
 
@@ -106,7 +106,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       const items = todo(s.check?.rules, getSheet()).filter((i) => !i.ok);
       // a clip move to another screen comes first: objects and events belong on that screen
       if (ptr < t.length && /\[data-ab='screen:/.test(t[ptr].selector)) { const el = find(t[ptr].selector); if (el) return { el, caption: t[ptr].caption || 'Open this screen.' }; }
-      const obj = items.find((i) => i.type === 'object');
+      const obj = items.find((i) => i.type === 'object' && !i.present); // one that's there and only needs settings: the clip shows those
       if (obj) { const g = objectGuide(obj, items); if (g) return g; }
       // missing variables next (a clip's expressions may use one the step's text asks for), unless one exists by that name
       const names = new Set((getProject().variables || []).map((x) => x.name));
@@ -115,7 +115,8 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       if (ptr < t.length && t[ptr].closes && !document.querySelector('dialog[open]')) ptr++; // closed with Esc or ✕: same thing
       // a box that already holds what the clip types (a starter that set it): nothing to do, so move on
       while (ptr < t.length && t[ptr].action === 'type') { const el = find(t[ptr].selector); if (!el || el.value === undefined || String(el.value).trim() !== String(t[ptr].text ?? '').trim()) break; ptr++; }
-      while (ptr < t.length && ((!obj && OBJECTISH.test(t[ptr].selector)) || (!v && VARISH.test(t[ptr].selector)))) ptr++; // done another way: skip that part
+      let renaming = false; // done another way: skip that part (and the name typed after an object's Rename)
+      while (ptr < t.length && ((!obj && (OBJECTISH.test(t[ptr].selector) || (renaming && /input\.rename/.test(t[ptr].selector)))) || (!v && VARISH.test(t[ptr].selector)))) { renaming = /menu:rename/.test(t[ptr].selector); ptr++; }
       if (ptr < t.length) {
         const el = find(t[ptr].selector);
         if (el) return { el, caption: captionFor(t[ptr], el) };
@@ -201,7 +202,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
   function place() {
     const t = target();
     if (!t) { ring.remove(); bubble.remove(); return; }
-    if (t.el !== lastEl) { lastEl = t.el; t.el.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } // off-screen in a long panel
+    if (t.el !== lastEl) { lastEl = t.el; t.el.scrollIntoView({ block: 'center', inline: 'nearest' }); } // off-screen in a long panel (centre: clear of sticky headings)
     const layer = t.el.closest('dialog[open]') || document.body;
     if (ring.parentNode !== layer) layer.append(ring, bubble);
     const r = t.el.getBoundingClientRect();

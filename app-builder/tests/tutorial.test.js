@@ -83,6 +83,11 @@ test('a step\u2019s check as a still-to-do list in plain words, ticking as the p
   const b2 = todo(t.steps[2].check.rules, sheet('sol-step-2'));
   assert.deepEqual(b2.map((i) => [i.type, i.name, i.ok]), [['variable', 'Minutes', false], ['event', undefined, false]]);
   assert.deepEqual(todo(null, ''), []);
+  const t2 = todo({ contains: ['object EntriesTable (table) text "" shows Entries'] }, '');
+  assert.deepEqual([t2[0].type, t2[0].kind, t2[0].name, t2[0].label], ['object', 'table', 'EntriesTable', 'a Table called EntriesTable (shows Entries)']);
+  assert.equal(t2[0].present, false);
+  const t3 = todo({ contains: ['object EntriesTable (table) text "" shows Entries'] }, 'object EntriesTable (table) text ""');
+  assert.deepEqual([t3[0].ok, t3[0].present], [false, true], 'there, but not showing Entries yet: settings left, not another table');
 });
 
 test('teacher notes, a second finished-app step and quizzes stay out', () => {

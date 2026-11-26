@@ -116,9 +116,13 @@ export function todo(rules, text) {
   const results = evalRules(rules, text);
   const items = [
     ...(rules.contains || []).map((f) => {
-      const m = String(f).trim().match(/^(?:object (\w+) )?\(([^)]+)\)$/);
+      // the object's kind in brackets, perhaps with its settings after: object EntriesTable (table) text "" shows Entries
+      const m = String(f).trim().match(/^(?:object (\w+) )?\(([^)]+)\)(?:\s+(.*))?$/);
       const c = m && KIND_BY_LABEL[m[2].toLowerCase()];
-      if (c) return { type: 'object', name: m[1] || '', kind: c.id, label: `a ${c.label}${m[1] ? ` called ${m[1]}` : ''}` };
+      const more = m?.[3] ? m[3].replace(/^text ""\s*/, '').trim() : '';
+      // present: an object of that name and kind is there already (only its settings, `more`, are still to do)
+      if (c) return { type: 'object', name: m[1] || '', kind: c.id, label: `a ${c.label}${m[1] ? ` called ${m[1]}` : ''}${more ? ` (${more})` : ''}`,
+        present: !!m[1] && String(text).replace(/\s+/g, '').includes(`object${m[1]}(${m[2]})`.replace(/\s+/g, '')) };
       const v = String(f).trim().match(/^(variable|list|table) (\w+)(?: =\s*(.*))?$/);
       if (v) {
         let value = v[3] ?? ''; try { if (value) value = String(JSON.parse(value)); } catch { /* as written */ }
