@@ -357,7 +357,19 @@ Matthew, 26 Nov 2026: guided progress should carry across devices. Chosen: no ac
 doc handoff-app-builder-accounts), a Continue link with a QR code, and the tutorial step inside saved files, all through
 one shape in `src/carry.js`, so a drive can be added later as one more place for it.
 
-## Sign in to save to your drive *(built 26 Nov 2026, waiting for client IDs; README › Your drive)*
+## Sign in to save to your drive *(live 26 Nov 2026: 1.3–1.6; README › Your drive)*
+
+Status, 26 Nov 2026:
+- **Microsoft:** registered in Matthew's own directory (client ID in `src/drive/config.js`).
+  - learningwaypoints.com is DNS-verified there and set as the app's publisher domain.
+  - Not yet a verified publisher (needs the Microsoft AI Cloud Partner Program: an @learningwaypoints.com email,
+    business details, a few days' vetting). Until then no school user can approve App Builder themselves, so each
+    school's IT grants admin consent once.
+  - CGGS: the sign-in reaches "Approval required" (asking only for the app folder, profile and offline access);
+    waiting on CGGS IT.
+- **Google:** Google Cloud project "Learning Waypoints", app name App Builder, in Testing (test users only). Before
+  other schools: publish, plus brand verification (domain via Search Console; `drive.file` is non-sensitive, so no
+  security assessment). Google Workspace for Education admins must still allow it for under-18 accounts.
 
 Matthew, 26 Nov 2026: build both now (CGGS uses Microsoft; Google for other schools), the Construct 3 way: sign in only to
 use the student's own drive, no App Builder accounts. Hidden until client IDs are set in `src/drive/config.js`. The
