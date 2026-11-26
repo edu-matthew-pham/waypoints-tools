@@ -341,11 +341,13 @@ Left, on purpose:
 Was a later idea (Markdown tutorials like MakeCode's, waiting for class feedback). Matthew, 26 Nov 2026: build it now,
 and share the same source as the tutorials website. So there is no separate tutorial format: `?lesson=<course>/<lesson>`
 reads the lesson's own `lesson.md` (text, `check` rules for ticks, `clip` selectors for the pointer, `try` starter and
-level). One edit to a lesson changes the website, its clips and the guided tutorial together.
+level, `expect:` lines on the running app for Try it ticks, and variables the text names for the watch ring; a Try the
+finished app step opens that app in a player over the editor). One edit to a lesson changes the website, its clips and
+the guided tutorial together.
 Possible next steps, only if classes need them:
 - smaller steps: one per numbered line of a lesson step (today it is one per lesson step, with the ring walking
   through the clip);
-- ticks from the running app (e.g. "TotalText shows 45"), beside the sheet-text rules;
+- the finished-app player showing variable values (the lesson text mentions them; the player has no sidebar);
 - a link from each App Builder lesson page on the tutorials site ("Open as a guided tutorial");
 - a generator that drafts a lesson's steps from a finished project, for a teacher to edit.
 

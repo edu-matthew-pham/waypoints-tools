@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseLesson, parseSource, ticks, region, targetsOf, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
+import { parseLesson, parseSource, ticks, region, targetsOf, triesOf, mentionedVariables, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
 import { sheetText } from '../src/core/sheet-text.js';
 import { checkProject } from '../src/core/project.js';
 
@@ -12,8 +12,11 @@ const lesson = readFileSync(new URL('lesson.md', dir), 'utf8');
 const app = readFileSync(new URL('app.json', dir), 'utf8');
 const sheet = (name) => sheetText(checkProject(JSON.parse(region(app, name))));
 
-test('a lesson becomes one tutorial step per App Builder build step (tasks split)', () => {
+test('a lesson becomes one tutorial step per App Builder build step (tasks split), after Try the finished app', () => {
   const t = parseLesson(lesson);
+  assert.equal(t.steps[0].title, 'Try the finished app');
+  assert.equal(t.steps[0].play, 'app.json#done');
+  t.steps.shift();
   assert.equal(t.title, 'A practice tracker');
   assert.equal(t.starter, 'app.json#start');
   assert.equal(t.level, 2);
@@ -25,7 +28,7 @@ test('a lesson becomes one tutorial step per App Builder build step (tasks split
 });
 
 test('the clip gives the pointers, in order, with their captions', () => {
-  const s = parseLesson(lesson).steps[1];
+  const s = parseLesson(lesson).steps[2];
   assert.equal(s.targets[0].selector, "[data-ab='new-variable-name']");
   assert.equal(s.targets[0].action, 'type');
   assert.match(s.targets[0].caption, /variable remembers a number/);
@@ -35,6 +38,7 @@ test('the clip gives the pointers, in order, with their captions', () => {
 
 test('steps tick as the lesson’s solutions are reached, and un-tick when undone', () => {
   const t = parseLesson(lesson);
+  t.steps.shift(); // Try the finished app: nothing to tick
   assert.deepEqual(ticks(t, sheet('start')), [false, false, false, false, false]);
   // the lesson's sol-step-N regions are where step N starts (the step before it, done)
   assert.deepEqual(ticks(t, sheet('sol-step-2')).slice(0, 3), [true, false, false]);
@@ -52,11 +56,20 @@ test('rules match the lesson page: spaces ignored, event phrases on one line, la
   assert.ok(!evalRules({ lacks: ['Add 1'] }, text)[0].ok);
 });
 
-test('teacher notes and steps that need another project stay out', () => {
+test('the clip\u2019s expect: lines on the running app become Try it ticks; named variables are found', () => {
+  const t = parseLesson(lesson);
+  assert.deepEqual(t.steps[3].tries, [{ widget: 'TotalText', contains: '15', after: 'SaveButton' }]);
+  assert.deepEqual(t.steps[2].tries, [], 'an expect on the editor (the event sheet) is not a try');
+  assert.deepEqual(triesOf([{ expect: { selector: '.view-run .stage', contains: 'Glasses: 0 of 8' } }]), [{ widget: '', contains: 'Glasses: 0 of 8', after: '' }]);
+  assert.deepEqual(mentionedVariables('beside *Minutes*, its value goes up; Sessions too', ['Minutes', 'Sessions']), ['Minutes']);
+});
+
+test('teacher notes, a second finished-app step and quizzes stay out', () => {
   const md = `---\ntitle: X\n---\n## Try it\n\n\`\`\`step\ntry: { playground: appbuilder, starter: "a.json#done" }\n\`\`\`\nlook\n\n## Build\n\n\`\`\`step\ntry: { playground: appbuilder, starter: "a.json#s", keep: b }\n\`\`\`\nDo it.\n\n## Quiz\n\n\`\`\`step\ncheck: { type: choice }\n\`\`\`\n\n\`\`\`teacher\nsecret: yes\n\`\`\`\n`;
   const t = parseLesson(md);
-  assert.deepEqual(t.steps.map((s) => s.title), ['Build']);
-  assert.equal(t.steps[0].check, null);
+  assert.deepEqual(t.steps.map((s) => s.title), ['Try it', 'Build']);
+  assert.equal(t.steps[0].play, 'a.json#done');
+  assert.equal(t.steps[1].check, null);
   assert.throws(() => parseLesson('no frontmatter'));
   assert.throws(() => parseLesson('---\ntitle: X\n---\n## Q\n\n```step\ncheck: { type: choice }\n```\n'), /no App Builder build steps/);
 });
@@ -71,11 +84,11 @@ test('the starter comes from beside the lesson, or from inside it', async () => 
 
 test('a lesson\u2019s source.json (the tutorials site) works like its lesson.md, starter included', async () => {
   const t = parseSource(JSON.stringify({ title: 'A practice tracker', files: { 'lesson.md': lesson, 'app.json': app } }));
-  assert.equal(t.steps.length, 5);
+  assert.equal(t.steps.length, 6);
   const p = await loadStarter(t, 'https://tutorials.learningwaypoints.com/x/source.json', async () => { throw new Error('should not fetch'); });
   assert.equal(p.name, 'Practice tracker');
   assert.throws(() => parseSource('{"files":{}}'), /isn.t a lesson/);
-  assert.equal(parseSource(lesson).steps.length, 5);
+  assert.equal(parseSource(lesson).steps.length, 6);
 });
 
 test('tutorial links: ?lesson= names a lesson in the tutorials repo; ?tutorial= only from allowed sites', () => {

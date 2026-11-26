@@ -10,9 +10,13 @@
 //                                  contains, event, lacks). No code check: the student just moves on with Next.
 //   clip:                       the lesson clip's click and type selectors (data-ab labels) are what the tutorial
 //                               points at, in order; its captions say what that pointer is for
+//   clip expect: on the app      a "Try it" tick: the running app (preview or Run tab) shows that, or the object changed
+//                               from how it was designed (students type their own numbers, not the clip's)
 //   try: { starter, level }     the first such step's starter is the project the tutorial starts from (one project
 //                               all the way through, like the lesson's `keep:`), and its level is the level
-// Steps that use a different project (Try the finished app) or no App Builder (a quiz) stay on the website.
+// An App Builder step before the first build step with its own starter (Try the finished app) becomes step 1: its
+// text and a button that opens that app in a player over the editor, so the student's own work is never swapped.
+// Steps with no App Builder (a quiz) stay on the website.
 // No DOM here, so tests run it in Node. Imports nothing from core/ or the editor.
 import yaml from 'js-yaml';
 
@@ -58,6 +62,26 @@ export function targetsOf(clip) {
   return out;
 }
 
+// What the running app should show, from a clip's expect: lines on the app (not on the editor). `after` is the last
+// object the clip clicked in the app before it, so the step can say "click SaveButton, then …".
+export function triesOf(clip) {
+  const out = [];
+  let after = '';
+  for (const a of Array.isArray(clip) ? clip : []) {
+    const sel = a?.click?.selector || a?.expect?.selector || '';
+    const inApp = /\.preview-col|\.view-run/.test(sel);
+    const widget = sel.match(/widget:(\w+)/)?.[1] || '';
+    if (a?.click && inApp && widget) after = widget;
+    if (a?.expect && inApp && (widget || /\.stage\b/.test(sel))) out.push({ widget, contains: String(a.expect.contains ?? ''), after });
+  }
+  return out;
+}
+
+// Variables a step names in bold or italics (*Minutes*), so the tutorial can point at their live values.
+export function mentionedVariables(body, names) {
+  return names.filter((n) => new RegExp(`\\*{1,2}${n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\*{1,2}`).test(body));
+}
+
 // The same rules as the lesson page (waypoints-tutorials tools/lesson-core.mjs, kind 'appbuilder'): spaces ignored;
 // contains anywhere; each event list all on one event line; lacks nowhere.
 export function evalRules(rules, text) {
@@ -93,7 +117,12 @@ export function parseLesson(raw) {
     try { config = yaml.load(m[1]) || {}; } catch { continue; }
     body = body.replace(m[0], '');
     const t = config.try;
-    if (t?.playground !== 'appbuilder' || !t.keep) continue;
+    if (t?.playground !== 'appbuilder') continue;
+    if (!t.keep) {
+      // Try the finished app: only before the build starts, and only one
+      if (keep === undefined && t.starter && !steps.length) steps.push({ title, body: body.trim(), check: null, targets: [], tries: [], play: String(t.starter) });
+      continue;
+    }
     if (keep === undefined) { keep = t.keep; starter = t.starter; level = t.level; }
     else if (t.keep !== keep) continue;
     const targets = targetsOf(config.clip);
@@ -104,11 +133,11 @@ export function parseLesson(raw) {
         const nl2 = s.indexOf('\n');
         const task = Array.isArray(config.tasks) ? config.tasks[n] || {} : {};
         steps.push({ title: (nl2 === -1 ? s : s.slice(0, nl2)).trim(), part: title, body: [n === 0 ? lead : '', nl2 === -1 ? '' : s.slice(nl2 + 1).trim()].filter(Boolean).join('\n\n'),
-          check: codeCheck(task.check), targets: n === 0 ? targets : targetsOf(task.clip) });
+          check: codeCheck(task.check), targets: n === 0 ? targets : targetsOf(task.clip), tries: n === 0 ? triesOf(config.clip) : triesOf(task.clip) });
       });
-    } else steps.push({ title, body: body.trim(), check: codeCheck(config.check), targets });
+    } else steps.push({ title, body: body.trim(), check: codeCheck(config.check), targets, tries: triesOf(config.clip) });
   }
-  if (!steps.length) throw new Error('This lesson has no App Builder build steps to guide.');
+  if (keep === undefined) throw new Error('This lesson has no App Builder build steps to guide.');
   return { title: meta.title ? String(meta.title) : 'Tutorial', starter: starter || '', level: Number(level) || null, steps, files };
 }
 const codeCheck = (c) => (c && c.type === 'code' && c.rules ? { text: String(c.text || ''), rules: c.rules } : null);
@@ -150,10 +179,11 @@ export function tutorialUrl(params, here) {
   return { url, id: url.replace(/^https?:\/\//, '').replace(/\/(lesson\.md|source\.json)$/, '') };
 }
 
-// The starter project: `file#region` beside the lesson (or inline in it).
-export async function loadStarter(tutorial, lessonUrl, fetchText) {
-  if (!tutorial.starter) return null;
-  const [file, name] = tutorial.starter.split('#');
+// A project from beside the lesson (or inside it): `file#region`. loadStarter: the one the tutorial starts from.
+export const loadStarter = (tutorial, lessonUrl, fetchText) => loadRef(tutorial, tutorial.starter, lessonUrl, fetchText);
+export async function loadRef(tutorial, ref, lessonUrl, fetchText) {
+  if (!ref) return null;
+  const [file, name] = ref.split('#');
   const text = tutorial.files[file] ?? await fetchText(new URL(file, lessonUrl).href);
   return JSON.parse(region(text, name));
 }

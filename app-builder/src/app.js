@@ -12,11 +12,11 @@ import { initMap } from './views/map.js';
 import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './edu/features.js';
 import { embed } from './embed.js';
-import { parseSource, loadStarter, tutorialUrl } from './edu/tutorial.js';
+import { parseSource, loadStarter, loadRef, tutorialUrl } from './edu/tutorial.js';
 import { startTutorial } from './ui/tutorial-panel.js';
 import { sheetText } from './core/sheet-text.js';
 import { addBuiltinSounds, sources } from './core/assets.js';
-import { projectMedia, useMedia } from './player.js';
+import { projectMedia, useMedia, Player, localStore } from './player.js';
 // Where media comes from, set here rather than in core: built-in sound files beside App Builder, plus more listed in
 // extra.json (e.g. FreePD tracks; none is fine). Video links: core/assets.js videoSource (Commons; YouTube opt-in).
 const MEDIA_SOURCES = { soundBase: 'sounds/', extraSounds: 'sounds/extra.json' };
@@ -415,6 +415,28 @@ document.addEventListener('keydown', (e) => {
 // a shared link pasted into this same tab only changes the # part, which doesn't reload the page: start again
 addEventListener('hashchange', () => { if (/^#(play|open)=/.test(location.hash)) location.reload(); });
 
+// ---------------- guided tutorial: Try the finished app ----------------
+// The lesson's finished app, running in a player over the editor: the student's own app is never swapped out.
+let getLessonFile = null;
+async function playFinished(lesson, ref) {
+  let p;
+  try { p = checkProject(await loadRef(lesson, ref, tutorialLink.url, getLessonFile)); } catch { notify('The finished app couldn\u2019t be opened.'); return; }
+  await mediaStore.load(p);
+  const host = h('div', { class: 'stage-host' }), area = h('div', { class: 'tut-play-stage' }, host);
+  const dlg = h('dialog', { class: 'es-dlg tut-play-dlg', 'aria-label': 'The finished app' },
+    h('div', { class: 'dlg-head' }, h('strong', {}, 'The finished app: try it'), h('span', { class: 'spacer' }),
+      h('button', { class: 'btn', 'data-ab': 'tutorial-play-restart', onclick: () => start() }, '\u21BB Restart'),
+      h('button', { class: 'icon', 'data-ab': 'tutorial-play-close', 'aria-label': 'Close the finished app', onclick: () => dlg.close() }, '\u2715')),
+    area);
+  document.body.append(dlg);
+  dlg.showModal();
+  const player = new Player(host, { store: localStore('appbuilder.tutorial.finished.' + tutorialLink.id), media: projectMedia(() => p, { soundBase: MEDIA_SOURCES.soundBase }) });
+  player.stage.fitTo(area, () => innerHeight * 0.7);
+  const start = () => { player.start(p); player.focus(); };
+  start();
+  dlg.addEventListener('close', () => { player.stop(); dlg.remove(); useMedia(projectMedia(() => S.project)); refresh(); }); // then the editor's media lookups again, as at the top
+}
+
 // ---------------- boot ----------------
 let initial = null;
 const hadSaved = !!store((ls) => ls.getItem(STORE_KEY));
@@ -435,7 +457,7 @@ let lesson = null;
 if (tutorialLink?.error) notify(tutorialLink.error);
 else if (tutorialLink) {
   try {
-    const get = async (url) => { const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status === 404 ? 'There is no lesson at that address.' : 'The lesson couldn\u2019t be loaded.'); return r.text(); };
+    const get = getLessonFile = async (url) => { const r = await fetch(url, { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status === 404 ? 'There is no lesson at that address.' : 'The lesson couldn\u2019t be loaded.'); return r.text(); };
     lesson = parseSource(await get(tutorialLink.url));
     const starter = await loadStarter(lesson, tutorialLink.url, get);
     if (starter) lessonStart = () => structuredClone(starter);
@@ -463,7 +485,8 @@ refresh();
 const tab = new URLSearchParams(location.search).get('tab');
 if (tab && tabViews[tab] !== undefined) setTab(tab);
 window.__app = { S, setTab, loadProject }; // handy for debugging and tests
-if (lesson) tutorial = startTutorial({ tutorial: lesson, id: tutorialLink.id, getSheet: () => sheetText(S.project), getTab: () => S.tab, store });
+if (lesson) tutorial = startTutorial({ tutorial: lesson, id: tutorialLink.id, getSheet: () => sheetText(S.project), getTab: () => S.tab, getProject: () => S.project, store,
+  onPlay: (ref) => playFinished(lesson, ref) });
 
 // An embedding page (a lesson) can start, reset and read the project. See src/embed.js.
 embed.start({

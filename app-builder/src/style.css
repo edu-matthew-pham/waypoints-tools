@@ -744,6 +744,10 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
 .play-error { max-width: 480px; margin: 80px auto; text-align: center; }
 
 /* guided tutorial (ui/tutorial-panel.js): only when a tutorial link opens it */
+.tut-play-dlg { width: min(960px, 94vw); }
+.tut-play-dlg .dlg-head { gap: 8px; }
+.tut-play-stage { display: flex; justify-content: center; padding: 16px; background: var(--bg); overflow: auto; }
+.tut-play { margin: 4px 0 8px; }
 .tut { position: fixed; right: 16px; bottom: 16px; width: 360px; max-height: min(70vh, 560px); display: flex; flex-direction: column; background: #fff; border: 1px solid var(--line); border-top: 4px solid #f59e0b; border-radius: 12px; box-shadow: 0 12px 32px rgba(16, 24, 40, .22); z-index: 30; font-size: 14px; }
 .tut.left { right: auto; left: 16px; }
 .tut[hidden], .tut-reopen[hidden] { display: none; }

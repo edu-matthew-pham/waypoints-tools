@@ -5,15 +5,26 @@
 // changes, so a student who races ahead finds later steps already ticked, and undoing something un-ticks it.
 // The ring follows the lesson clip's clicks in order; clicking (or typing into) the control it points at moves it on.
 // If that control isn't on screen it points at the tab it lives on, or at the control that opens it.
+// Once a step is built, it points at what to try in the running app (a "Try it" tick, from the clip's expect: lines)
+// and then at the live value of any variable the step names, so students watch it change.
 import { h } from './dom.js';
-import { ticks } from '../edu/tutorial.js';
+import { ticks, mentionedVariables } from '../edu/tutorial.js';
 
-export function startTutorial({ tutorial, id, getSheet, getTab, store }) {
+const APP = (sel) => `.view-events .preview-col ${sel}, .view-run ${sel}`; // the running app: preview or Run tab
+
+export function startTutorial({ tutorial, id, getSheet, getTab, getProject, onPlay, store }) {
   const KEY = 'appbuilder.tutorial.' + id + '.step';
+  const TRIED = 'appbuilder.tutorial.' + id + '.tried';
   let done = ticks(tutorial, getSheet());
+  // what has been tried in the running app ("<step>:<n>") or opened ("<step>:play"); kept, since the app's output moves on
+  let tried; try { tried = new Set(JSON.parse(store((ls) => ls.getItem(TRIED)) || '[]')); } catch { tried = new Set(); }
+  const mark = (k) => { tried.add(k); store((ls) => ls.setItem(TRIED, JSON.stringify([...tried]))); };
+  const built = (i) => done[i] !== false; // ticked, or nothing to tick
+  const triedAll = (i) => tutorial.steps[i].tries.every((_, n) => tried.has(`${i}:${n}`));
+  const complete = (i) => { const s = tutorial.steps[i]; return s.play ? tried.has(`${i}:play`) : (s.check || s.tries.length) ? built(i) && triedAll(i) : false; };
   const saved = Number(store((ls) => ls.getItem(KEY)));
   let at = Number.isInteger(saved) && saved >= 0 && saved < tutorial.steps.length && store((ls) => ls.getItem(KEY)) !== null ? saved
-    : Math.max(0, done.findIndex((d) => d !== true));
+    : Math.max(0, tutorial.steps.findIndex((_, i) => !complete(i)));
   let ptr = 0;            // which of this step's pointers is next
   let open = true, small = innerWidth < 700, left = false, finished = false; // phones start with just the title
 
@@ -31,10 +42,10 @@ export function startTutorial({ tutorial, id, getSheet, getTab, store }) {
     if (!open) { place(); return; }
     const s = tutorial.steps[at];
     const last = at === tutorial.steps.length - 1;
-    const ok = done[at] === true;
+    const ok = complete(at);
     const dots = h('div', { class: 'tut-dots' }, tutorial.steps.map((st, i) => h('button', {
-      class: 'tut-dot' + (i === at ? ' on' : '') + (done[i] ? ' done' : ''), 'data-ab': 'tutorial-step:' + (i + 1),
-      title: `Step ${i + 1}: ${st.title}${done[i] ? ' (done)' : ''}`, 'aria-label': `Step ${i + 1}: ${st.title}${done[i] ? ', done' : ''}`, onclick: () => go(i),
+      class: 'tut-dot' + (i === at ? ' on' : '') + (complete(i) ? ' done' : ''), 'data-ab': 'tutorial-step:' + (i + 1),
+      title: `Step ${i + 1}: ${st.title}${complete(i) ? ' (done)' : ''}`, 'aria-label': `Step ${i + 1}: ${st.title}${complete(i) ? ', done' : ''}`, onclick: () => go(i),
     })));
     const head = h('div', { class: 'tut-head' },
       h('span', { class: 'tut-count' }, `Step ${at + 1} of ${tutorial.steps.length}`),
@@ -43,16 +54,18 @@ export function startTutorial({ tutorial, id, getSheet, getTab, store }) {
       h('button', { class: 'icon', 'data-ab': 'tutorial-side', title: 'Move to the other side', 'aria-label': 'Move the tutorial to the other side', onclick: () => { left = !left; draw(); } }, '⇆'),
       h('button', { class: 'icon', 'data-ab': 'tutorial-shrink', title: small ? 'Show the whole step' : 'Make smaller', 'aria-label': small ? 'Show the whole step' : 'Make the tutorial smaller', 'aria-expanded': String(!small), onclick: () => { small = !small; draw(); } }, small ? '▴' : '▾'),
       h('button', { class: 'icon', 'data-ab': 'tutorial-close', title: 'Hide the tutorial', 'aria-label': 'Hide the tutorial', onclick: () => { open = false; draw(); } }, '✕'));
-    const check = s.check
-      ? h('p', { class: 'tut-check' + (ok ? ' ok' : ''), role: 'status' }, ok ? '✓ Done: ' : 'This ticks by itself when it’s done: ', s.check.text)
-      : h('p', { class: 'tut-check none' }, 'When you’ve done this, choose Next.');
+    const check = [];
+    if (s.play) check.push(h('button', { class: 'btn primary tut-play', 'data-ab': 'tutorial-play', onclick: async () => { await onPlay(s.play); mark(`${at}:play`); draw(); } }, '▶ Open the finished app'));
+    if (s.check) check.push(h('p', { class: 'tut-check' + (built(at) ? ' ok' : ''), role: 'status' }, built(at) ? '✓ Done: ' : 'This ticks by itself when it’s done: ', s.check.text));
+    s.tries.forEach((t, n) => { const y = tried.has(`${at}:${n}`); check.push(h('p', { class: 'tut-check' + (y ? ' ok' : ''), role: 'status' }, (y ? '✓ ' : '') + tryText(t))); });
+    if (!check.length) check.push(h('p', { class: 'tut-check none' }, 'When you’ve done this, choose Next.'));
     const nav = h('div', { class: 'tut-nav' },
       h('button', { class: 'btn', 'data-ab': 'tutorial-back', disabled: at === 0, onclick: () => go(at - 1) }, 'Back'),
       h('span', { class: 'spacer' }),
-      last ? h('button', { class: 'btn' + (ok || !s.check ? ' primary' : ''), 'data-ab': 'tutorial-finish', onclick: () => { finished = true; draw(); } }, 'Finish')
+      last ? h('button', { class: 'btn' + (ok || !(s.check || s.tries.length) ? ' primary' : ''), 'data-ab': 'tutorial-finish', onclick: () => { finished = true; draw(); } }, 'Finish')
         : h('button', { class: 'btn' + (ok ? ' primary' : ''), 'data-ab': 'tutorial-next', onclick: () => go(at + 1) }, 'Next'));
     const body = finished
-      ? h('div', { class: 'tut-body' }, h('p', {}, done.every((d) => d !== false) ? 'That’s the whole tutorial done. ' : 'That’s the last step. Steps without a tick are still waiting for you. ', 'Keep building, or go back to the lesson for what comes next.'))
+      ? h('div', { class: 'tut-body' }, h('p', {}, tutorial.steps.every((st, i) => st.play || complete(i) || !(st.check || st.tries.length)) ? 'That’s the whole tutorial done. ' : 'That’s the last step. Steps without a tick are still waiting for you. ', 'Keep building, or go back to the lesson for what comes next.'))
       : h('div', { class: 'tut-body' }, markdown(s.body));
     card.replaceChildren(head, h('div', { class: 'tut-main' },
       s.part ? h('p', { class: 'tut-part' }, s.part) : null,
@@ -68,15 +81,44 @@ export function startTutorial({ tutorial, id, getSheet, getTab, store }) {
   };
   const find = (sel) => { try { return [...document.querySelectorAll(sel)].find(visible) || null; } catch { return null; } };
   function target() {
-    const t = tutorial.steps[at].targets;
-    if (!open || finished || done[at] === true || ptr >= t.length) return null;
-    const el = find(t[ptr].selector);
-    if (el) return { el, caption: t[ptr].caption };
-    const tab = t[ptr].selector.match(/\.view-(\w+)/)?.[1];
-    if (tab && getTab() !== tab) { const te = find(`[data-ab='tab:${tab}']`); if (te) return { el: te, caption: `Open the ${tab[0].toUpperCase() + tab.slice(1)} tab.` }; }
-    if (ptr > 0) { const back = find(t[ptr - 1].selector); if (back) return { el: back, caption: t[ptr - 1].caption }; }
+    if (!open || finished) return null;
+    const s = tutorial.steps[at], t = s.targets;
+    if (!built(at) && ptr < t.length) { // building: follow the clip
+      const el = find(t[ptr].selector);
+      if (el) return { el, caption: t[ptr].caption };
+      const tab = t[ptr].selector.match(/\.view-(\w+)/)?.[1];
+      if (tab && getTab() !== tab) { const te = find(`[data-ab='tab:${tab}']`); if (te) return { el: te, caption: `Open the ${tab[0].toUpperCase() + tab.slice(1)} tab.` }; }
+      if (ptr > 0) { const back = find(t[ptr - 1].selector); if (back) return { el: back, caption: t[ptr - 1].caption }; }
+      return null;
+    }
+    if (!built(at)) return null;
+    const next = s.tries.find((_, n) => !tried.has(`${at}:${n}`)); // built: try it in the running app
+    if (next) {
+      const el = next.after && find(APP(`[data-ab='widget:${next.after}']`));
+      if (el) return { el, caption: `Try it: click ${next.after}.` };
+      if (!find(APP('.stage'))) { const te = find("[data-ab='tab:events']"); if (te) return { el: te, caption: 'Open Events to try it in the app.' }; }
+      return null;
+    }
+    const names = (getProject().variables || []).map((v) => v.name); // then watch the variables it names
+    const watch = mentionedVariables(s.body, names);
+    for (const n of watch) { const el = find(`.side [data-now='${CSS.escape(n)}']`); if (el) return { el, caption: `Watch ${n} here while you use the app.` }; }
+    // live values show only while the app runs (Events preview or Run)
+    if (watch.length && !find(APP('.stage'))) { const te = find("[data-ab='tab:events']"); if (te) return { el: te, caption: `Open Events to run the app and watch ${watch[0]} change.` }; }
     return null;
   }
+  // Has the running app shown what a try asks for? Its text, or (for an object) anything but how it was designed,
+  // since students type their own numbers rather than the clip's.
+  function checkTries() {
+    let changed = false;
+    tutorial.steps[at].tries.forEach((t, n) => {
+      if (tried.has(`${at}:${n}`)) return;
+      const els = [...document.querySelectorAll(APP(t.widget ? `[data-ab='widget:${t.widget}']` : '.stage'))].filter(visible);
+      const designed = t.widget ? designText(t.widget) : null;
+      if (els.some((el) => { const x = el.textContent || ''; return (t.contains && x.includes(t.contains)) || (designed !== null && x.trim() !== designed.trim()); })) { mark(`${at}:${n}`); changed = true; }
+    });
+    if (changed) draw();
+  }
+  const designText = (name) => { for (const sc of getProject().screens || []) for (const o of sc.objects || []) if (o.name === name) return String(o.instances?.[0]?.text ?? ''); return null; };
   function place() {
     const t = target();
     if (!t) { ring.remove(); bubble.remove(); return; }
@@ -106,7 +148,7 @@ export function startTutorial({ tutorial, id, getSheet, getTab, store }) {
   document.addEventListener('keydown', (e) => { if (e.key === 'Enter') advance(e, 'type'); }, true);
   addEventListener('resize', place);
   document.addEventListener('scroll', place, true);
-  setInterval(place, 250); // dialogs opening, tabs changing, things moving
+  setInterval(() => { if (open && !finished) checkTries(); place(); }, 250); // the running app, dialogs, tabs, things moving
 
   draw();
   return {
@@ -116,6 +158,12 @@ export function startTutorial({ tutorial, id, getSheet, getTab, store }) {
       if (done.join() !== before) draw(); else place();
     },
   };
+}
+
+function tryText(t) {
+  const first = t.after ? `click ${t.after} in the app, then ` : '';
+  if (!t.widget) return `Try it: ${first}check the app shows \u201C${t.contains}\u201D.`;
+  return `Try it: ${first}check ${t.widget} changes${t.contains ? ` (in the lesson it showed \u201C${t.contains}\u201D)` : ''}.`;
 }
 
 // The lesson's Markdown, simply: paragraphs, numbered and bulleted lists, **bold**, *italic*, `code`, links.

@@ -51,13 +51,19 @@ From the lesson it takes each build step (a `## Step` whose step block has `try:
   undoing un-ticks. Steps without a code check just say "choose Next";
 - **an amber ring** on the control to use next, following the lesson clip's clicks and typing in order, with the clip's
   caption beside it. It moves on when the student uses that control; if the control isn't showing, it points at its tab
-  or at the control that opens it. After the clip's part, no ring.
+  or at the control that opens it;
+- **Try it ticks** from the clip's `expect:` lines on the running app (preview or Run tab): once the step is built, the
+  ring points at what to click in the app, and the tick comes when the app shows the clip's value or the object changes
+  from how it was designed (students type their own numbers, not the clip's);
+- **watching variables:** then, if the step's text names a variable in bold or italics (*Minutes*), the ring points at
+  its live value on the left (or at the Events tab, since values show only while the app runs);
+- **Try the finished app:** an App Builder step before the build starts, with its own starter, becomes step 1 with an
+  "Open the finished app" button: it runs in a player over the editor, so the student's own app is never swapped.
 
 Nothing is locked: Back, Next and the step dots always work. The tutorial starts from the first build step's starter
 (`app.json#start` beside the lesson), keeps its work and step in the browser under its own name, and uses the step's
 level. The card can be moved to the other side (it also moves itself off whatever the ring points at), made smaller, or
-hidden (a Tutorial button brings it back). On phones it's a strip along the bottom. Steps that need a different project
-(Try the finished app) or aren't App Builder (a quiz) stay on the website. Code: `src/edu/tutorial.js` (reading the
+hidden (a Tutorial button brings it back). On phones it's a strip along the bottom. Steps that aren't App Builder (a quiz) stay on the website. Code: `src/edu/tutorial.js` (reading the
 lesson, ticks; no DOM, tested in Node against a copy of the practice tracker lesson) and `src/ui/tutorial-panel.js`.
 
 ## Layout
