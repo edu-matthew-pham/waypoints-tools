@@ -342,6 +342,10 @@ select.ctl { padding-right: 6px; }
 .tg input:checked + .tg-track { background: var(--accent); }
 .tg input:checked + .tg-track::after { transform: translateX(20px); }
 .tg input:focus-visible + .tg-track { box-shadow: 0 0 0 3px var(--accent-soft); }
+.tg.tick .tg-track { width: 24px; height: 24px; border-radius: 6px; background: #fff; border: 2px solid #98a2b3; box-sizing: border-box; }
+.tg.tick .tg-track::after { content: none; }
+.tg.tick input:checked + .tg-track { background: var(--accent); border-color: var(--accent); }
+.tg.tick input:checked + .tg-track::before { content: ''; position: absolute; left: 6px; top: 2px; width: 6px; height: 11px; border: solid #fff; border-width: 0 3px 3px 0; transform: rotate(45deg); }
 .w-slider > input[type=range] { accent-color: var(--accent); margin: 0; cursor: pointer; }
 .stage:not(.design):focus { outline: none; }
 .stage.kb-focus:not(.design) { box-shadow: 0 0 0 3px var(--accent-soft), 0 10px 30px rgba(20, 30, 60, .12); }

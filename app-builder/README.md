@@ -268,6 +268,11 @@ Level 4 (or a lesson allow-list that names a table action). Plan: tutorials Proj
 - Sheet text: `object Music (sound) text "" sound calm`, `object Clip (video) text "" link "https://…"`.
 - Tests: `tests/media.test.js`.
 
+**Toggle: Tick box look** (1.10): Properties › Look: Switch (the default) or Tick box. Either is on or off:
+`Toggle.on` is true or false, and *is switched*, *is on* and *Set on* work the same; a tick box suits lists of things
+to do, a switch suits settings. It is a real checkbox for screen readers. Sheet text adds "(tick box)". (Note for
+lessons: `if()` needs a comparison, so `if(BedJob.on = true, "Done!", "Not yet")`.)
+
 **Show a player** (1.5): a Sound's Properties tick, on by default. Untick it for background music or sound effects: the
 Sound takes no space while the app runs and still plays from events (Play, Stop), like Construct's Audio. In Design it
 shows faded, labelled "no player: plays from events", so it can still be found and selected. Its credit (the open

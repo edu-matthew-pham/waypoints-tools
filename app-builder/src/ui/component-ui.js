@@ -282,6 +282,9 @@ export const RENDER = {
     make: () => h('label', { class: 'tg' }, h('input', { type: 'checkbox', role: 'switch' }), h('span', { class: 'tg-track' }), h('span', { class: 'tg-label' })),
     write: (inner, p) => {
       const box = inner.querySelector('input'), label = inner.querySelector('.tg-label');
+      const tick = p.look === 'tick'; // a tick box: the same on/off, drawn as a box that shows a tick
+      inner.classList.toggle('tick', tick);
+      box.setAttribute('role', tick ? 'checkbox' : 'switch');
       if (box.checked !== !!p.on) box.checked = !!p.on;
       if (label.textContent !== p.text) label.textContent = p.text;
     },

@@ -88,7 +88,11 @@ export function initDesign(root) {
     // extra fields for components that have more than text and size
     const extra = [];
     if (obj.kind === 'toggle') {
-      extra.push(h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: !!inst.on, onchange: (e) => { inst.on = e.target.checked; hooks.commit(); } }), h('span', {}, 'Starts on')));
+      extra.push(h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: !!inst.on, onchange: (e) => { inst.on = e.target.checked; hooks.commit(); } }), h('span', {}, inst.look === 'tick' ? 'Starts ticked' : 'Starts on')));
+      const look = h('select', { class: 'ctl', 'data-ab': 'prop:look', 'aria-label': 'Look', onchange: (e) => { inst.look = e.target.value; hooks.commit(); } },
+        h('option', { value: 'switch', selected: inst.look !== 'tick' }, 'Switch'), h('option', { value: 'tick', selected: inst.look === 'tick' }, 'Tick box'));
+      extra.push(h('label', { class: 'f' }, h('span', {}, 'Look'), look),
+        h('p', { class: 'muted small' }, 'Either look is on or off: .on is true or false, and "is on" and Set on work the same. A tick box suits lists of things to do; a switch suits settings.'));
     }
     if (obj.kind === 'image') {
       const choose = (name) => { inst.image = name; hooks.commit(); };

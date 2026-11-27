@@ -23,3 +23,17 @@ test('adding each component to a screen works and names stay unique', () => {
   const names = s.objects.map((o) => o.name);
   assert.equal(new Set(names).size, names.length);
 });
+
+test('a Toggle can look like a tick box: the same on/off, and the sheet text says so', async () => {
+  const { sheetText } = await import('../src/core/sheet-text.js');
+  const { checkProject, newProject, addObject } = await import('../src/core/project.js');
+  const { Runtime } = await import('../src/core/runtime.js');
+  const p = checkProject(newProject('Jobs'));
+  const t = addObject(p.screens[0], 'toggle').obj; t.name = 'BedJob'; t.instances[0].look = 'tick';
+  assert.match(sheetText(p), /object BedJob \(toggle\) text "[^"]*" \(tick box\)/);
+  const rt = new Runtime(p, {}); rt.start();
+  const inst = rt.instancesOf('BedJob')[0];
+  assert.equal(inst.props.look, 'tick');
+  rt.userChange(inst.id, true);
+  assert.equal(inst.props.on, true);
+});

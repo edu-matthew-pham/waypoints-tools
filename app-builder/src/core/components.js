@@ -28,6 +28,6 @@ export const COMPONENTS = {
   recorder: { id: 'recorder', label: 'Recorder', category: 'Media', hint: 'Record a short sound with the microphone (mic on for this app only).', base: 'Recorder', props: { text: '', w: 300, h: 104 }, exposes: ['sound', 'length', 'recording'] },
   list:   { id: 'list',   label: 'List',       category: 'Data', hint: 'Shows the items of a list, one per row.', base: 'List', props: { text: '', w: 342, h: 220 }, extra: { source: '' } },
   table:  { id: 'table',  label: 'Table',      category: 'Data', hint: 'Shows a table: a row for each record, a column for each field.', base: 'Table', props: { text: '', w: 460, h: 240 }, extra: { source: '', columns: '' } },
-  toggle: { id: 'toggle', label: 'Toggle',     category: 'Choices', hint: 'An on/off switch with a label.',        base: 'Toggle', props: { text: 'Switch', w: 180, h: 32 }, extra: { on: false }, exposes: ['on'] },
+  toggle: { id: 'toggle', label: 'Toggle',     category: 'Choices', hint: 'An on/off switch with a label.',        base: 'Toggle', props: { text: 'Switch', w: 180, h: 32 }, extra: { on: false, look: 'switch' }, exposes: ['on'] }, // look: 'switch' or 'tick' (a tick box), the same on/off
   slider: { id: 'slider', label: 'Slider',     category: 'Choices', hint: 'Drag to pick a number.',                base: 'Slider', props: { text: '',       w: 240, h: 32 }, extra: { min: 0, max: 100, value: 50 }, exposes: ['value', 'min', 'max'] },
 };
