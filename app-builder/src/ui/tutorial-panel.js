@@ -213,7 +213,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     Object.assign(bubble.style, { left: Math.max(8, Math.min(innerWidth - 268, r.left)) + 'px', top: (below ? r.bottom + 10 : Math.max(8, r.top - 54)) + 'px' });
     // keep the card off the thing it points at
     const c = card.getBoundingClientRect();
-    if (open && !card.hidden && r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom) { left = !left; card.classList.toggle('left', left); }
+    if (open && !card.hidden && !card.contains(t.el) && r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom) { left = !left; card.classList.toggle('left', left); }
   }
   // clicking or typing into what the ring points at moves it on (capture: before the editor redraws)
   // pointerdown as well as click: the app's own objects on the stage take the press (to select or drag them), so
