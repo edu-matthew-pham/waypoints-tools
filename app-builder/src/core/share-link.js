@@ -1,6 +1,8 @@
 // Share by link: the whole app travels inside the link, after the #, compressed, so there's no server and nothing is
 // stored anywhere. index.html#play=… opens just the working app; index.html#open=… opens a copy in App Builder.
 // Pictures and sounds of the app's own (uploads, recordings) are too big for a link: those apps are shared as a file.
+// So are apps with web pages of their own (Embed): any HTML can be pasted, and it shouldn't get a learningwaypoints.com link.
+import { embedSource } from './assets.js';
 // No DOM; CompressionStream exists in browsers and in Node 18+.
 
 const b64url = (bytes) => {
@@ -12,7 +14,9 @@ const unb64url = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, 
 async function pipe(bytes, stream) { return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer()); }
 
 // What a shared app leaves out: nothing it needs to run (uploads are checked separately).
-export const canShareByLink = (project) => !(project.assets || []).length && !(project.sounds || []).length;
+// An Embed linking a site off the usual list (Allow any website) is shared as a file too.
+export const canShareByLink = (project) => !(project.assets || []).length && !(project.sounds || []).length && !(project.pages || []).length
+  && !(project.screens || []).some((sc) => (sc.objects || []).some((o) => o.kind === 'embed' && o.instances.some((i) => embedSource(project, i.page).kind === 'blocked')));
 
 // project -> "z.<base64url of deflated JSON>" (or "j.<base64url of JSON>" where compression isn't available)
 export async function encodeApp(project) {

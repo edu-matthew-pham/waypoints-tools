@@ -94,7 +94,17 @@ export function keepNow(data) {
   return storeOk === false && !(data instanceof Blob) ? data : ref; // a recording with no store lives in memory only
 }
 let storeOk; // known once the store has opened
-const toBlob = (dataUrl) => { const { type, bytes } = dataUrlToBytes(dataUrl); return new Blob([bytes], { type }); };
+// text (an Embed's web page) is UTF-8, so it reads the same in any browser
+const withCharset = (type) => (/^text\//.test(type) && !/charset=/i.test(type) ? type + ';charset=utf-8' : type);
+const toBlob = (dataUrl) => { const { type, bytes } = dataUrlToBytes(dataUrl); return new Blob([bytes], { type: withCharset(type) }); };
+
+// A web page for an Embed (HTML text), as { data, size } like keep(): a reference, or a data: URL with no media store.
+export async function keepPage(html) {
+  const type = 'text/html;charset=utf-8';
+  const blob = new Blob([html], { type });
+  const ref = await keepBlob(blob);
+  return { data: ref || bytesToDataUrl(new Uint8Array(await blob.arrayBuffer()), type), size: blob.size };
+}
 
 // An upload, as { data, size }: data is a reference when the store kept it, or the data: URL as before when it couldn't.
 export async function keep(dataUrl) {

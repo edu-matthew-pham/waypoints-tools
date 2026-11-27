@@ -7,7 +7,7 @@
 import { Runtime } from './core/runtime.js';
 import { usesKeys } from './core/catalog.js';
 import { sizeOf, tableColumns } from './core/project.js';
-import { imageData, soundInfo, videoSource } from './core/assets.js';
+import { imageData, soundInfo, videoSource, embedSource } from './core/assets.js';
 import { Stage } from './ui/stage.js';
 import { pictures, media as mediaLookups } from './ui/component-ui.js';
 import { h } from './ui/dom.js';
@@ -28,6 +28,7 @@ export const projectMedia = (getProject, { soundBase } = {}) => ({
   picture: (name) => imageData(getProject(), name),
   sound: (name) => soundInfo(getProject(), name, soundBase),
   video: (link) => videoSource(link, { allowYoutube: !!getProject().allowYoutube }),
+  embed: (page) => embedSource(getProject(), page, { allowAnyLink: !!getProject().allowAnyEmbed }),
   camera: () => !!getProject().allowCamera,
   mic: () => !!getProject().allowMic,
 });
@@ -37,6 +38,7 @@ export function useMedia(m) {
   if (m.picture) pictures.lookup = m.picture;
   if (m.sound) mediaLookups.sound = m.sound;
   if (m.video) mediaLookups.video = m.video;
+  if (m.embed) mediaLookups.embed = m.embed;
   if (m.camera) mediaLookups.camera = m.camera;
   if (m.mic) mediaLookups.mic = m.mic;
 }

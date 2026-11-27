@@ -5,9 +5,10 @@ import { OBJECT_KINDS } from '../core/catalog.js';
 import { duplicateInstance, deleteInstance, findInstance, isIdentifier, parseValue, sizeOf, tableColumns, isList, isTable, tableFields } from '../core/project.js';
 import { S, screen, hooks } from '../state.js';
 import { renameInput } from '../ui/rename-input.js';
-import { keep } from '../media-store.js';
-import { pickPicture, pickSound } from '../ui/upload.js';
-import { imageNames, imageData, assetName, soundNames, soundInfo, soundAssetName, videoSource, BUILTIN_SOUNDS } from '../core/assets.js';
+import { keep, keepPage } from '../media-store.js';
+import { pickPicture, pickSound, pickPage, pageCap } from '../ui/upload.js';
+import { modal } from '../ui/sheet-dialogs.js';
+import { imageNames, imageData, assetName, soundNames, soundInfo, soundAssetName, videoSource, BUILTIN_SOUNDS, pageNames, pageAssetName, embedSource } from '../core/assets.js';
 import { renameInstVar } from '../core/rename.js';
 import { screenItems } from '../ui/screen-items.js';
 
@@ -144,6 +145,7 @@ export function initDesign(root) {
           onchange: (e) => { S.project.allowYoutube = e.target.checked; hooks.commit(); } }),
           h('span', {}, 'Allow YouTube links in this app (off by default: YouTube is social media, so turn this on only if your school is happy with it)')));
     }
+    if (obj.kind === 'embed') extra.push(...embedProps(inst));
     if (obj.kind === 'drawing') {
       const bg = h('select', { class: 'ctl', 'aria-label': 'Background picture', 'data-ab': 'prop:background', onchange: (e) => { inst.background = e.target.value; hooks.commit(); } },
         h('option', { value: '' }, 'None (white)'),
@@ -221,7 +223,7 @@ export function initDesign(root) {
 
     props.replaceChildren(
       h('h3', {}, obj.name, h('small', {}, ` ${OBJECT_KINDS[obj.kind]?.label ?? obj.kind}${obj.instances.length > 1 ? ` · copy ${n} of ${obj.instances.length}` : ''}`)),
-      ...(['slider', 'shape', 'list', 'table'].includes(obj.kind) ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : obj.kind === 'image' || obj.kind === 'video' ? 'Description (read aloud by screen readers)' : obj.kind === 'sound' ? 'Title shown (leave empty for the sound\u2019s own)' : 'Text'), text)]),
+      ...(['slider', 'shape', 'list', 'table'].includes(obj.kind) ? [] : [h('label', { class: 'f wide' }, h('span', {}, obj.kind === 'input' ? 'Starting text' : obj.kind === 'toggle' ? 'Label' : obj.kind === 'image' || obj.kind === 'video' || obj.kind === 'embed' ? 'Description (read aloud by screen readers)' : obj.kind === 'sound' ? 'Title shown (leave empty for the sound\u2019s own)' : 'Text'), text)]),
       h('div', { class: 'grid4' }, numField('X', 'x', inst), numField('Y', 'y', inst), numField('Width', 'w', inst, 24), numField('Height', 'h', inst, 20)),
       ...extra,
       h('label', { class: 'f check' }, h('input', { type: 'checkbox', checked: inst.visible !== false, onchange: (e) => { inst.visible = e.target.checked; hooks.commit(); } }), h('span', {}, 'Visible at start')),
@@ -233,6 +235,49 @@ export function initDesign(root) {
         showCopies || obj.instances.length > 1 ? h('button', { class: 'btn', 'data-ab': 'duplicate', onclick: () => { const c = duplicateInstance(obj, inst, sizeOf(S.project)); S.selId = c.id; hooks.commit(); } }, 'Duplicate (new copy)') : null,
         h('button', { class: 'btn danger', 'data-ab': 'delete', onclick: () => { deleteInstance(screen(), inst.id); S.selId = null; hooks.commit(); } }, 'Delete')),
     );
+  }
+
+  // An Embed: one of the app's web pages (paste HTML or upload a .html file) or a link to a website.
+  function embedProps(inst) {
+    const pages = pageNames(S.project);
+    const isLink = /^https?:\/\//i.test(inst.page || '');
+    const use = (page) => { inst.page = page; hooks.commit(); };
+    const addPage = async (fileName, html) => {
+      if (!String(html).trim()) { hooks.notify('There is no HTML to use.'); return false; }
+      const size = new Blob([html]).size, max = await pageCap();
+      if (size > max) { hooks.notify(`That page is too big (keep it under about ${(max / 1e6).toFixed(1)} MB).`); return false; }
+      const name = pageAssetName(S.project, fileName);
+      (S.project.pages ||= []).push({ name, ...await keepPage(html) });
+      use(name);
+      return true;
+    };
+    const sel = h('select', { class: 'ctl', 'aria-label': 'Shows', 'data-ab': 'prop:page', onchange: (e) => use(e.target.value === '#link' ? 'https://' : e.target.value) },
+      h('option', { value: '', selected: !inst.page }, pages.length ? '\u2014 choose \u2014' : 'Nothing yet: paste or upload a page'),
+      pages.map((n) => h('option', { value: n, selected: inst.page === n }, `Web page: ${n}`)),
+      h('option', { value: '#link', selected: isLink }, 'A website (link)'));
+    const src = embedSource(S.project, inst.page, { allowAnyLink: !!S.project.allowAnyEmbed });
+    const paste = () => {
+      const area = h('textarea', { class: 'ctl emb-paste', rows: 14, spellcheck: 'false', 'data-ab': 'embed-html', 'aria-label': 'HTML', placeholder: '<!DOCTYPE html>\n<html>\u2026</html>' });
+      const nm = h('input', { class: 'ctl', value: 'page', 'aria-label': 'Name', 'data-ab': 'embed-name' });
+      const { close } = modal('Paste a web page',
+        h('div', {}, h('p', { class: 'muted small' }, 'Paste one whole HTML file, such as a simulation an AI chat made for you. It must be one file: scripts and styles inside it, libraries from a link. It runs in a safe box: it can\u2019t see the rest of the app, other apps or anything saved in this browser.'),
+          area, h('label', { class: 'f wide' }, h('span', {}, 'Name'), nm)),
+        h('button', { class: 'btn primary', type: 'button', 'data-ab': 'embed-use', onclick: async () => { if (await addPage(nm.value || 'page', area.value)) close(); } }, 'Use this page'));
+      area.focus();
+    };
+    return [
+      h('label', { class: 'f wide' }, h('span', {}, 'Shows'), sel),
+      isLink ? h('label', { class: 'f wide' }, h('span', {}, 'Link'), h('input', { class: 'ctl', type: 'url', value: inst.page, 'aria-label': 'Website link', 'data-ab': 'prop:embed-link',
+        placeholder: 'https://phet.colorado.edu/sims/html/\u2026', onchange: (e) => use(e.target.value.trim()) })) : null,
+      h('div', { class: 'btn-row' },
+        h('button', { class: 'btn', type: 'button', 'data-ab': 'embed-paste', onclick: paste }, '+ Paste HTML'),
+        h('button', { class: 'btn', type: 'button', 'data-ab': 'embed-upload', title: 'Upload a .html file', onclick: () => pickPage(({ fileName, html }) => addPage(fileName, html), hooks.notify) }, '+ Upload .html')),
+      h('p', { class: 'muted small' }, src.kind === 'page' ? 'Runs in a safe box: it can\u2019t see the rest of the app or anything saved in this browser. ' : src.kind === 'link' ? `Shows ${src.from}. Some sites won\u2019t show inside another page: then use the Open link in its corner. ` : src.why + '. ',
+        'Try it in the Run tab.'),
+      isLink || S.project.allowAnyEmbed ? h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: !!S.project.allowAnyEmbed, 'data-ab': 'allow-any-embed',
+        onchange: (e) => { S.project.allowAnyEmbed = e.target.checked; hooks.commit(); } }),
+        h('span', {}, 'Allow any website in this app (off: only PhET, Desmos, GeoGebra and Wikimedia Commons; turn on only for sites your school is happy with)')) : null,
+    ].filter(Boolean);
   }
 
   // arrows nudge, Delete removes. Returns true if it handled the key.

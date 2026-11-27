@@ -212,7 +212,7 @@ const RECENT_KEY = STORE_KEY + '.recent', RECENT_MAX = 5;
 function recentApps() {
   try { return JSON.parse(store((ls) => ls.getItem(RECENT_KEY)) || '[]'); } catch { return []; }
 }
-const emptyApp = (p) => p.screens.length <= 1 && !p.variables.length && !(p.assets || []).length && !(p.sounds || []).length
+const emptyApp = (p) => p.screens.length <= 1 && !p.variables.length && !(p.assets || []).length && !(p.sounds || []).length && !(p.pages || []).length
   && p.screens.every((s) => !s.events.length) && !(p.allScreens?.events || []).length && !(p.functions || []).length;
 function keepInRecent(p, key = RECENT_KEY) {
   if (!p || emptyApp(p)) return;
@@ -552,7 +552,7 @@ function qrFor(url) {
 // button there to open a copy in App Builder (#open=). Apps with their own pictures or sounds are shared as a file.
 async function shareApp() {
   if (!canShareByLink(S.project)) {
-    const { close } = modal('Share', h('p', {}, 'This app has pictures or sounds of its own (uploaded or recorded), and they are too big to fit in a link. Save it and share the file instead: the other person opens it with Open\u2026 in App Builder.'),
+    const { close } = modal('Share', h('p', {}, 'This app has pictures, sounds or web pages of its own (uploaded, recorded or pasted), and they can\u2019t go in a link. Save it and share the file instead: the other person opens it with Open\u2026 in App Builder.'),
       [h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close'), h('button', { class: 'btn primary', type: 'button', onclick: () => { close(); saveFile(); } }, 'Save the file')]);
     return;
   }

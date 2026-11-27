@@ -65,3 +65,23 @@ export function pickSound(onReady, notify) {
   });
   input.click();
 }
+
+// Pick a web page (.html) for an Embed: one self-contained file. Read as text; the caller keeps it (keepPage).
+// Capped at about 2 MB (a simulation is usually well under 200 KB), or about 500 KB with no media store.
+const PAGE_CAP = [2_000_000, 500_000];
+export const pageCap = () => cap(PAGE_CAP);
+export function pickPage(onReady, notify) {
+  const input = h('input', { type: 'file', accept: 'text/html,.html,.htm' });
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const max = await cap(PAGE_CAP);
+      if (file.size > max) { notify(`That page is too big (keep it under about ${(max / 1e6).toFixed(1)} MB: one file, without big pictures inside it).`); return; }
+      onReady({ fileName: file.name, html: await file.text() });
+    } catch {
+      notify('Could not read that page.');
+    }
+  });
+  input.click();
+}

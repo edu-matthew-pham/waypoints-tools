@@ -104,3 +104,47 @@ export function videoSource(link, { allowYoutube = false } = {}) {
   if (/\.(webm|mp4|ogv|m4v|mov)$/i.test(u.pathname)) return { kind: 'file', src: u.href, from: host };
   return { kind: 'none', why: 'Use a link to a video file (.webm or .mp4), such as a Wikimedia Commons file' };
 }
+
+// Web pages, for the Embed object: a simulation or tool someone made (often with an AI chat) as one self-contained
+// .html file. Uploads live in project.pages = [{ name, data, size? }], data as for pictures (a media reference, or a
+// data: URL where there is no media store). Only apps that use an Embed have project.pages; others are unchanged.
+// An Embed's `page` is the name of one of those pages, or a link to a website.
+//
+// A page runs sandboxed (ui/component-ui.js): scripts only, never this site's origin, so it can't read App Builder's
+// storage, other apps or drive sign-in, and can't move the page it is on. A link keeps its own site's origin.
+// Websites students can link without the teacher's say (project.allowAnyEmbed turns on any https site):
+export const EMBED_SITES = [
+  { host: 'phet.colorado.edu', from: 'PhET' },
+  { host: 'desmos.com', from: 'Desmos' },
+  { host: 'geogebra.org', from: 'GeoGebra' },
+  { host: 'commons.wikimedia.org', from: 'Wikimedia Commons' },
+];
+export const pageNames = (project) => (project.pages || []).map((a) => a.name);
+export function pageAssetName(project, fileName) {
+  const base = (String(fileName).replace(/\.[^.]*$/, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'page').replace(/^(\d)/, 'w$1');
+  const taken = new Set(pageNames(project));
+  let name = base, n = 2;
+  while (taken.has(name)) name = `${base}_${n++}`;
+  return name;
+}
+//   { kind: 'page', src, name }        one of the app's own pages (src: its object URL, or data: URL)
+//   { kind: 'link', src, from }        a website
+//   { kind: 'blocked' | 'none', why }
+export function embedSource(project, value, { allowAnyLink = false } = {}) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return { kind: 'none', why: 'Nothing to show yet: paste HTML, upload a page or give a link' };
+  const page = (project.pages || []).find((a) => a.name === raw);
+  if (page) {
+    const src = mediaSrc(page.data);
+    return src ? { kind: 'page', src, name: raw } : { kind: 'none', why: `The page "${raw}" isn’t in this browser (open a saved file of the app to bring it back)` };
+  }
+  if (!/^https?:\/\//i.test(raw)) return { kind: 'none', why: `There’s no page called "${raw}"` };
+  let u;
+  try { u = new URL(raw); } catch { return { kind: 'none', why: 'That isn’t a web link' }; }
+  if (u.protocol !== 'https:') return { kind: 'none', why: 'Use an https:// link' };
+  const host = u.hostname.toLowerCase();
+  const site = EMBED_SITES.find((s) => host === s.host || host.endsWith('.' + s.host));
+  if (site) return { kind: 'link', src: u.href, from: site.from };
+  if (!allowAnyLink) return { kind: 'blocked', why: `${host} isn’t one of the usual sites (PhET, Desmos, GeoGebra, Wikimedia Commons): tick "Allow any website" to use it` };
+  return { kind: 'link', src: u.href, from: host.replace(/^www\./, '') };
+}

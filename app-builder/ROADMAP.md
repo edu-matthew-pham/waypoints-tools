@@ -18,7 +18,7 @@ The picker groups tiles by category and only shows what the current level / less
 | Media | Image (+ asset panel, built-in icons), Emoji/icon | 2 | Assets stored as data URLs in the project file (size cap and warning). |
 | Data | List (shows items), Repeater (one row per list item), Gallery | 3-4 | Needs the list value type and "for each" first (section 4). |
 | Layout | Stack (row/column), Container, Tabs, Scroll area | 3-4 | Needs children inside containers (section 5). |
-| Advanced | Custom HTML widget (sandboxed iframe) | 4 | Escape hatch; talks to events through postMessage. |
+| Advanced | Custom HTML widget (sandboxed iframe) *(the Embed object, §13; phase 1 built 28 Nov 2026)* | 4 | Escape hatch; talks to events through postMessage. |
 
 ## 2. Input events
 
@@ -278,6 +278,48 @@ logger, a revision quiz, a budget, a timeline. No accounts, so school approval i
 4. **Templates:** a gallery of starting points (quiz, tracker, photo log), fed by the samples plan.
 5. **Teacher confidence:** a "for teachers" page (what it is, privacy, collecting work) and time being reliable in class.
 6. **iPad and phone,** at least for running apps.
+
+## 13. Embed object *(proposed and agreed 28 Nov 2026, Matthew; phase 1 built 28 Nov, 1.12: README › Embed)*
+
+**Why.** A trial with teachers making their own apps. Teachers already use an AI chat to make single-file simulations
+(as Matthew did for science). Embed lets them bring one in and build the app around it with event sheets: questions, a
+table of readings, checks. It keeps the agreed stance of no built-in AI (§9): a copyable prompt does the AI part. What
+Google Sites embeds can't do is the two-way bridge (phase 2) between the embedded tool and event sheets.
+
+**Phase 1, the object** *(built)*:
+- Sources: paste HTML, upload an `.html` file, or a link. A link that refuses to be framed: an Open ↗ link in its corner.
+- Pasted or uploaded HTML must be one self-contained file (scripts and styles inside, libraries from a CDN). Several-file
+  sims go through the link route. Default hosting for teachers: none, the HTML lives inside the app. GitHub Pages is for
+  keen teachers, or a shared Learning Waypoints collection later.
+- Storage: a page is an upload (`project.pages`) in the media store. Zip and drive saves write it as `embeds/<name>.html`.
+  Share by link: like other uploads, an app with its own pages is shared as a file, which also keeps arbitrary HTML off
+  public learningwaypoints.com links (so is one linking a site off the list).
+- Sandbox, only inside Embed iframes: apps without an Embed (all current tutorial apps) are unchanged, and the
+  interpreter keeps running student logic with no eval. Pages: `sandbox="allow-scripts"` only (an object URL in a
+  sandboxed iframe, rather than `srcdoc`: the same blank origin, and the page streams from the media store). Never
+  `allow-same-origin` (it would run as App Builder's origin and reach IndexedDB, localStorage and drive tokens); no top
+  navigation, popups or forms. Links: `allow-scripts allow-same-origin` (their own site's origin; PhET, Desmos and
+  GeoGebra need it) plus forms and popups. If App Builder later adds a Content-Security-Policy, allow blob: frames and
+  the permitted link sources.
+- Levels and students: Level 4. Technically safe for students (the sandbox protects App Builder whoever pastes). Links
+  are limited to PhET, Desmos, GeoGebra and Wikimedia Commons unless the app's Allow any website is ticked (like
+  Allow YouTube links). The learning risk is skipping the event sheets: lessons can require the bridge events.
+
+**Phase 2, the bridge:**
+- Event "When the embed sends `<name>`", with the value available in the event. Action "Send to embed `<name>` `<value>`".
+- `postMessage` `{ name, value }`: plain text or numbers only, a size cap, accepted only from that iframe's own window.
+  Messages are data, never evaluated, and join the event queue like a click. Interpreter tests fake messages without an iframe.
+
+**Then:**
+- Prompt helper: a copyable prompt asking an AI chat for one self-contained HTML file that sends named values by this
+  protocol (e.g. "send `period` whenever it changes").
+- A sample: a ready-made pendulum that sends `period`, with an app around it (a readings table, questions, checks). The
+  basis of an advanced lesson (the student builds the app around a given sim and never writes HTML) and of the teacher
+  trial's templates.
+
+**Separate from the build:** a teacher trial, 3–5 teachers starting from templates (sim + questions, vocab drill, prac
+data logger, exit ticket), watching what they change and where event sheets stop them.
+**Not planned:** a built-in AI widget (cost, keys, privacy, school approval).
 
 ## Suggested order
 

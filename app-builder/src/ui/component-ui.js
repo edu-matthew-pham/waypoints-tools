@@ -7,7 +7,8 @@ import { isPictureValue, isSoundValue, refRange } from '../core/media.js';
 export const pictures = { lookup: () => '' };
 // name -> { src, title, credit } for sounds; link -> video source (core/assets.js videoSource). Set by the app.
 // camera, mic: are they allowed for this app (project.allowCamera, allowMic; off unless the teacher turns them on)
-export const media = { sound: () => null, video: () => ({ kind: 'none', why: 'No video link yet' }), camera: () => false, mic: () => false };
+// embed: an Embed's page -> core/assets.js embedSource
+export const media = { sound: () => null, video: () => ({ kind: 'none', why: 'No video link yet' }), embed: () => ({ kind: 'none', why: 'Nothing to show yet' }), camera: () => false, mic: () => false };
 const isPicValue = isPictureValue;
 const thumb = (v) => (isSoundValue(v) ? h('span', { class: 'cell-snd' }, '🔊 Recording') : h('img', { class: 'cell-pic', src: pictures.lookup(v), alt: '' }));
 const startOf = (src) => refRange(src.replace(/^blob:[^#]*/, 'media:00000000'))?.[0] || 0;
@@ -25,6 +26,7 @@ export const ICONS = {
   recorder: svg('<rect x="18" y="6" width="12" height="22" rx="6"/><path d="M11 22a13 13 0 0 0 26 0M24 35v7M17 42h14"/>'),
   photo:  svg('<path d="M6 16h8l3-5h14l3 5h8v22H6z"/><circle cx="24" cy="26" r="7"/>'),
   video:  svg('<rect x="5" y="11" width="38" height="26" rx="4"/><path d="M21 18v12l10-6z" fill="currentColor"/>'),
+  embed:  svg('<rect x="5" y="8" width="38" height="32" rx="4"/><path d="M5 16h38"/><path d="M19 24l-5 5 5 5M29 24l5 5-5 5"/>'),
   list:   svg('<path d="M16 14h24M16 24h24M16 34h24"/><circle cx="9" cy="14" r="1.5" fill="currentColor"/><circle cx="9" cy="24" r="1.5" fill="currentColor"/><circle cx="9" cy="34" r="1.5" fill="currentColor"/>'),
   table:  svg('<rect x="6" y="9" width="36" height="30" rx="3"/><path d="M6 18h36M6 28h36M20 9v30"/>'),
   toggle: svg('<rect x="6" y="15" width="36" height="18" rx="9"/><circle cx="33" cy="24" r="5"/>'),
@@ -39,6 +41,19 @@ Object.assign(ICONS, {
   variables: svg('<rect x="7" y="9" width="34" height="30" rx="5"/><path d="M17 18l14 12M31 18L17 30"/>'),
 });
 export const FALLBACK_ICON = svg('<rect x="8" y="8" width="32" height="32" rx="6"/>');
+
+export const PAGE_SANDBOX = 'allow-scripts';
+export const LINK_SANDBOX = 'allow-scripts allow-same-origin allow-forms allow-popups';
+// The sandbox is set before the src, so the page never loads without it.
+function embedFrame(src, title) {
+  const f = document.createElement('iframe');
+  f.setAttribute('sandbox', src.kind === 'page' ? PAGE_SANDBOX : LINK_SANDBOX);
+  f.setAttribute('referrerpolicy', src.kind === 'page' ? 'no-referrer' : 'strict-origin-when-cross-origin');
+  if (src.kind === 'link') f.setAttribute('allow', 'fullscreen');
+  f.setAttribute('title', title || (src.kind === 'page' ? `Web page: ${src.name}` : `From ${src.from}`));
+  f.setAttribute('src', src.src);
+  return f;
+}
 
 // make(design) builds the inner element once; write(inner, props) brings it up to date.
 // white or dark words on an element's (computed) background, whichever is easier to read
@@ -130,6 +145,27 @@ export const RENDER = {
       el._seq = p.mediaSeq || 0;
       if (pl.tagName === 'VIDEO') { if (p.playing) { pl.currentTime = 0; pl.play().catch(() => pl.dispatchEvent(new Event('pause'))); } else pl.pause(); }
       else pl.contentWindow?.postMessage(JSON.stringify({ event: 'command', func: p.playing ? 'playVideo' : 'pauseVideo', args: [] }), '*');
+    },
+  },
+  // A web page of the app's own (pasted or uploaded HTML) or a website, in an iframe. Pages get the strict sandbox:
+  // scripts only, so they run in a blank origin of their own and can't reach App Builder's storage, the drive sign-in or
+  // the page around them (no allow-same-origin, no top navigation, no popups, no forms). A website keeps its own
+  // origin (allow-same-origin means its own site there, not App Builder's), which tools like PhET need. In Design only
+  // a placeholder shows, so dragging works and nothing runs while editing.
+  embed: {
+    make: (design) => { const el = h('div', { class: 'emb' }); el._design = design; return el; },
+    write: (el, p) => {
+      const src = media.embed(p.page);
+      const key = JSON.stringify([src, p.text]);
+      if (el._key === key) return;
+      el._key = key;
+      if (el._design || (src.kind !== 'page' && src.kind !== 'link')) {
+        el.replaceChildren(h('div', { class: 'emb-ph' }, h('div', { class: 'emb-big' }, '🌐'),
+          h('div', {}, src.kind === 'page' ? `Web page: ${src.name}` : src.kind === 'link' ? `Website from ${src.from}` : src.why)));
+        return;
+      }
+      el.replaceChildren(embedFrame(src, p.text), ...(src.kind === 'link'
+        ? [h('a', { class: 'emb-open', href: src.src, target: '_blank', rel: 'noopener noreferrer', title: 'If it doesn\u2019t show here, open it in a new tab' }, `Open ${src.from} ↗`)] : []));
     },
   },
   list: {

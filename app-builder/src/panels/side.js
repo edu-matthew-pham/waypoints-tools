@@ -191,7 +191,20 @@ export function renderSide(el) {
           const name = soundAssetName(S.project, fileName);
           S.project.sounds.push({ name, ...await keep(data), title: fileName.replace(/\.[^.]*$/, '') }); hooks.commit();
         }, hooks.notify), 'data-ab': 'side-upload-sound' }, '+ Upload sound'))] : []),
-    ...(S.project.assets.length || S.project.sounds?.length ? [storageNote()] : []),
+    // Web pages for Embeds: only shown once the app has one (pasted or uploaded on an Embed)
+    ...((S.project.pages || []).length ? [
+      h('h3', {}, 'Web pages (whole app)'),
+      h('div', { class: 'pic-list' }, S.project.pages.map((a) => h('div', { class: 'var pic-row', 'data-ab': 'page:' + a.name },
+        h('span', { class: 'snd-ico', 'aria-hidden': 'true' }, '🌐'), h('span', { class: 'vname' }, a.name),
+        h('span', { class: 'muted start-count' }, `${Math.round(uploadSize(a) / 1024)} KB`),
+        h('button', { class: 'icon danger', title: 'Delete web page', onclick: () => {
+          const users = S.project.screens.flatMap((sc) => sc.objects.filter((o) => o.instances.some((i) => i.page === a.name)).map((o) => o.name));
+          if (users.length) { hooks.notify(`${a.name} is still used by ${users.join(', ')}. Change those first.`); return; }
+          S.project.pages = S.project.pages.filter((x) => x !== a);
+          if (!S.project.pages.length) delete S.project.pages;
+          hooks.commit();
+        } }, '×'))))] : []),
+    ...(S.project.assets.length || S.project.sounds?.length || S.project.pages?.length ? [storageNote()] : []),
     h('p', { class: 'muted legal' }, h('span', { 'data-ab': 'version' }, `App Builder ${VERSION}. `), 'Free for education. Commercial use by permission only.'),
   );
 }

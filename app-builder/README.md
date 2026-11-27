@@ -285,6 +285,33 @@ Sound takes no space while the app runs and still plays from events (Play, Stop)
 shows faded, labelled "no player: plays from events", so it can still be found and selected. Its credit (the open
 licences ask for one) then shows in a line under the running app. The sheet text adds "(no player)".
 
+## Embed (ROADMAP §13, phase 1, 28 Nov 2026; 1.12; Level 4)
+
+**Embed object** (Media, Level 4): a simulation or tool made as one self-contained HTML file (often by an AI chat, with
+App Builder's events built around it), or a website. Properties › Shows: one of the app's **web pages** or **A website
+(link)**; **+ Paste HTML** (a box to paste a whole file, and a name) or **+ Upload .html** (up to about 2 MB; about
+500 KB with no media store).
+
+- **Pages** live in `project.pages = [{ name, data, size? }]`, like uploads: kept in the media store as
+  `text/html;charset=utf-8`, listed under **Web pages (whole app)** in the sidebar (only once there is one), and saved
+  in the zip as `embeds/<name>.html`, so they can be opened and edited outside App Builder and opened again. Projects
+  without an Embed don't get a `pages` list, so they and their sheet text are unchanged.
+- **Sandbox** (`src/ui/component-ui.js`, `PAGE_SANDBOX`): a page runs in an iframe with `sandbox="allow-scripts"` only,
+  set before its `src` (the page's object URL). No `allow-same-origin`, so it gets a blank origin of its own and can't
+  read App Builder's localStorage or IndexedDB (projects, media, drive sign-in) or reach the page around it; no
+  `allow-top-navigation`, `allow-popups` or `allow-forms`. App Builder itself is unchanged: student logic still runs in
+  its own interpreter, with no eval; embedded HTML is the only code it didn't write, and only inside that iframe.
+  `tests/browser/embed.test.mjs` checks a page that tries all of this gets nowhere.
+- **Websites:** PhET, Desmos, GeoGebra and Wikimedia Commons (and their subdomains), https only. Any other site needs
+  the app's **Allow any website** tick (off by default, like Allow YouTube links). A website keeps its own origin
+  (`allow-scripts allow-same-origin allow-forms allow-popups`: same-origin means its own site there), and gets an
+  **Open … ↗** link in its corner for sites that refuse to show inside another page.
+- **Design** shows a placeholder (nothing runs while editing); the Run tab and shared apps show the real thing.
+- **Share by link:** apps with their own pages, or linking a site off the list, are shared as a file (Share says so),
+  so pasted HTML never gets a learningwaypoints.com link.
+- Sheet text: `object Sim (embed) text "" page "pendulum"`. Tests: `tests/embed.test.js`, `tests/browser/embed.test.mjs`.
+- Next (ROADMAP §13): the bridge (events from the page, Send to embed), a copyable prompt, a pendulum sample.
+
 ## Media store (ROADMAP §10, step 1, 26 Nov 2026)
 
 Uploaded pictures and sounds are kept as files in the browser's IndexedDB (database `appbuilder-media`): this site's
@@ -415,6 +442,7 @@ just the working app, full size (`src/play-page.js`, the Player only), with Rest
 (`#open=…`: loads it as the viewer's own copy; their current app goes to Recent). The original never changes; a changed
 app needs a new link. A shared app's Remember between visits data stays in each viewer's browser (its own key per link).
 Apps with their own pictures or sounds (uploads, recordings) are too big for a link: Share says so and offers Save.
+So are apps with their own web pages (Embed), or an Embed linking a site off the usual list.
 Typical links are 1–3k characters; over 8k, the dialog warns that some chat apps cut long links. Inside the tutorials,
 the link points at the tutorials site's copy of App Builder, so a student can send a teacher their app from a lesson.
 

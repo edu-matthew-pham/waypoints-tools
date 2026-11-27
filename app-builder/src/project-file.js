@@ -1,6 +1,6 @@
 // Saving and opening a project as a file.
 //
-// No pictures or recordings: plain JSON, as before (projectname.app.json).
+// No pictures or recordings: plain JSON, as before (projectname.app.json). An Embed's web pages are in embeds/<name>.html.
 // With them: one zip (projectname.app.zip) holding project.json, which keeps its media:<id> references, and a media/
 // folder with each file, named by its reference (media/7f3a09c2.png). It opens on any computer, and is also an
 // ordinary zip someone can look inside.
@@ -14,8 +14,9 @@ import { VERSION } from './version.js';
 import { validProgress } from './carry.js';
 
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/svg+xml': 'svg',
+  'text/html': 'html',
   'audio/mpeg': 'mp3', 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/wav': 'wav', 'audio/x-wav': 'wav' };
-const TYPE = Object.fromEntries(Object.entries(EXT).map(([t, e]) => [e, t]));
+const TYPE = { ...Object.fromEntries(Object.entries(EXT).map(([t, e]) => [e, t])), html: 'text/html;charset=utf-8' };
 const baseType = (t) => String(t || '').split(';')[0];
 const fileName = (name, ext) => (name || 'app').replace(/[^\w-]+/g, '-') + ext;
 
@@ -27,11 +28,13 @@ export async function buildSave(project, remembered = null, progress = null) {
   const refs = [...collectRefs(out)];
   if (!refs.length) return { filename: fileName(project.name, '.app.json'), data: JSON.stringify(out, null, 2), type: 'application/json', missing: 0 };
   const files = [], media = {};
+  // an Embed's web pages go in embeds/, by name, so they are easy to find, open and edit outside App Builder
+  const pageOf = new Map((out.pages || []).filter((a) => typeof a.data === 'string').map((a) => [refFile(a.data), a.name]));
   let missing = 0;
   for (const ref of refs) {
     const f = await getFile(ref);
     if (!f) { missing++; continue; }
-    const path = `media/${ref.slice(6)}.${EXT[baseType(f.type)] || 'bin'}`;
+    const path = pageOf.has(ref) ? `embeds/${String(pageOf.get(ref)).replace(/[^\w-]+/g, '-')}.html` : `media/${ref.slice(6)}.${EXT[baseType(f.type)] || 'bin'}`;
     media[ref] = { file: path, type: f.type };
     files.push({ name: path, bytes: new Uint8Array(await f.blob.arrayBuffer()) });
   }

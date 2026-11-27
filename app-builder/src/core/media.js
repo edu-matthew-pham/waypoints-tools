@@ -53,12 +53,12 @@ export const mediaSrc = (v) => {
   return u && v.length > 14 ? u + v.slice(14) : u;
 };
 // is this value a picture someone made or uploaded (a data: URL or reference to an image)? Recordings are references too.
-export const isPictureValue = (v) => (typeof v === 'string' && v.startsWith('data:image/')) || (isRef(v) && !mediaType(v).startsWith('audio/'));
+export const isPictureValue = (v) => (typeof v === 'string' && v.startsWith('data:image/')) || (isRef(v) && !mediaType(v).startsWith('audio/') && !mediaType(v).startsWith('text/'));
 export const isSoundValue = (v) => (typeof v === 'string' && v.startsWith('data:audio/')) || (isRef(v) && mediaType(v).startsWith('audio/'));
 
-// Uploads kept in the project (project.assets and project.sounds: [{ name, data, ... }]). `data` is a reference when
+// Uploads kept in the project (project.assets, project.sounds and, for Embeds, project.pages: [{ name, data, ... }]). `data` is a reference when
 // the file is in the media store, or a data: URL (older projects, a saved file, or a browser with no media store).
-export const uploads = (project) => [...(project.assets || []), ...(project.sounds || [])];
+export const uploads = (project) => [...(project.assets || []), ...(project.sounds || []), ...(project.pages || [])];
 export const uploadsToMove = (project) => uploads(project).filter((a) => isDataUrl(a.data));
 // rough size in bytes of an upload, for the sidebar
 export const uploadSize = (a) => a.size ?? (isDataUrl(a.data) ? Math.round((a.data.length - a.data.indexOf(',') - 1) * 0.75) : 0);
