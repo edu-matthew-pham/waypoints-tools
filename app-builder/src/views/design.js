@@ -198,6 +198,13 @@ export function initDesign(root) {
           } }), h('span', {}, f)))));
       }
     }
+    if (obj.kind === 'text' || obj.kind === 'button') { // '' is the app's own style; events can change it too
+      const own = !inst.color;
+      extra.push(h('label', { class: 'f' }, h('span', {}, obj.kind === 'text' ? 'Colour of the words' : 'Colour'),
+        h('input', { type: 'color', 'data-ab': 'prop:color', value: /^#[0-9a-f]{6}$/i.test(inst.color || '') ? inst.color : (obj.kind === 'text' ? '#1c2333' : '#2f6fdd'), 'aria-label': 'Colour',
+          oninput: (e) => { inst.color = e.target.value; sync(); }, onchange: () => hooks.commit() }),
+        own ? h('span', { class: 'muted small' }, 'the usual') : h('button', { class: 'btn small', type: 'button', 'data-ab': 'prop:color-reset', onclick: () => { inst.color = ''; hooks.commit(); } }, 'Usual')));
+    }
     if (obj.kind === 'shape') {
       extra.push(h('label', { class: 'f' }, h('span', {}, 'Colour'), h('input', { type: 'color', value: inst.color || '#2f6fdd', 'aria-label': 'Colour', oninput: (e) => { inst.color = e.target.value; sync(); }, onchange: () => hooks.commit() })));
     }

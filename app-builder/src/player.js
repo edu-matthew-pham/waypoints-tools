@@ -143,6 +143,7 @@ export class Player {
         : i.kind === 'table' ? { ...i.props, items: rt.globals.get(i.props.source), fields: tableColumns(rt.project, i.props), selected: i.selected || 0,
           pictureFields: (rt.tables.get(i.props.source) || []).filter((f) => f.type === 'picture').map((f) => f.name) }
           : i.props })));
+    this.stage.el.style.background = rt.background || ''; // Set screen background (as designed until an event sets it)
     this.on.onDraw?.(rt);
   }
 }

@@ -268,6 +268,12 @@ Level 4 (or a lesson allow-list that names a table action). Plan: tutorials Proj
 - Sheet text: `object Music (sound) text "" sound calm`, `object Clip (video) text "" link "https://…"`.
 - Tests: `tests/media.test.js`.
 
+**Colours while the app runs** (1.11, from Level 2): *Set {target} colour to …* for a Box (its fill), a Text (its
+words) and a Button (its fill; the label turns white or dark to stay readable), and *Set screen background to …*
+(kept across screens until set again; as designed until an event sets it). A colour is a name in quotes (`"black"`,
+`"light blue"`) or a code (`"#1c2333"`); anything else is an error in that event, not a crash (`src/core/colour.js`).
+Text and Button also get a Colour in Design ("Usual" goes back to the app's own style).
+
 **Toggle: Tick box look** (1.10): Properties › Look: Switch (the default) or Tick box. Either is on or off:
 `Toggle.on` is true or false, and *is switched*, *is on* and *Set on* work the same; a tick box suits lists of things
 to do, a switch suits settings. It is a real checkbox for screen readers. Sheet text adds "(tick box)". (Note for

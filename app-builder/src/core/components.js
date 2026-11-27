@@ -15,8 +15,8 @@
 export const CATEGORIES = ['Basics', 'Choices', 'Data', 'Media', 'Layout'];
 
 export const COMPONENTS = {
-  button: { id: 'button', label: 'Button',     category: 'Basics', hint: 'Something to tap or click.',            base: 'Button', props: { text: 'Button', w: 150, h: 46 } },
-  text:   { id: 'text',   label: 'Text',       category: 'Basics', hint: 'Words on the screen. Events can change them.', base: 'Text',   props: { text: 'Text',   w: 220, h: 32 } },
+  button: { id: 'button', label: 'Button',     category: 'Basics', hint: 'Something to tap or click.',            base: 'Button', props: { text: 'Button', w: 150, h: 46 } , extra: { color: '' } },
+  text:   { id: 'text',   label: 'Text',       category: 'Basics', hint: 'Words on the screen. Events can change them.', base: 'Text',   props: { text: 'Text',   w: 220, h: 32 } , extra: { color: '' } },
   input:  { id: 'input',  label: 'Text input', category: 'Basics', hint: 'A box where the user types.',           base: 'Input',  props: { text: '',       w: 220, h: 42 } },
   shape:  { id: 'shape',  label: 'Box',        category: 'Basics', hint: 'A coloured rectangle: bars, backgrounds, dividers.', base: 'Box', props: { text: '', w: 200, h: 24 }, extra: { color: '#2f6fdd' } },
   image:  { id: 'image',  label: 'Image',      category: 'Media', hint: 'A picture: upload one or pick a built-in.', base: 'Image', props: { text: '', w: 120, h: 120 }, extra: { image: 'star' } },

@@ -41,11 +41,25 @@ Object.assign(ICONS, {
 export const FALLBACK_ICON = svg('<rect x="8" y="8" width="32" height="32" rx="6"/>');
 
 // make(design) builds the inner element once; write(inner, props) brings it up to date.
+// white or dark words on an element's (computed) background, whichever is easier to read
+function readableOn(el) {
+  const m = getComputedStyle(el).backgroundColor.match(/[\d.]+/g);
+  if (!m) return '';
+  const [r, g, b] = m.map(Number);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#1c2333' : '#ffffff';
+}
 const setText = (inner, p) => { if (inner.textContent !== p.text) inner.textContent = p.text; };
 // read(el) turns a user's change on the element into the value the interpreter wants (default: el.value).
 export const RENDER = {
-  button: { make: () => h('button', { type: 'button' }), write: setText },
-  text: { make: () => h('div', { class: 't' }), write: setText },
+  // colour: '' is the app's own style; a Button's label turns white or dark to stay readable on its fill
+  button: { make: () => h('button', { type: 'button' }), write: (inner, p) => {
+    setText(inner, p);
+    if ((inner.dataset.c || '') === (p.color || '')) return;
+    inner.dataset.c = p.color || '';
+    inner.style.background = p.color || ''; inner.style.borderColor = p.color || '';
+    inner.style.color = p.color ? readableOn(inner) : '';
+  } },
+  text: { make: () => h('div', { class: 't' }), write: (inner, p) => { setText(inner, p); if ((inner.style.color || '') !== (p.color || '')) inner.style.color = p.color || ''; } },
   input: {
     make: (design) => h('input', { type: 'text', spellcheck: 'false', autocomplete: 'off', placeholder: design ? 'Text input' : '' }),
     write: (inner, p) => { if (inner.value !== p.text) inner.value = p.text; },

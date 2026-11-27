@@ -21,7 +21,7 @@ const L1_ACT = ['setText', 'setVar', 'addTo', 'subtractFrom', 'goToScreen', 'set
 const L2_COND = [...L1_COND, 'everyTick', 'compareVar', 'compareValues', 'onChanged',
   'onPressed', 'onReleased', 'onToggled', 'onSlid', 'onSubmitted', 'isOn', 'onKey', 'onKeyUp', 'onEvery', 'onAfter', 'triggerOnce', 'compareText', 'isPlaying', 'onEnded'];
 const L3_COND = [...L2_COND, 'compareInst', 'keyHeld', 'forEach', 'repeat', 'listHas', 'onItemClicked', 'onDrawn', 'onRecorded', 'onPhotoTaken'];
-const L2_ACT = [...L1_ACT, 'setOn', 'setSlider', 'setSize', 'setImage', 'playSound', 'stopSound', 'setSound', 'setVideo', 'openLink'];
+const L2_ACT = [...L1_ACT, 'setOn', 'setSlider', 'setSize', 'setImage', 'playSound', 'stopSound', 'setSound', 'setVideo', 'openLink', 'setColour', 'setBackground'];
 const MAKE_MEDIA = ['clearDrawing', 'undoDrawing', 'setPenColour', 'setPenSize', 'setDrawingBackground', 'takePhoto', 'setImageFrom'];
 const L3_ACT = [...L2_ACT, ...MAKE_MEDIA, 'setSoundNamed', 'setInst', 'addToInst', 'listAdd', 'listRemoveAt', 'listRemoveValue', 'listSet', 'listClear'];
 // Level 4 only (level 4 offers everything; these lists say which entries are new there, so none is forgotten)

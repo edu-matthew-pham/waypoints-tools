@@ -324,6 +324,8 @@ export class Runtime {
   setProp(inst, name, value) {
     if (inst.props[name] !== value) { inst.props[name] = value; this.#changed(); }
   }
+  // the screen background an event set (null: as designed); kept across screens until set again
+  setBackground(colour) { if (this.background !== colour) { this.background = colour; this.#changed(); } }
   goTo(screenId) {
     if (!this.project.screens.some((s) => s.id === screenId)) throw new ExprError('That screen no longer exists');
     this.pendingScreen = screenId;

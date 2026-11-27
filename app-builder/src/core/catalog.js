@@ -9,6 +9,7 @@ import { COMPONENTS } from './components.js';
 //              args (one value box per parameter of the chosen function: { param: expression })
 
 import { ExprError, fmt, OPERATORS, compare } from './expr.js';
+import { colourValue } from './colour.js';
 
 export const OBJECT_KINDS = COMPONENTS; // kept under the old name for the interpreter and project helpers
 export { OPERATORS, compare };
@@ -208,6 +209,19 @@ export const ACTIONS = {
     category: 'Object', label: 'Undo the last line on {target}',
     params: [obj({ kinds: ['drawing'] })],
     run: (rt, ctx, p) => rt.each(ctx, p.target, (inst) => rt.drawing(inst, 'undo')),
+  },
+  // Colours while the app runs (1.11): a Box's fill, a Text's letters, a Button's fill (its label stays readable).
+  setColour: {
+    category: 'Object', label: 'Set {target} colour to {value}',
+    params: [obj({ kinds: ['shape', 'text', 'button'] }), expr('value', '"black"')],
+    help: 'A colour name in quotes, like "black" or "light blue", or a code like "#1c2333". For a Text it is the colour of the words; for a Box or a Button, its fill.',
+    run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => rt.setProp(inst, 'color', colourValue(fmt(rt.evalExpr(p.value, c))))),
+  },
+  setBackground: {
+    category: 'Screen', label: 'Set screen background to {value}',
+    params: [expr('value', '"black"')],
+    help: 'A colour name in quotes, like "black" or "white", or a code like "#1c2333". It stays until it is set again, on every screen.',
+    run: (rt, ctx, p) => rt.setBackground(colourValue(fmt(rt.evalExpr(p.value, ctx)))),
   },
   setPenColour: {
     category: 'Object', label: 'Set {target} pen colour to {value}',
