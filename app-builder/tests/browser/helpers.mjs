@@ -20,7 +20,11 @@ export function lessonFiles(name) {
 export const region = (files, name) => JSON.parse(files['app.json'].split('// region: ' + name + '\n')[1].split('\n// endregion')[0]);
 
 let browser = null;
-export async function launch() { browser ??= await chromium.launch(); return browser; }
+// Watch it run: HEADED=1 shows the browser window; SLOWMO=300 waits that many ms between actions.
+export async function launch() {
+  browser ??= await chromium.launch({ headless: !process.env.HEADED, slowMo: Number(process.env.SLOWMO) || 0 });
+  return browser;
+}
 export async function close() { await browser?.close(); browser = null; }
 
 // A fresh page (its own storage). lessons: { 'code/apps/x': 'fixture-name' }; list: the tutorials list to serve.

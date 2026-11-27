@@ -12,6 +12,7 @@ inputs, driven by an event sheet: *when this happens, do that*. Runs in the brow
     npx playwright install chromium # once, for the browser tests
     npm run test:browser            # browser tests: real Chromium, files from disk (tests/browser/)
     npm run audit:lessons           # every published lesson, guided: a student who only follows the ring
+    HEADED=1 SLOWMO=300 npm run audit:lessons water   # watch it in a browser window, slowed down, one lesson
     python3 -m http.server 8080     # run locally from the repo root, then open /app-builder/
 
 `src/` is the source; `index.html` is built from it (`tools/build.mjs`) and committed, so the site needs no build step.
