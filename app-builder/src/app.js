@@ -12,7 +12,7 @@ import { initMap } from './views/map.js';
 import { checkProject, newProject, findInstance, DEVICES } from './core/project.js';
 import { LEVELS, resolve, fromParams } from './edu/features.js';
 import { embed } from './embed.js';
-import { parseSource, loadStarter, loadRef, tutorialUrl, TUTORIAL_LIST, parseTutorialList } from './edu/tutorial.js';
+import { parseSource, loadStarter, loadRef, tutorialUrl, TUTORIAL_LIST, tutorialSections } from './edu/tutorial.js';
 import { startTutorial } from './ui/tutorial-panel.js';
 import { sheetText } from './core/sheet-text.js';
 import { addBuiltinSounds, sources } from './core/assets.js';
@@ -463,30 +463,48 @@ async function tutorialList() {
     current ? h('button', { class: 'btn', type: 'button', 'data-ab': 'tutorial-leave', onclick: () => { location.href = here; } }, 'Leave the tutorial') : null,
     h('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close')].filter(Boolean);
   const { close } = modal('Guided tutorials', body, foot);
-  let courses;
+  let sections;
   try {
     const r = await fetch(TUTORIAL_LIST, { cache: 'no-cache' });
     if (!r.ok) throw new Error('missing');
-    courses = parseTutorialList(await r.json());
+    sections = tutorialSections(await r.json());
   } catch (e) {
     body.replaceChildren(h('p', {}, /newer form/.test(e?.message) ? e.message : 'The list of tutorials couldn\u2019t be loaded. Check the internet connection, or open a tutorial from its lesson page.'));
     return;
   }
   // started: its work or its step is kept in this browser
+  // started: its work or its step is kept in this browser
   const started = (slug) => store((ls) => ls.getItem('appbuilder.tutorial.' + slug) !== null || ls.getItem('appbuilder.tutorial.' + slug + '.step') !== null);
+  const has = (sec, test) => sec.groups.some((g) => g.lessons.some(test));
+  // one section at a time: the one you're in, else the last one you've started something in, else the first
+  let at = sections.findIndex((sec) => has(sec, (l) => l.slug === current));
+  if (at < 0) at = sections.map((sec) => has(sec, (l) => started(l.slug))).lastIndexOf(true);
+  if (at < 0) at = 0;
+  const panel = h('div', { class: 'tl-panel', role: 'tabpanel' });
+  const tabs = h('div', { class: 'tl-tabs', role: 'tablist', 'aria-label': 'Tutorial sections' });
+  const show = (i) => {
+    at = i;
+    tabs.replaceChildren(...sections.map((sec, k) => {
+      const n = sec.groups.reduce((t, g) => t + g.lessons.length, 0);
+      return h('button', { class: 'tl-tab' + (k === at ? ' on' : ''), type: 'button', role: 'tab', 'aria-selected': String(k === at), 'data-ab': 'tutorial-section:' + (k + 1),
+        onclick: () => show(k) }, h('span', { class: 'tl-step' }, String(k + 1)), sec.title, h('span', { class: 'tl-n' }, `${n}`));
+    }));
+    panel.replaceChildren(...sections[at].groups.map((g) => h('section', { class: 'tl-course' }, g.title ? h('h4', {}, g.title) : null,
+      h('ul', {}, g.lessons.map((l) => {
+        const isNow = l.slug === current;
+        return h('li', {}, h('button', { class: 'tl-item' + (isNow ? ' now' : ''), type: 'button', 'data-ab': 'tutorial:' + l.slug,
+          onclick: () => { if (isNow) { close(); return; } location.href = here + '?lesson=' + encodeURI(l.slug); } },
+          h('span', { class: 'tl-title' }, l.title, l.optional ? h('span', { class: 'tag' }, 'extra') : null,
+            isNow ? h('span', { class: 'tag on' }, 'open now') : started(l.slug) ? h('span', { class: 'tag' }, 'started') : null),
+          l.summary ? h('span', { class: 'tl-sum' }, l.summary) : null));
+      })))));
+    panel.scrollTop = 0;
+  };
   body.replaceChildren(
     h('p', { class: 'muted small' }, 'Build an app step by step: the steps sit beside App Builder, with a pointer to what to click and a tick as each step is done. ',
       current ? 'Your work on each tutorial is kept separately in this browser.' : 'The app you\u2019re building now stays in this browser.'),
-    ...courses.map((c) => h('section', { class: 'tl-course' }, h('h3', {}, c.title),
-      c.groups.map((g) => [g.title ? h('h4', {}, g.title) : null,
-        h('ul', {}, g.lessons.map((l) => {
-          const isNow = l.slug === current;
-          return h('li', {}, h('button', { class: 'tl-item' + (isNow ? ' now' : ''), type: 'button', 'data-ab': 'tutorial:' + l.slug,
-            onclick: () => { if (isNow) { close(); return; } location.href = here + '?lesson=' + encodeURI(l.slug); } },
-            h('span', { class: 'tl-title' }, l.title, l.optional ? h('span', { class: 'tag' }, 'extra') : null,
-              isNow ? h('span', { class: 'tag on' }, 'open now') : started(l.slug) ? h('span', { class: 'tag' }, 'started') : null),
-            l.summary ? h('span', { class: 'tl-sum' }, l.summary) : null));
-        }))]))));
+    sections.length > 1 ? tabs : null, panel);
+  show(at);
 }
 
 async function continueElsewhere() {

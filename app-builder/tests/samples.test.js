@@ -61,8 +61,8 @@ test('water tracker: stops at the goal, Every tick keeps the text right, Reset w
 test('Construct habits: uppercase() works, Name.Text gets a friendly hint', () => {
   const p = practiceTracker();
   const sc = exprScopeFor(p, p.screens[0]);
-  assert.equal(check('uppercase(TextInput.text)', sc), null);
-  assert.match(check('int(TextInput.Text)', sc), /Use TextInput.text \(small letters\)/);
+  assert.equal(check('uppercase(MinutesInput.text)', sc), null);
+  assert.match(check('int(MinutesInput.Text)', sc), /Use MinutesInput.text \(small letters\)/);
 });
 
 test('values journal: choose a value, describe it, see it in the list', () => {

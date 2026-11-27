@@ -266,3 +266,21 @@ export function parseTutorialList(json) {
     return { path: String(c.path || ''), title: String(c.title || c.path || 'Tutorials'), groups };
   }).filter((c) => c.groups.length);
 }
+
+// The list in sections, shown one at a time so a long pathway isn't daunting. A unit may name its section
+// ("section": "First apps"); units without one fall in their course's own section (the course's title). Sections keep
+// the list's order: [{ title, groups: [{ unit, title, lessons }] }].
+export function tutorialSections(json) {
+  const d = typeof json === 'string' ? JSON.parse(json) : json;
+  const courses = parseTutorialList(d);
+  const named = new Map();
+  for (const c of d.courses || []) for (const u of (Array.isArray(c?.units) ? c.units : [])) if (u?.id && typeof u.section === 'string' && u.section.trim()) named.set(`${c.path}|${u.id}`, u.section.trim());
+  const sections = [];
+  for (const c of courses) for (const g of c.groups) {
+    const title = named.get(`${c.path}|${g.unit}`) || c.title;
+    let sec = sections[sections.length - 1];
+    if (!sec || sec.title !== title) sections.push(sec = { title, groups: [] });
+    sec.groups.push(g);
+  }
+  return sections;
+}

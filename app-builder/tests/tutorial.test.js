@@ -146,3 +146,17 @@ test('the list of guided tutorials (appbuilder-tutorials.json v1): courses, less
   assert.equal(list[0].groups[1].lessons[0].optional, true);
   assert.throws(() => parseTutorialList({ v: 2, courses: [] }), /newer form/);
 });
+
+test('the tutorials list in sections: a unit’s "section" names it; without one, each course is a section', async () => {
+  const { tutorialSections } = await import('../src/edu/tutorial.js');
+  const L = (slug, unit) => ({ slug: 'code/' + slug, title: slug, unit });
+  const list = (withSections) => ({ v: 1, courses: [
+    { path: 'code/apps', title: 'App Builder apps', units: [
+      { id: 'respond', title: 'Apps that respond', ...(withSections ? { section: 'First apps' } : {}) },
+      { id: 'track', title: 'Keep track', ...(withSections ? { section: 'First apps' } : {}) },
+      { id: 'screens', title: 'Screens and lists', ...(withSections ? { section: 'More apps' } : {}) }],
+      lessons: [L('apps/a', 'respond'), L('apps/b', 'track'), L('apps/c', 'screens')] },
+    { path: 'code/data-apps', title: 'Data apps', units: [{ id: 'lists', title: 'Lists' }], lessons: [L('data-apps/d', 'lists')] }] });
+  assert.deepEqual(tutorialSections(list(false)).map((s) => [s.title, s.groups.map((g) => g.unit)]), [['App Builder apps', ['respond', 'track', 'screens']], ['Data apps', ['lists']]]);
+  assert.deepEqual(tutorialSections(list(true)).map((s) => [s.title, s.groups.map((g) => g.unit)]), [['First apps', ['respond', 'track']], ['More apps', ['screens']], ['Data apps', ['lists']]]);
+});

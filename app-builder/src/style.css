@@ -829,8 +829,13 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
 }
 
 /* the list of guided tutorials (app.js tutorialList) */
-.tl { max-height: 65vh; overflow-y: auto; }
-.tl-course h3 { font-size: 15px; margin: 14px 0 4px; }
+.tl { display: flex; flex-direction: column; max-height: 70vh; }
+.tl-panel { overflow-y: auto; min-height: 0; }
+.tl-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 4px; }
+.tl-tab { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: #fff; border-radius: 99px; padding: 5px 12px 5px 5px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.tl-tab.on { background: #1c2333; border-color: #1c2333; color: #fff; }
+.tl-step { display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 99px; background: #fde68a; color: #78350f; font-size: 11px; }
+.tl-n { font-weight: 500; opacity: .6; font-size: 12px; }
 .tl-course h4 { font-size: 12px; margin: 10px 0 4px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 .tl ul { list-style: none; margin: 0; padding: 0; }
 .tl-item { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 10px; margin: 0 0 6px; cursor: pointer; }

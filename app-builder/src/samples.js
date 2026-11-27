@@ -115,13 +115,13 @@ export function practiceTracker() {
       id: 'main', name: 'Tracker',
       objects: [
         obj('Title', 'text', [inst('t1', 24, 40, 342, 36, 'Practice tracker')]),
-        obj('TextInput', 'input', [inst('t2', 24, 100, 200, 42, '')]),
+        obj('MinutesInput', 'input', [inst('t2', 24, 100, 200, 42, '')]),
         obj('SaveButton', 'button', [inst('t3', 236, 98, 130, 46, 'Save')]),
         obj('TotalText', 'text', [inst('t4', 24, 170, 342, 32, "You've practised 0 minutes")]),
       ],
       events: [
         ev('p1', [{ type: 'onClicked', target: 'SaveButton' }], [
-          { type: 'addTo', value: 'int(TextInput.text)', var: 'Minutes' },
+          { type: 'addTo', value: 'int(MinutesInput.text)', var: 'Minutes' },
           { type: 'setText', target: 'TotalText', value: `"You've practised " & Minutes & " minutes"` },
         ]),
       ],
@@ -197,13 +197,13 @@ export function valuesJournal() {
       { id: 'describe', name: 'Describe',
         objects: [
           obj('Question', 'text', [inst('j3', 24, 40, 342, 64, '')]),
-          obj('TextInput', 'input', [inst('j4', 24, 120, 342, 46, '')]),
+          obj('NoteInput', 'input', [inst('j4', 24, 120, 342, 46, '')]),
           obj('AddButton', 'button', [inst('j5', 24, 184, 342, 48, 'Add to my journal')]),
         ],
         events: [
           ev('jd1', [{ type: 'onStart' }], [{ type: 'setText', target: 'Question', value: '"What did you do to show " & Chosen & "?"' }]),
           ev('jd2', [{ type: 'onClicked', target: 'AddButton' }], [
-            { type: 'listAdd', value: 'uppercase(Chosen) & ": " & TextInput.text', list: 'Journal' },
+            { type: 'listAdd', value: 'uppercase(Chosen) & ": " & NoteInput.text', list: 'Journal' },
             { type: 'goToScreen', screen: 'journal' },
           ]),
         ],

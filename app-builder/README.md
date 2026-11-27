@@ -88,6 +88,9 @@ themselves and App Builder keeps no copy. Lessons are grouped by course and unit
 "started" for any with work or a step kept in this browser, and "open now". Choosing one opens it with `?lesson=`; the
 app being built stays in this browser, as each tutorial keeps its own. Inside a tutorial, "Leave the tutorial" goes
 back to normal building. If the list can't be loaded (no internet), the dialog says so; nothing else changes.
+Since 1.9 the list shows in **sections**, one at a time as tabs (e.g. First apps, More apps, Data apps), so a long
+pathway isn't daunting. A unit in the list may name its section (`"section": "First apps"`); units without one fall in
+their course's own section. The dialog opens on the section you're in, else the last one you've started something in.
 
 ## Layout
 
