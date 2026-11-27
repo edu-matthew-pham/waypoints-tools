@@ -121,8 +121,12 @@ export function todo(rules, text) {
       const c = m && KIND_BY_LABEL[m[2].toLowerCase()];
       const more = m?.[3] ? m[3].replace(/^text ""\s*/, '').trim() : '';
       // present: an object of that name and kind is there already (only its settings, `more`, are still to do)
+      // text "Save" in a rule: the object's text, which the tutorial can guide (select it, then its Text box)
+      const wantText = m?.[3]?.match(/^text "((?:[^"\\]|\\.)*)"/)?.[1];
       if (c) return { type: 'object', name: m[1] || '', kind: c.id, label: `a ${c.label}${m[1] ? ` called ${m[1]}` : ''}${more ? ` (${more})` : ''}`,
-        present: !!m[1] && String(text).replace(/\s+/g, '').includes(`object${m[1]}(${m[2]})`.replace(/\s+/g, '')) };
+        more, ...(wantText ? { text: wantText.replace(/\\(.)/g, '$1') } : {}),
+        // present: one of that name (or, unnamed, that kind) is there already; only its settings are left to do
+        present: String(text).replace(/\s+/g, '').includes((m[1] ? `object${m[1]}(${m[2]})` : `(${m[2]})`).replace(/\s+/g, '')) };
       const v = String(f).trim().match(/^(variable|list|table) (\w+)(?: =\s*(.*))?$/);
       if (v) {
         let value = v[3] ?? ''; try { if (value) value = String(JSON.parse(value)); } catch { /* as written */ }

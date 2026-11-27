@@ -26,7 +26,8 @@ test('the list shows in sections, one at a time; a lesson opens guided; Leave go
   await p.waitForSelector("[data-ab='tutorial']");
   assert.match(p.url(), /\?lesson=code\/apps\/practice-tracker$/);
   await p.click("[data-ab='tutorials']");
-  await p.waitForSelector('.tl-item.now');
+  await p.waitForSelector('.tl-item.here');
+  assert.equal(await p.locator('.tl-item.here').evaluate((e) => getComputedStyle(e).fontFamily === getComputedStyle(e.parentElement).fontFamily && e.getBoundingClientRect().width > 300), true, 'the open lesson looks like the others (27 Nov: it took the sidebar\u2019s .now style)');
   await p.click("[data-ab='tutorial-leave']");
   await p.waitForSelector("[data-ab='tutorials']");
   assert.equal(new URL(p.url()).search, '');

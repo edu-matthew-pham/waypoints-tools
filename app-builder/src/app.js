@@ -493,7 +493,7 @@ async function tutorialList() {
     panel.replaceChildren(...sections[at].groups.map((g) => h('section', { class: 'tl-course' }, g.title ? h('h4', {}, g.title) : null,
       h('ul', {}, g.lessons.map((l) => {
         const isNow = l.slug === current;
-        return h('li', {}, h('button', { class: 'tl-item' + (isNow ? ' now' : ''), type: 'button', 'data-ab': 'tutorial:' + l.slug,
+        return h('li', {}, h('button', { class: 'tl-item' + (isNow ? ' here' : ''), type: 'button', 'data-ab': 'tutorial:' + l.slug,
           onclick: () => { if (isNow) { close(); return; } location.href = here + '?lesson=' + encodeURI(l.slug); } },
           h('span', { class: 'tl-title' }, l.title, l.optional ? h('span', { class: 'tag' }, 'extra') : null,
             isNow ? h('span', { class: 'tag on' }, 'open now') : started(l.slug) ? h('span', { class: 'tag' }, 'started') : null),

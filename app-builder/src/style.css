@@ -840,7 +840,7 @@ button.item.guided .val { font-family: ui-monospace, SFMono-Regular, Menlo, Cons
 .tl ul { list-style: none; margin: 0; padding: 0; }
 .tl-item { display: block; width: 100%; text-align: left; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 8px 10px; margin: 0 0 6px; cursor: pointer; }
 .tl-item:hover { border-color: #f59e0b; }
-.tl-item.now { border-color: #f59e0b; background: #fffbeb; }
+.tl-item.here { border-color: #f59e0b; background: #fffbeb; } /* not .now: that is the sidebar's live values */
 .tl-title { display: flex; gap: 6px; align-items: center; font-weight: 600; }
 .tl-title .tag { font-weight: 500; font-size: 11px; }
 .tl-title .tag.on { background: #fde68a; }

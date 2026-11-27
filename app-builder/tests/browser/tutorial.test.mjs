@@ -112,3 +112,22 @@ test('work saved before a lesson renamed its input: the ring leads the rename, t
   assert.equal(r.built, true, `stopped: ${r.stop}`);
   assert.ok(await p.evaluate(() => window.__app.S.project.screens[0].objects.some((o) => o.name === 'MinutesInput')));
 });
+
+test('a check that asks for an object’s text: the ring selects it and says what to type', async () => {
+  const files = lessonFiles('practice-tracker');
+  // Build 1's check, as lessons can write it: the button says Save, and the title says Practice tracker
+  files['lesson.md'] = files['lesson.md'].replace('"object SaveButton (button)"', '"object SaveButton (button) text \\"Save\\"", "(text) text \\"Practice tracker\\""');
+  const steps = parseLesson(files['lesson.md']).steps;
+  const i = steps.findIndex((s) => /^Build 1/.test(s.title));
+  const p = await page({ lessons: { 'code/apps/practice-tracker': files } });
+  await openApp(p, '?lesson=code/apps/practice-tracker');
+  await loadProject(p, region(files, steps[i].start.split('#')[1]));
+  await p.click(`[data-ab='tutorial-step:${i + 1}']`);
+  await p.waitForTimeout(300);
+  const r = await followRing(p, { maxMoves: 60 });
+  assert.equal(r.built, true, `stopped: ${r.stop}`);
+  const texts = await p.evaluate(() => Object.fromEntries(window.__app.S.project.screens[0].objects.map((o) => [o.name, o.instances[0].text])));
+  assert.equal(texts.SaveButton, 'Save');
+  assert.ok(Object.values(texts).includes('Practice tracker'));
+  assert.deepEqual(p.errors, []);
+});

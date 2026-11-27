@@ -125,6 +125,9 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
         if (tab && getTab() !== tab) { const te = find(`[data-ab='tab:${tab}']`); if (te) return { el: te, caption: `Open the ${tab[0].toUpperCase() + tab.slice(1)} tab.` }; }
         if (ptr > 0) { const back = find(t[ptr - 1].selector); if (back) return { el: back, caption: t[ptr - 1].caption }; }
       }
+      // an object that's there but needs its text (the check says text "Save"): select it, then its Text box
+      const setText = items.find((i) => i.type === 'object' && i.present && i.text !== undefined);
+      if (setText) { const g = textGuide(setText, items) || (!setText.name && objectGuide(setText, items)); if (g) return g; } // unnamed, and none spare: add one
       // a dialog open with nothing in it to point at (the clip pressed Enter to finish it): Done, when it can be chosen
       const dlg = document.querySelector('dialog[open]');
       if (dlg) { const d = [...dlg.querySelectorAll("[data-ab='done']")].find((x) => visible(x) && !x.disabled); return d ? { el: d, caption: 'When it says what you want, choose Done.' } : null; }
@@ -173,6 +176,22 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     }
     const add = find("[data-ab='add-object']");
     if (add) return { el: add, caption: `Add ${item.label.replace(/ called (\w+)$/, ', then name it $1')}.` };
+    return null;
+  }
+
+  // Setting an object's text: the object (by name; unnamed, the newest of that kind no rule names), selected, then
+  // the Text box in Properties.
+  function textGuide(item) {
+    const named = new Set(todo(tutorial.steps[at].check?.rules, '').filter((i) => i.name).map((i) => i.name));
+    const objs = (getProject().screens || []).flatMap((sc) => sc.objects || []).filter((o) => o.kind === item.kind);
+    const o = item.name ? objs.find((x) => x.name === item.name) : objs.filter((x) => !named.has(x.name)).pop();
+    if (!o) return null;
+    const row = find(`.side [data-ab='object:${CSS.escape(o.name)}']`);
+    const selected = row?.getAttribute('aria-current') === 'true';
+    const box = selected && find("[data-ab='prop:text']");
+    if (box) return { el: box, caption: `${o.name}'s text. Type: ${item.text}` };
+    if (row) return { el: row, caption: `Select ${o.name} to set its text.` };
+    if (getTab() !== 'design') { const te = find("[data-ab='tab:design']"); if (te) return { el: te, caption: 'Open the Design tab.' }; }
     return null;
   }
 
