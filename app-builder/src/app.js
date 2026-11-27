@@ -278,7 +278,8 @@ function saveFile({ as = false } = {}) {
     return;
   }
   // not saved anywhere yet, with drives on offer: ask where (the Save ▾ menu)
-  if (!saveTo && Object.keys(drives).length) { saveMenuAt(document.querySelector('[data-ab=save]')); return; }
+  // (only for a plain Save: "Save to this computer…" and Save as come here with as = true, and must save, not ask again)
+  if (!as && !saveTo && Object.keys(drives).length) { saveMenuAt(document.querySelector('[data-ab=save]')); return; }
   if (!as && saveTo && canPick) { writeTo(saveTo.handle, saveTo.kept ? rememberedNow() : null, saveTo); return; }
   const kept = rememberedNow(), n = Object.keys(kept).length;
   if (!n) { chooseAndSave(null); return; }
