@@ -181,7 +181,11 @@ export function parseLesson(raw) {
     } else steps.push({ title, body: body.trim(), check: codeCheck(config.check), targets, tries: triesOf(config.clip), clip, start: String(t.starter || '') }); // start: the lesson's starter for this step
   }
   if (keep === undefined) throw new Error('This lesson has no App Builder build steps to guide.');
-  return { title: meta.title ? String(meta.title) : 'Tutorial', starter: starter || '', level: Number(level) || null, steps, files };
+  // Every object a lesson names in its checks, with its kind ({ MinutesInput: 'input', ... }): a later step's events
+  // may use one the student's app doesn't have (skipped the rename, or work saved before a lesson renamed it).
+  const names = {};
+  for (const st of steps) for (const it of todo(st.check?.rules, '')) if (it.type === 'object' && it.name) names[it.name] = it.kind;
+  return { title: meta.title ? String(meta.title) : 'Tutorial', starter: starter || '', level: Number(level) || null, steps, files, names };
 }
 const codeCheck = (c) => (c && c.type === 'code' && c.rules ? { text: String(c.text || ''), rules: c.rules } : null);
 
@@ -209,6 +213,20 @@ export function clipUrls(step, lessonUrl) {
 
 // "Stuck?" hints: the clip's captions, in order, without repeats.
 export const hintsOf = (step) => [...new Set(step.targets.map((t) => t.caption).filter(Boolean))];
+
+// Objects this step's unmet events use by name that the app doesn't have, when the lesson says what kind they are:
+// [{ type: 'object', name, kind, label, used: true }]. projectNames: the names the app has.
+export function missingUsed(tutorial, step, text, projectNames) {
+  const out = [];
+  for (const it of todo(step.check?.rules, text)) {
+    if (it.ok || it.type !== 'event') continue;
+    for (const f of it.frags) for (const w of f.match(/[A-Za-z_]\w*/g) || []) {
+      const kind = tutorial.names?.[w];
+      if (kind && !projectNames.has(w) && !out.some((o) => o.name === w)) out.push({ type: 'object', name: w, kind, label: `a ${COMPONENTS[kind]?.label || kind} called ${w} (this step's events use it)`, used: true });
+    }
+  }
+  return out;
+}
 
 // Which steps are done: a step with a check is done while its rules pass (so undoing un-ticks it).
 export const ticks = (tutorial, text) => tutorial.steps.map((s) => (s.check ? passes(s.check.rules, text) : null));

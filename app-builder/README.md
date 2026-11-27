@@ -7,8 +7,11 @@ inputs, driven by an event sheet: *when this happens, do that*. Runs in the brow
 
 **Use it:** https://tools.learningwaypoints.com/app-builder/  (one self-contained `index.html`; Chrome, Edge, Firefox, Safari)
 
-    cd app-builder && npm test      # headless tests of the interpreter (node:test, no dependencies)
+    cd app-builder && npm test      # unit tests: the interpreter, education layer, files, links (node:test, no browser)
     npm install && npm run build    # rebuilds index.html from src/ (esbuild bundles app.js, style.css is inlined)
+    npx playwright install chromium # once, for the browser tests
+    npm run test:browser            # browser tests: real Chromium, files from disk (tests/browser/)
+    npm run audit:lessons           # every published lesson, guided: a student who only follows the ring
     python3 -m http.server 8080     # run locally from the repo root, then open /app-builder/
 
 `src/` is the source; `index.html` is built from it (`tools/build.mjs`) and committed, so the site needs no build step.

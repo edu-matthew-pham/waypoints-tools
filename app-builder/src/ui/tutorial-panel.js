@@ -8,7 +8,7 @@
 // Once a step is built, it points at what to try in the running app (a "Try it" tick, from the clip's expect: lines)
 // and then at the live value of any variable the step names, so students watch it change.
 import { h } from './dom.js';
-import { ticks, mentionedVariables, clipUrls, hintsOf, todo } from '../edu/tutorial.js';
+import { ticks, mentionedVariables, clipUrls, hintsOf, todo, missingUsed } from '../edu/tutorial.js';
 import { COMPONENTS } from '../core/components.js';
 
 const OBJECTISH = /add-object|kind:|object-menu|menu:rename/; // clip moves that add or rename objects (a rename box only after menu:rename: functions are renamed in it too)
@@ -38,7 +38,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
   const reopen = h('button', { class: 'btn tut-reopen', 'data-ab': 'tutorial-open', onclick: () => { open = true; draw(); } });
   document.body.append(card, reopen);
 
-  const go = (i) => { at = Math.max(0, Math.min(tutorial.steps.length - 1, i)); ptr = 0; card.dataset.next = tutorial.steps[at].targets[0]?.selector || ''; finished = false; cheer = -1; wasAt = at; wasComplete = complete(at); store((ls) => ls.setItem(KEY, String(at))); draw(); };
+  const go = (i) => { at = Math.max(0, Math.min(tutorial.steps.length - 1, i)); ptr = 0; clearedFor = new Set(); card.dataset.next = tutorial.steps[at].targets[0]?.selector || ''; finished = false; cheer = -1; wasAt = at; wasComplete = complete(at); store((ls) => ls.setItem(KEY, String(at))); draw(); };
 
   function draw() {
     card.hidden = !open; reopen.hidden = open;
@@ -64,7 +64,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     if (s.play) check.push(h('button', { class: 'btn primary tut-play', 'data-ab': 'tutorial-play', onclick: () => { mark(`${at}:play`); celebrate(); draw(); onPlay(s.play, { next: at + 1 < tutorial.steps.length ? tutorial.steps[at + 1].title : '', onNext: () => go(at + 1) }); } }, '▶ Open the finished app'));
     if (s.check) {
       check.push(h('p', { class: 'tut-check' + (built(at) ? ' ok' : ''), role: 'status' }, built(at) ? '✓ Done: ' : 'This ticks by itself when it’s done: ', s.check.text));
-      const items = built(at) ? [] : todo(s.check.rules, getSheet());
+      const items = built(at) ? [] : [...todo(s.check.rules, getSheet()), ...missingUsed(tutorial, s, getSheet(), projectNames())];
       if (items.length) check.push(h('ul', { class: 'tut-todo', 'data-ab': 'tutorial-todo' }, items.map((i) => h('li', { class: i.ok ? 'ok' : '' }, (i.ok ? '✓ ' : '○ ') + i.label))));
     }
     s.tries.forEach((t, n) => { const y = tried.has(`${at}:${n}`); check.push(h('p', { class: 'tut-check' + (y ? ' ok' : ''), role: 'status' }, (y ? '✓ ' : '') + tryText(t))); });
@@ -106,7 +106,8 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       const items = todo(s.check?.rules, getSheet()).filter((i) => !i.ok);
       // a clip move to another screen comes first: objects and events belong on that screen
       if (ptr < t.length && /\[data-ab='screen:/.test(t[ptr].selector)) { const el = find(t[ptr].selector); if (el) return { el, caption: t[ptr].caption || 'Open this screen.' }; }
-      const obj = items.find((i) => i.type === 'object' && !i.present); // one that's there and only needs settings: the clip shows those
+      // an object to add, or one this step's events use that the app hasn't got (e.g. still called TextInput)
+      const obj = items.find((i) => i.type === 'object' && !i.present) || missingUsed(tutorial, s, getSheet(), projectNames())[0];
       if (obj) { const g = objectGuide(obj, items); if (g) return g; }
       // missing variables next (a clip's expressions may use one the step's text asks for), unless one exists by that name
       const names = new Set((getProject().variables || []).map((x) => x.name));
@@ -147,6 +148,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     if (watch.length && !find(APP('.stage'))) { const te = find("[data-ab='tab:events']"); if (te) return { el: te, caption: `Open Events to run the app and watch ${watch[0]} change.` }; }
     return null;
   }
+  const projectNames = () => new Set((getProject().screens || []).flatMap((sc) => (sc.objects || []).map((o) => o.name)));
   // Pointing at what a missing object needs: the picker tile, renaming one the student added with its default name
   // (Button1 -> SaveButton), or Add object.
   function objectGuide(item, items) {
@@ -187,7 +189,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     if (changed) { celebrate(); draw(); }
   }
   // what the card shows that changes with the project: the ticks and this step's still-to-do list
-  const sig = () => at + ':' + done.join() + '|' + todo(tutorial.steps[at].check?.rules, getSheet()).map((i) => +i.ok).join('');
+  const sig = () => at + ':' + done.join() + '|' + todo(tutorial.steps[at].check?.rules, getSheet()).map((i) => +i.ok).join('') + '|' + missingUsed(tutorial, tutorial.steps[at], getSheet(), projectNames()).map((i) => i.name).join();
   let lastSig = '';
   // a step that has just become complete gets the banner; a hidden card's Tutorial button turns green
   let wasComplete = complete(at), wasAt = at;
@@ -211,9 +213,21 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     bubble.hidden = !t.caption;
     const below = r.bottom + 60 < innerHeight;
     Object.assign(bubble.style, { left: Math.max(8, Math.min(innerWidth - 268, r.left)) + 'px', top: (below ? r.bottom + 10 : Math.max(8, r.top - 54)) + 'px' });
-    // keep the card off the thing it points at
+    keepClear(t.el, r);
+  }
+  // Keep the card off the thing the ring points at, without ever flip-flopping: move to the other side only if that
+  // side is clear of it, and only once for each thing; if both sides would cover it, shrink the card to its title line
+  // (the student can open it again). Never for the card's own checklist: moving would move the ring too.
+  let clearedFor = new Set(); // things already decided this step: each gets one decision, so nothing can flip-flop
+  function keepClear(el, r) {
+    if (!open || card.hidden || card.contains(el) || clearedFor.has(el)) return;
     const c = card.getBoundingClientRect();
-    if (open && !card.hidden && !card.contains(t.el) && r.right > c.left && r.left < c.right && r.bottom > c.top && r.top < c.bottom) { left = !left; card.classList.toggle('left', left); }
+    const hits = (x0, x1, y0, y1) => r.right > x0 && r.left < x1 && r.bottom > y0 && r.top < y1;
+    if (!hits(c.left, c.right, c.top, c.bottom)) return;
+    clearedFor.add(el);
+    const w = c.width, other = left ? [innerWidth - 16 - w, innerWidth - 16] : [16, 16 + w];
+    if (innerWidth > 700 && !hits(other[0], other[1], c.top, c.bottom)) { left = !left; card.classList.toggle('left', left); return; }
+    if (!small) { small = true; draw(); }
   }
   // clicking or typing into what the ring points at moves it on (capture: before the editor redraws)
   // pointerdown as well as click: the app's own objects on the stage take the press (to select or drag them), so
@@ -244,7 +258,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       try { tried = new Set(JSON.parse(store((ls) => ls.getItem(TRIED)) || '[]')); } catch { tried = new Set(); }
       const n = Number(store((ls) => ls.getItem(KEY)));
       at = Number.isInteger(n) && n >= 0 && n < tutorial.steps.length ? n : at;
-      ptr = 0; finished = false; open = true; cheer = -1; lastEl = null; card.dataset.next = tutorial.steps[at].targets[0]?.selector || '';
+      ptr = 0; finished = false; open = true; cheer = -1; lastEl = null; clearedFor = new Set(); card.dataset.next = tutorial.steps[at].targets[0]?.selector || '';
       done = ticks(tutorial, getSheet());
       wasAt = at; wasComplete = complete(at); lastSig = sig(); // no "Step done" banner for progress that just arrived
       draw();

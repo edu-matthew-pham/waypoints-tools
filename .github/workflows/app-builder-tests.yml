@@ -1,0 +1,56 @@
+# App Builder's checks, on every push and pull request that touches app-builder/ (so a branch shows ✓ or ✗ before it
+# is merged to main, which is live):
+#   1. unit tests (npm test: core, education layer, project files, links; fast, no browser)
+#   2. index.html is built from src/ (a src/ change without a fresh build fails here)
+#   3. browser tests (npm run test:browser: real Chromium, files from disk: saving, guided tutorials following the
+#      ring through real lessons in tests/fixtures, the card staying put, Choose a photo/sound, the Tutorials list)
+# And, weekly and on demand, the lesson audit: the follow-the-ring student through every published lesson on the
+# tutorials site, reporting steps that get stuck, flip or error (a lesson change can need an App Builder change, or
+# the other way round).
+name: "App Builder: tests"
+on:
+  push:
+    paths: ["app-builder/**", ".github/workflows/app-builder-tests.yml"]
+  pull_request:
+    paths: ["app-builder/**", ".github/workflows/app-builder-tests.yml"]
+  schedule:
+    - cron: "17 20 * * 0" # Monday morning, Australian time
+  workflow_dispatch:
+    inputs:
+      audit:
+        description: "Also run the lesson audit (every published lesson)"
+        type: boolean
+        default: true
+jobs:
+  test:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app-builder } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: app-builder/package-lock.json }
+      - run: npm ci
+      - name: Unit tests
+        run: npm test
+      - name: index.html is built from src/
+        run: npm run build && git diff --exit-code -- index.html || (echo "::error::index.html is out of date: run npm run build and commit it"; exit 1)
+      - name: Browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npm run test:browser
+  lessons:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.audit)
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app-builder } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: app-builder/package-lock.json }
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Lesson audit (every published App Builder lesson)
+        run: npm run audit:lessons | tee audit.txt
+      - name: Summary
+        if: always()
+        run: { echo '```'; cat audit.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

@@ -20,7 +20,7 @@ explainClip:
   clip:
     - caption: { text: "Minutes is a variable: it starts at 0.", say: "Minutes is a variable. It starts at zero." }
     - wait: 800
-    - type: { selector: ".view-run [data-ab='widget:TextInput'] input", text: "15" }
+    - type: { selector: ".view-run [data-ab='widget:MinutesInput'] input", text: "15" }
     - click: { selector: ".view-run [data-ab='widget:SaveButton']" }
     - caption: { text: "Save runs one event: add 15 to Minutes, then set the text.", say: "Clicking Save runs one event. It adds fifteen to Minutes, then sets the text." }
     - wait: 900
@@ -74,15 +74,15 @@ insight: "Laying out the screen first, with names that say what each thing is, m
 try: { playground: appbuilder, starter: "app.json#start", keep: build, level: 2, height: 640 }
 check:
   type: code
-  text: "The screen has a text input, a button called SaveButton and a text called TotalText."
-  rules: { contains: ["(text input)", "object SaveButton (button)", "object TotalText (text)"] }
+  text: "The screen has a text input called MinutesInput, a button called SaveButton and a text called TotalText."
+  rules: { contains: ["object MinutesInput (text input)", "object SaveButton (button)", "object TotalText (text)"] }
 ```
 
 1. On the **Design** tab, choose **+ Add object**, then **Text**. In **Properties**, change its text to *Practice tracker*.
 2. Add a **Text input**: the box the user types in.
 3. Add a **Button** and set its text to *Save*.
 4. Add one more **Text** below. Set its text to *You've practised 0 minutes*.
-5. Name things for what they are: select the button, click **⋯** beside it, choose **Rename** and call it *SaveButton*. Rename the last text *TotalText*.
+5. Name the things your events will use, for what they are: select the button, click **⋯** beside it, choose **Rename** and call it *SaveButton*. Rename the text input *MinutesInput* and the last text *TotalText*. The title is never used by an event, so it can keep its name.
 
 Drag things where you want them, or use the arrow keys (Alt and the arrows change the size). Your work carries on into the next steps.
 
@@ -154,15 +154,15 @@ insight: "Adding Set text fixes what students just saw, and int() makes the type
 try: { playground: appbuilder, starter: "app.json#sol-step-3", keep: build, level: 2, height: 640 }
 check:
   type: code
-  text: "The same event sets TotalText to show the total, and adds what was typed: int(TextInput.text)."
-  rules: { event: [["when SaveButton is clicked", "to variable Minutes", "Set TotalText text to", "Minutes"], ["when SaveButton is clicked", "Add int(TextInput.text) to variable Minutes"]] }
+  text: "The same event sets TotalText to show the total, and adds what was typed: int(MinutesInput.text)."
+  rules: { event: [["when SaveButton is clicked", "to variable Minutes", "Set TotalText text to", "Minutes"], ["when SaveButton is clicked", "Add int(MinutesInput.text) to variable Minutes"]] }
 ```
 
 1. Click the event, choose **+ Action**, then **TotalText**, then **Set TotalText text to …**. Type exactly: `"You've practised " & Minutes & " minutes"`
 2. Click Save in the preview. Now it changes.
-3. Use what the user typed: click the **Add 15** action and change 15 to `int(TextInput.text)`. A text input holds text, even when you type 20; `int()` turns it into a number.
+3. Use what the user typed: click the **Add 15** action and change 15 to `int(MinutesInput.text)`. A text input holds text, even when you type 20; `int()` turns it into a number.
 
-Your work is kept in this browser. **Save** at the top keeps a copy as a file on your computer if you want one.
+Your work is kept in this browser. **Save** at the top, then **Save to this computer…**, keeps a copy as a file if you want one.
 
 ## Check: how the text is made
 

@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { parseLesson, parseSource, ticks, region, targetsOf, triesOf, mentionedVariables, clipUrls, hintsOf, todo, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
+import { parseLesson, parseSource, ticks, region, targetsOf, triesOf, mentionedVariables, clipUrls, hintsOf, todo, missingUsed, evalRules, tutorialUrl, loadStarter, inlineFiles } from '../src/edu/tutorial.js';
 import { sheetText } from '../src/core/sheet-text.js';
 import { checkProject } from '../src/core/project.js';
 
@@ -78,7 +78,7 @@ test('a step\u2019s check as a still-to-do list in plain words, ticking as the p
   const t = parseLesson(lesson);
   const items = todo(t.steps[1].check.rules, sheet('start'));
   assert.deepEqual(items.map((i) => [i.type, i.kind, i.name, i.label, i.ok]), [
-    ['object', 'input', '', 'a Text input', false], ['object', 'button', 'SaveButton', 'a Button called SaveButton', false], ['object', 'text', 'TotalText', 'a Text called TotalText', false]]);
+    ['object', 'input', 'MinutesInput', 'a Text input called MinutesInput', false], ['object', 'button', 'SaveButton', 'a Button called SaveButton', false], ['object', 'text', 'TotalText', 'a Text called TotalText', false]]);
   assert.ok(todo(t.steps[1].check.rules, sheet('sol-step-2')).every((i) => i.ok));
   const b2 = todo(t.steps[2].check.rules, sheet('sol-step-2'));
   assert.deepEqual(b2.map((i) => [i.type, i.name, i.ok]), [['variable', 'Minutes', false], ['event', undefined, false]]);
@@ -159,4 +159,14 @@ test('the tutorials list in sections: a unit’s "section" names it; without one
     { path: 'code/data-apps', title: 'Data apps', units: [{ id: 'lists', title: 'Lists' }], lessons: [L('data-apps/d', 'lists')] }] });
   assert.deepEqual(tutorialSections(list(false)).map((s) => [s.title, s.groups.map((g) => g.unit)]), [['App Builder apps', ['respond', 'track', 'screens']], ['Data apps', ['lists']]]);
   assert.deepEqual(tutorialSections(list(true)).map((s) => [s.title, s.groups.map((g) => g.unit)]), [['First apps', ['respond', 'track']], ['More apps', ['screens']], ['Data apps', ['lists']]]);
+});
+
+test('an object a step\u2019s events use that the app lacks (e.g. still TextInput after the lesson renamed it) is asked for', () => {
+  const t = parseLesson(lesson);
+  assert.equal(t.names.MinutesInput, 'input');
+  const b3 = t.steps.find((s) => /^Build 3/.test(s.title));
+  const old = sheet('done').replace(/MinutesInput/g, 'TextInput');
+  const names = new Set(['Title', 'TextInput', 'SaveButton', 'TotalText']);
+  assert.deepEqual(missingUsed(t, b3, old, names).map((i) => [i.name, i.kind, i.label]), [['MinutesInput', 'input', "a Text input called MinutesInput (this step's events use it)"]]);
+  assert.deepEqual(missingUsed(t, b3, sheet('done'), new Set([...names, 'MinutesInput'])), [], 'nothing missing once it is there');
 });

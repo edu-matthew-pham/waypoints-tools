@@ -293,19 +293,23 @@ rows, Sound and Video. Next (26 Nov 2026, Matthew: both are useful whatever clas
 6. §9 AI help, once how AI is used in class is decided.  7. Layout and tabs, yes/no fields, Grid.
 Alongside: Data apps tried with a class; its feedback can reorder this.
 
-## Testing *(flagged 26 Nov 2026, Matthew: later)*
+## Testing *(built 27 Nov 2026, 1.9.2; Matthew asked after two bugs reached the live site)*
 
-Now: `npm test` covers the logic (running events, expressions, renames, sheet text, map, levels) with no browser,
-which is where most risky behaviour is. Gaps: nothing tests the editor itself (side panel, dialogs, Events tab), the
-built `index.html` isn't checked against `src/`, and tests only run when someone remembers. The README's
-`npm run test:ui` / `tools/embed-test.mjs` don't exist in the repo (out of date, or lost).
-
-1. **A check on every push** (GitHub Actions, about 20 minutes to set up): run the tests, rebuild, fail if
-   `index.html` is out of date. Worth doing first once several chats push to main.
-2. **A few browser checks** (5–10) using the `data-ab` labels: add an event, make and call a function, run, check
-   the result. Before a class trial, when an editor bug costs a lesson.
-3. **Golden sheet text** for the samples plus a project with functions, so wording changes that lesson checks rely
-   on can't slip through.
+Runs by itself on every push and pull request touching `app-builder/` (GitHub Actions, `.github/workflows/app-builder-tests.yml`),
+so a branch shows ✓ or ✗ before it is merged to main:
+1. **Unit tests** (`npm test`): running events, expressions, renames, sheet text, map, levels, files, links, the
+   education layer (lessons read as guided tutorials, their checklists, the Tutorials list).
+2. **index.html is built from src/**: a `src/` change without a fresh build fails.
+3. **Browser tests** (`npm run test:browser`, `tests/browser/`): real Chromium with every request answered from disk.
+   Saving (Save ▾ → this computer; Ctrl+S; opening the file again); guided tutorials (a student who only follows the
+   ring through steps of four real lessons copied into `tests/fixtures`, the card never flip-flopping, on four
+   screen sizes, Try the finished app, Step done, progress kept, work saved before a lesson renamed something);
+   Choose a photo and Choose a sound with camera and microphone off; a Sound with no player; the Tutorials list.
+   Each was checked to fail on the bug it guards against.
+4. **Lesson audit** (`npm run audit:lessons`, weekly and on demand in Actions): the same student through every guided
+   build step of every published lesson, reporting steps that get stuck, flip or error.
+Still to do: a test per condition and action in the catalog (each added through the editor, its dialog completed, its
+sheet text checked); refresh the lesson fixtures when lessons change (the audit notices first).
 
 ## Automation hooks *(done, 24 Nov 2026)*
 
