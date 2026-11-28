@@ -137,7 +137,7 @@ test('the bridge: page -> "Sim sends period" and Sim.period; "Send gravity" -> p
   await p.waitForTimeout(300);
   assert.equal((await run('Out').innerText()).trim(), 'period 2.5');
   await run('Moon').click();
-  assert.equal(await p.frameLocator(".view-run [data-ab='widget:Sim'] iframe").locator('#t').innerText(), 'gravity 1.6');
+  await p.frameLocator(".view-run [data-ab='widget:Sim'] iframe").locator('#t', { hasText: 'gravity 1.6' }).waitFor({ timeout: 5000 }); // the page updates when the message arrives
   await p.waitForFunction(() => document.querySelector(".view-run [data-ab='widget:Echo']")?.innerText.includes('echo'), null, { timeout: 5000 });
   assert.equal((await run('Echo').innerText()).trim(), 'echo 3.2');
   assert.deepEqual(await p.evaluate(() => window.__app.player?.rt?.errors?.map((e) => e.message) ?? []), []);
@@ -155,7 +155,7 @@ test('the Pendulum lab sample: the sim reports its period, Moon changes gravity,
   await p.waitForFunction(() => /Period: 4\.97 s/.test(document.querySelector(".view-run [data-ab='widget:PeriodText']")?.innerText || ''), null, { timeout: 5000 });
   assert.match(await run('GravityText').innerText(), /Gravity: 1\.6/);
   await run('Record').click();
-  await p.waitForTimeout(200);
+  await run('ReadingsView').filter({ hasText: '4.97' }).waitFor({ timeout: 5000 });
   assert.match(await run('ReadingsView').innerText(), /1\s+1\.6\s+4\.97/);
   assert.deepEqual(p.errors, []);
 });
