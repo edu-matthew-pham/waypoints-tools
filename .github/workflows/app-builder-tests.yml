@@ -54,10 +54,15 @@ jobs:
       - name: Lesson audit (every published App Builder lesson)
         run: |
           set -o pipefail
-          npm run audit:lessons | tee audit.txt
+          npm run audit:lessons -- --video videos | tee audit.txt
       - name: Summary
         if: always()
         run: |
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           cat audit.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+      # one .webm per guided build step: what a student following the ring sees (download from the run's page)
+      - name: Videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: guided-tutorial-videos, path: app-builder/videos/*.webm, retention-days: 30, if-no-files-found: ignore }

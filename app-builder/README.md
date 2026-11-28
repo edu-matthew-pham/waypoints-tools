@@ -302,6 +302,15 @@ licences ask for one) then shows in a line under the running app. The sheet text
   renaming it). Test: tests/browser/tutorial.test.mjs › a typo in a value box; `npm run audit:lessons` unchanged
   (18 built, 17 checklist, the same 2 stuck steps as before).
 
+## Videos of the lesson audit (28 Nov 2026)
+
+`node tools/lesson-audit.mjs --video <folder>` (also with `--content` and a filter word) records each guided build
+step as a .webm, named `<course>--<lesson>--<step>.webm`: what a student who only follows the ring sees, one move about
+every second (slower than the audit's usual pace, so it can be watched). The weekly (and on-demand) lesson audit on
+GitHub records them all and keeps them for 30 days as the run's **guided-tutorial-videos** download (Actions › App
+Builder: tests › the run › Artifacts). A check that the ring leads a scripted student through, not a substitute for
+trying lessons by hand or with a class.
+
 ## Two guided-tutorial fixes (1.14.1, 28 Nov 2026)
 
 - Clip selectors written with Playwright's `:has-text('words')` (such as `label:has-text('Visible at start') input`)

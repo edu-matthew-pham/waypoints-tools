@@ -28,9 +28,11 @@ export async function launch() {
 export async function close() { await browser?.close(); browser = null; }
 
 // A fresh page (its own storage). lessons: { 'code/apps/x': 'fixture-name' }; list: the tutorials list to serve.
-export async function page({ view = [1300, 860], lessons = {}, list = null, noSavePicker = false } = {}) {
+// video: a folder to record the page into (a .webm, written when its context closes; the lesson audit's --video)
+export async function page({ view = [1300, 860], lessons = {}, list = null, noSavePicker = false, video = null } = {}) {
   const b = await launch();
-  const ctx = await b.newContext({ viewport: { width: view[0], height: view[1] }, acceptDownloads: true });
+  const ctx = await b.newContext({ viewport: { width: view[0], height: view[1] }, acceptDownloads: true,
+    ...(video ? { recordVideo: { dir: video, size: { width: view[0], height: view[1] } } } : {}) });
   await ctx.route(SITE + '**', (r) => {
     const path = new URL(r.request().url()).pathname.slice(1);
     const cors = { 'access-control-allow-origin': '*' };
