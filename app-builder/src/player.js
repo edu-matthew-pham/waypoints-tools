@@ -62,6 +62,7 @@ export class Player {
         submit: (id) => this.rt?.submit(id),
         key: (name, down) => this.rt?.key(name, down),
         keysReset: () => this.rt?.releaseKeys(),
+        embed: (id, name, value) => this.rt?.embedMessage(id, name, value),
         media: (id, type) => { if (type === 'ended') this.rt?.mediaEnded(id); else this.rt?.mediaState(id, type === 'play'); },
       },
     });
@@ -92,6 +93,7 @@ export class Player {
         openLink: (link) => this.openLink(link),
         snapshot: (id) => { const d = this.stage.snapshot(id); return d ? this.keepMedia(d) : null; },
         keepPicture: (dataUrl) => this.keepMedia(dataUrl), // Choose a photo
+        sendToEmbed: (id, name, value) => this.stage.sendToEmbed(id, name, value),
       },
     });
     this.rt = rt;

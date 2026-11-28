@@ -54,6 +54,8 @@ export function openChooser(sheet, kind, ev, depth, onPick) {
     const b = sheet._blocked(kind, { ...entry, params: entry.params.filter((p) => p.type !== 'object' && p.type !== 'instVar') }, ev, depth);
     if (b) return b;
     if (entry.params.some((p) => p.type === 'instVar') && !o.vars.length) return `Give ${o.name} a variable of its own first`;
+    const msg = entry.params.find((p) => p.type === 'message');
+    if (msg && !o[msg.list]?.length) return `List what ${o.name} ${msg.list === 'sends' ? 'sends' : 'listens for'} first (its Properties)`;
     return '';
   };
 

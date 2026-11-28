@@ -183,6 +183,15 @@ export class Runtime {
     if (inst.selected !== index) { inst.selected = index; this.#changed(); }
     this.fire('itemClicked', { object: inst.object, instance: inst, clicked: { index, item: items[index - 1] } });
   }
+  // An Embed's page sent a value (already checked: a name it lists, one plain value). Sim.period reads the latest.
+  embedMessage(instanceId, name, value) {
+    const inst = this.byId.get(instanceId);
+    if (!inst || inst.kind !== 'embed') return;
+    (inst.received ||= {})[name] = value;
+    this.#changed();
+    this.fire('embedSent', { object: inst.object, instance: inst, message: name });
+  }
+  sendToEmbed(inst, name, value) { this.hooks.sendToEmbed?.(inst.id, name, value); }
   press(instanceId) { this.#touch('pressed', instanceId); }
   release(instanceId) { this.#touch('released', instanceId); }
   submit(instanceId) { this.#touch('submitted', instanceId); }
@@ -373,6 +382,10 @@ export class Runtime {
         if (p === 'picture' && (inst.kind === 'drawing' || inst.kind === 'photo')) return this.pictureOf(inst);
         if (p === 'sound' && inst.kind === 'recorder') return isRef(inst.props.file) ? withRange(inst.props.file, inst.props.start, inst.props.end, inst.props.length) : inst.props.file || '';
         if (p in inst.props) return inst.props[p];
+        if (inst.kind === 'embed') {
+          if (inst.received && p in inst.received) return inst.received[p];
+          throw new ExprError(`${o} hasn't sent ${p} yet`);
+        }
         throw new ExprError(`${o} has no property "${p}"`);
       },
       call: (name, values) => this.callFunction(name, values, ctx, true), // Total(price, qty)
@@ -516,6 +529,7 @@ export class Runtime {
     if (!entry || entry.trigger !== occ.name) return false;
     if (entry.keyed && trig.key !== 'any' && trig.key !== occ.key) return false;
     if (entry.timer && occ.eventId !== ev.id) return false;
+    if (entry.message && trig[entry.message] !== occ.message) return false;
     if (entry.object) {
       if (trig[entry.object] !== occ.object) return false;
       if (occ.clicked) ctx.clicked = occ.clicked;

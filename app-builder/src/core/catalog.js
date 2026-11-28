@@ -6,10 +6,12 @@ import { COMPONENTS } from './components.js';
 // Label templates use {param} placeholders; the editor turns them into controls.
 // Param types: object, variable, instVar (belongs to the event's `target`),
 //              expr, operator, screen, showhide, function (one of the app's functions),
-//              args (one value box per parameter of the chosen function: { param: expression })
+//              args (one value box per parameter of the chosen function: { param: expression }),
+//              message (one of the names an Embed lists in Properties: prm.list is 'sends' or 'listens')
 
 import { ExprError, fmt, OPERATORS, compare } from './expr.js';
 import { colourValue } from './colour.js';
+import { plainValue } from './embed-bridge.js';
 
 export const OBJECT_KINDS = COMPONENTS; // kept under the old name for the interpreter and project helpers
 export { OPERATORS, compare };
@@ -69,6 +71,11 @@ export const CONDITIONS = {
     category: 'Object', label: '{target} finishes a recording', trigger: 'changed', object: 'target',
     params: [obj({ kinds: ['recorder'] })],
     help: 'Runs when the user stops recording (or it reaches 20 seconds). Recorder.sound is the recording, ready for a Sound or a table; Recorder.length is how long it is, in seconds.',
+  },
+  onEmbedSends: {
+    category: 'Object', label: '{target} sends {message}', trigger: 'embedSent', object: 'target', message: 'message',
+    params: [obj({ kinds: ['embed'] }), { name: 'message', type: 'message', list: 'sends' }],
+    help: 'Runs when the Embed\'s page sends this value (list the names it sends in its Properties). Sim.period is the latest value it sent.',
   },
   onKey: {
     category: 'Keyboard', label: 'Key {key} is pressed', trigger: 'keyDown', keyed: true,
@@ -287,6 +294,19 @@ export const ACTIONS = {
     help: 'A link to a video file, such as one on Wikimedia Commons. The name is worked out when the app runs, so a table field can hold each row\'s link.',
     run: (rt, ctx, p) => rt.each(ctx, p.target, (inst, c) => { rt.media(inst, 'stop'); rt.setProp(inst, 'link', fmt(rt.evalExpr(p.link, c)).trim()); }),
   },
+  sendToEmbed: {
+    category: 'Object', label: 'Send {message} = {value} to {target}',
+    params: [obj({ kinds: ['embed'] }), { name: 'message', type: 'message', list: 'listens' }, expr('value', '1')],
+    help: 'Sends one value (a number, text, true or false) to the Embed\'s page (list the names it listens for in its Properties). The page decides what to do with it.',
+    run: (rt, ctx, p) => {
+      if (!p.message) throw new ExprError('Choose what to send (list the names the Embed listens for in its Properties)');
+      rt.each(ctx, p.target, (inst, c) => {
+        const v = plainValue(rt.evalExpr(p.value, c));
+        if (v === undefined) throw new ExprError('Send one value: a number, some text (up to 1000 letters), true or false');
+        rt.sendToEmbed(inst, p.message, v);
+      });
+    },
+  },
   openLink: {
     category: 'System', label: 'Open link {link} in a new tab',
     params: [expr('link', '"https://commons.wikimedia.org"')],
@@ -473,6 +493,12 @@ export function defaultParams(entry, scope) {
       case 'showhide': out[prm.name] = 'show'; break;
       case 'onoff': out[prm.name] = 'on'; break;
       case 'key': out[prm.name] = 'Enter'; break;
+      case 'message': { // the first name the first Embed lists
+        const t = entry.params.find((x) => x.type === 'object');
+        const o = scope.objects.find((x) => x.name === out[t?.name]);
+        out[prm.name] = o?.[prm.list]?.[0] ?? '';
+        break;
+      }
       case 'posSize': out[prm.name] = 'w'; break;
       case 'picture': out[prm.name] = scope.pictures?.[0] ?? 'star'; break;
       case 'sound': out[prm.name] = scope.sounds?.[0] ?? 'chime'; break;

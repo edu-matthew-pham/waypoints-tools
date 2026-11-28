@@ -100,3 +100,62 @@ test('a website on the usual list: its own origin, with an Open link; others are
   assert.match(await p.locator(".view-run [data-ab='widget:Other']").innerText(), /Allow any website/);
   assert.deepEqual(p.errors, []);
 });
+
+// The bridge: a page posts { name, value } to the app, and the app sends values back. Only that iframe's window,
+// only names the Embed lists, only plain values.
+const TALKER = `<!DOCTYPE html><p id="t">waiting</p><script>
+parent.postMessage({ name: 'secret', value: 1 }, '*');            // not listed: dropped
+parent.postMessage({ name: 'period', value: { evil: 1 } }, '*');  // not one plain value: dropped
+parent.postMessage({ name: 'period', value: 2.5 }, '*');
+addEventListener('message', (e) => {
+  const { name, value } = e.data || {};
+  if (name !== 'gravity') return;
+  document.getElementById('t').textContent = 'gravity ' + value;
+  parent.postMessage({ name: 'echo', value: value * 2 }, '*');
+});
+</script>`;
+
+test('the bridge: page -> "Sim sends period" and Sim.period; "Send gravity" -> page; nothing else gets through', async () => {
+  const p = await page(); await openApp(p);
+  const ev = (conds, actions) => ({ id: Math.random().toString(36).slice(2), else: false, conds, actions, children: [] });
+  const proj = app([
+    W('Sim', 'embed', 20, 20, 300, 160, { page: 'talker', sends: 'period, echo', listens: 'gravity' }),
+    W('Out', 'text', 20, 200, 300, 30, { text: '-' }), W('Echo', 'text', 20, 240, 300, 30, { text: '-' }), W('Moon', 'button', 20, 280, 120, 40, { text: 'Moon' }),
+  ], { pages: [{ name: 'talker', data: dataPage(TALKER) }] });
+  proj.screens[0].events = [
+    ev([{ type: 'onEmbedSends', target: 'Sim', message: 'period' }], [{ type: 'setText', target: 'Out', value: '"period " & Sim.period' }]),
+    ev([{ type: 'onEmbedSends', target: 'Sim', message: 'echo' }], [{ type: 'setText', target: 'Echo', value: '"echo " & Sim.echo' }]),
+    ev([{ type: 'onClicked', target: 'Moon' }], [{ type: 'sendToEmbed', target: 'Sim', message: 'gravity', value: '1.6' }]),
+  ];
+  await loadProject(p, proj);
+  await runTab(p);
+  const run = (n) => p.locator(`.view-run [data-ab='widget:${n}']`);
+  await p.waitForFunction(() => document.querySelector(".view-run [data-ab='widget:Out']")?.innerText.includes('period'), null, { timeout: 5000 });
+  assert.equal((await run('Out').innerText()).trim(), 'period 2.5');
+  // a message from another window (here the app's own page) is ignored, even with a listed name
+  await p.evaluate(() => window.postMessage({ name: 'period', value: 99 }, '*'));
+  await p.waitForTimeout(300);
+  assert.equal((await run('Out').innerText()).trim(), 'period 2.5');
+  await run('Moon').click();
+  assert.equal(await p.frameLocator(".view-run [data-ab='widget:Sim'] iframe").locator('#t').innerText(), 'gravity 1.6');
+  await p.waitForFunction(() => document.querySelector(".view-run [data-ab='widget:Echo']")?.innerText.includes('echo'), null, { timeout: 5000 });
+  assert.equal((await run('Echo').innerText()).trim(), 'echo 3.2');
+  assert.deepEqual(await p.evaluate(() => window.__app.player?.rt?.errors?.map((e) => e.message) ?? []), []);
+  assert.deepEqual(p.errors, []);
+});
+
+test('the Pendulum lab sample: the sim reports its period, Moon changes gravity, Record adds a row', async () => {
+  const p = await page(); await openApp(p);
+  await p.selectOption("[data-ab='samples']", 'Pendulum lab (Embed)');
+  await p.waitForFunction(() => window.__app.S.project.name === 'Pendulum lab');
+  await runTab(p);
+  const run = (n) => p.locator(`.view-run [data-ab='widget:${n}']`);
+  await p.waitForFunction(() => /Period: 2\.01 s/.test(document.querySelector(".view-run [data-ab='widget:PeriodText']")?.innerText || ''), null, { timeout: 5000 });
+  await run('Planet').nth(1).click(); // Moon
+  await p.waitForFunction(() => /Period: 4\.97 s/.test(document.querySelector(".view-run [data-ab='widget:PeriodText']")?.innerText || ''), null, { timeout: 5000 });
+  assert.match(await run('GravityText').innerText(), /Gravity: 1\.6/);
+  await run('Record').click();
+  await p.waitForTimeout(200);
+  assert.match(await run('ReadingsView').innerText(), /1\s+1\.6\s+4\.97/);
+  assert.deepEqual(p.errors, []);
+});

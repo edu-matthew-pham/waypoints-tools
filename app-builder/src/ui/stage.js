@@ -6,6 +6,7 @@
 import { h } from './dom.js';
 import { DEVICES } from '../core/project.js';
 import { RENDER } from './component-ui.js';
+import { readMessage } from '../core/embed-bridge.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -77,6 +78,18 @@ export class Stage {
         const read = RENDER[this.nodes.get(w.dataset.id)?.kind]?.read;
         this.on.input?.(w.dataset.id, read ? read(e.target) : e.target.value);
       });
+      // An Embed's page sending a value: only from that iframe's own window (a page's origin is "null", so the window is
+      // the check, not the origin), only a name the Embed lists, only one plain value (core/embed-bridge.js).
+      this.onMessage = (e) => {
+        if (!e.source) return;
+        for (const [id, n] of this.nodes) {
+          if (n.kind !== 'embed' || n.inner.querySelector('iframe')?.contentWindow !== e.source) continue;
+          const m = readMessage(e.data, this.items.get(id)?.props.sends);
+          if (m) this.on.embed?.(id, m.name, m.value);
+          return;
+        }
+      };
+      window.addEventListener('message', this.onMessage);
       // pressed / released: release goes to the object that was pressed, even if the pointer slid off it
       let pressed = null;
       this.el.addEventListener('pointerdown', (e) => {
@@ -130,6 +143,16 @@ export class Stage {
       if (!this.items.has(id)) { RENDER[n.kind]?.destroy?.(n.inner); n.wrap.remove(); this.nodes.delete(id); }
     }
     this.#applySelection();
+  }
+
+  // "Send … to Sim": one plain value to an Embed's page. A page has a blank origin of its own, so '*' (it is the only
+  // window that can receive it); a website gets it only at its own origin.
+  sendToEmbed(id, name, value) {
+    const f = this.nodes.get(id)?.inner.querySelector('iframe');
+    if (!f?.contentWindow) return;
+    let to = '*';
+    if (f.getAttribute('sandbox')?.includes('allow-same-origin')) { try { to = new URL(f.src).origin; } catch { return; } }
+    f.contentWindow.postMessage({ name, value }, to);
   }
 
   // App screen size (Web page or Phone).

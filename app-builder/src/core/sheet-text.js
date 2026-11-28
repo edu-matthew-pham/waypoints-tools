@@ -13,6 +13,7 @@
 //   event: when SaveButton is clicked | do: Add 15 to variable Minutes; Set TotalText text to "You've " & Minutes
 //   event: when SaveButton is clicked > when TotalText text = "x" | do: ...      (a sub-event repeats its parents)
 //   event: else | do: ...
+import { messageNames } from './embed-bridge.js';
 import { entryFor, KEYS, SORT_DIRS } from './catalog.js';
 import { COMPONENTS } from './components.js';
 import { allScreensEvents } from './shared.js';
@@ -61,7 +62,7 @@ export function sheetText(project) {
     out.push(`screen ${s.name}`);
     for (const o of s.objects || []) {
       const i = o.instances[0] || {};
-      out.push(`object ${o.name} (${COMPONENTS[o.kind]?.label.toLowerCase() ?? o.kind}) text ${val(i.text ?? '')}${(o.kind === 'list' || o.kind === 'table') && i.source ? ` shows ${i.source}` : ''}${o.kind === 'sound' ? ` sound ${i.sound ?? ''}${i.player === false ? ' (no player)' : ''}` : ''}${o.kind === 'toggle' && i.look === 'tick' ? ' (tick box)' : ''}${o.kind === 'video' && i.link ? ` link ${val(i.link)}` : ''}${o.kind === 'embed' && i.page ? ` page ${val(i.page)}` : ''}${o.instances.length > 1 ? ` copies ${o.instances.length}` : ''}`);
+      out.push(`object ${o.name} (${COMPONENTS[o.kind]?.label.toLowerCase() ?? o.kind}) text ${val(i.text ?? '')}${(o.kind === 'list' || o.kind === 'table') && i.source ? ` shows ${i.source}` : ''}${o.kind === 'sound' ? ` sound ${i.sound ?? ''}${i.player === false ? ' (no player)' : ''}` : ''}${o.kind === 'toggle' && i.look === 'tick' ? ' (tick box)' : ''}${o.kind === 'video' && i.link ? ` link ${val(i.link)}` : ''}${o.kind === 'embed' && i.page ? ` page ${val(i.page)}` : ''}${o.kind === 'embed' && messageNames(i.sends).length ? ` sends ${messageNames(i.sends).join(', ')}` : ''}${o.kind === 'embed' && messageNames(i.listens).length ? ` listens ${messageNames(i.listens).join(', ')}` : ''}${o.instances.length > 1 ? ` copies ${o.instances.length}` : ''}`);
       for (const iv of o.instanceVars || []) out.push(`object variable ${o.name}.${iv.name} = ${val(iv.value)}`);
     }
     walk(s.events, []);

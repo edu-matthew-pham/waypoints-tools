@@ -525,6 +525,7 @@ table.live td.chg { animation: nowbump .8s ease-out; background: var(--accent-so
 .emb-open { position: absolute; right: 6px; bottom: 6px; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(28, 35, 51, .75); color: #fff; text-decoration: none; }
 .emb-ph { flex: 1; display: grid; place-content: center; text-align: center; gap: 6px; color: #4b5568; background: #f3f5f9; font-size: 13px; padding: 10px; }
 .emb-big { font-size: 34px; }
+.emb-paste { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; min-height: 220px; resize: vertical; }
 p.small, .muted.small { font-size: 12px; }
 
 /* linked fields and the nested view */

@@ -8,6 +8,7 @@ import { renameInput } from '../ui/rename-input.js';
 import { keep, keepPage } from '../media-store.js';
 import { pickPicture, pickSound, pickPage, pageCap } from '../ui/upload.js';
 import { modal } from '../ui/sheet-dialogs.js';
+import { badNames, embedPrompt } from '../core/embed-bridge.js';
 import { imageNames, imageData, assetName, soundNames, soundInfo, soundAssetName, videoSource, BUILTIN_SOUNDS, pageNames, pageAssetName, embedSource } from '../core/assets.js';
 import { renameInstVar } from '../core/rename.js';
 import { screenItems } from '../ui/screen-items.js';
@@ -256,6 +257,28 @@ export function initDesign(root) {
       pages.map((n) => h('option', { value: n, selected: inst.page === n }, `Web page: ${n}`)),
       h('option', { value: '#link', selected: isLink }, 'A website (link)'));
     const src = embedSource(S.project, inst.page, { allowAnyLink: !!S.project.allowAnyEmbed });
+    // the names the page sends, or listens for: a comma-separated box (core/embed-bridge.js messageNames)
+    const names = (key, label, eg, help) => {
+      const bad = badNames(inst[key]);
+      return h('label', { class: 'f wide' }, h('span', {}, label),
+        h('input', { class: 'ctl', value: inst[key] || '', placeholder: 'e.g. ' + eg, 'data-ab': 'prop:' + key, 'aria-label': label, onchange: (e) => { inst[key] = e.target.value.trim(); hooks.commit(); } }),
+        h('small', { class: 'muted' }, bad.length ? `Can't use: ${bad.join(', ')} (names start with a letter, then letters, numbers or _; not x, y, w, h, text, visible or page)` : help));
+    };
+    // a prompt to paste into an AI chat, asking for one HTML file that talks to the app by these names
+    const promptBox = () => {
+      const what = h('input', { class: 'ctl', placeholder: 'e.g. a pendulum where you can change the length', 'aria-label': 'What it should be', 'data-ab': 'embed-prompt-what' });
+      const out = h('textarea', { class: 'ctl emb-paste', rows: 14, readonly: true, spellcheck: 'false', 'data-ab': 'embed-prompt-text', 'aria-label': 'Prompt' });
+      const fill = () => { out.value = embedPrompt({ what: what.value, sends: inst.sends, listens: inst.listens }); };
+      what.addEventListener('input', fill);
+      fill();
+      const { close } = modal('A prompt for an AI chat',
+        h('div', {}, h('p', { class: 'muted small' }, 'Copy this into an AI chat you\u2019re allowed to use. Paste the HTML it gives back with + Paste HTML. It uses the names in Sends and Listens for, so fill those in first.'),
+          h('label', { class: 'f wide' }, h('span', {}, 'What should it be?'), what), out),
+        h('button', { class: 'btn primary', type: 'button', 'data-ab': 'embed-prompt-copy', onclick: async () => {
+          try { await navigator.clipboard.writeText(out.value); hooks.notify('Prompt copied.'); close(); } catch { out.select(); hooks.notify('Select the prompt and copy it (Ctrl+C).'); }
+        } }, 'Copy'));
+      what.focus();
+    };
     const paste = () => {
       const area = h('textarea', { class: 'ctl emb-paste', rows: 14, spellcheck: 'false', 'data-ab': 'embed-html', 'aria-label': 'HTML', placeholder: '<!DOCTYPE html>\n<html>\u2026</html>' });
       const nm = h('input', { class: 'ctl', value: 'page', 'aria-label': 'Name', 'data-ab': 'embed-name' });
@@ -274,6 +297,9 @@ export function initDesign(root) {
         h('button', { class: 'btn', type: 'button', 'data-ab': 'embed-upload', title: 'Upload a .html file', onclick: () => pickPage(({ fileName, html }) => addPage(fileName, html), hooks.notify) }, '+ Upload .html')),
       h('p', { class: 'muted small' }, src.kind === 'page' ? 'Runs in a safe box: it can\u2019t see the rest of the app or anything saved in this browser. ' : src.kind === 'link' ? `Shows ${src.from}. Some sites won\u2019t show inside another page: then use the Open link in its corner. ` : src.why + '. ',
         'Try it in the Run tab.'),
+      names('sends', 'Sends', 'period, angle', 'What the page tells the app. Each name gets an event (Sim sends period) and a value (Sim.period).'),
+      names('listens', 'Listens for', 'gravity, reset', 'What the app can tell the page (Send … to Sim).'),
+      h('button', { class: 'btn', type: 'button', 'data-ab': 'embed-prompt', onclick: promptBox }, 'Copy a prompt for an AI chat'),
       isLink || S.project.allowAnyEmbed ? h('label', { class: 'f check wide' }, h('input', { type: 'checkbox', checked: !!S.project.allowAnyEmbed, 'data-ab': 'allow-any-embed',
         onchange: (e) => { S.project.allowAnyEmbed = e.target.checked; hooks.commit(); } }),
         h('span', {}, 'Allow any website in this app (off: only PhET, Desmos, GeoGebra and Wikimedia Commons; turn on only for sites your school is happy with)')) : null,

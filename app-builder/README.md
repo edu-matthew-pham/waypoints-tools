@@ -285,7 +285,7 @@ Sound takes no space while the app runs and still plays from events (Play, Stop)
 shows faded, labelled "no player: plays from events", so it can still be found and selected. Its credit (the open
 licences ask for one) then shows in a line under the running app. The sheet text adds "(no player)".
 
-## Embed (ROADMAP §13, phase 1, 28 Nov 2026; 1.12; Level 4)
+## Embed (ROADMAP §13, 28 Nov 2026; 1.12, the bridge 1.13; Level 4)
 
 **Embed object** (Media, Level 4): a simulation or tool made as one self-contained HTML file (often by an AI chat, with
 App Builder's events built around it), or a website. Properties › Shows: one of the app's **web pages** or **A website
@@ -309,8 +309,21 @@ App Builder's events built around it), or a website. Properties › Shows: one o
 - **Design** shows a placeholder (nothing runs while editing); the Run tab and shared apps show the real thing.
 - **Share by link:** apps with their own pages, or linking a site off the list, are shared as a file (Share says so),
   so pasted HTML never gets a learningwaypoints.com link.
-- Sheet text: `object Sim (embed) text "" page "pendulum"`. Tests: `tests/embed.test.js`, `tests/browser/embed.test.mjs`.
-- Next (ROADMAP §13): the bridge (events from the page, Send to embed), a copyable prompt, a pendulum sample.
+- Sheet text: `object Sim (embed) text "" page "pendulum" sends period, length listens gravity`; events read
+  `when Sim sends period` and `Send gravity = 1.6 to Sim`. Tests: `tests/embed.test.js`, `tests/browser/embed.test.mjs`.
+- **The bridge** (1.13, `src/core/embed-bridge.js`): Properties › **Sends** and **Listens for** list the names (`period,
+  length`; letters, numbers and _, not the Embed's own x, y, w, h, text, visible, page). The page posts
+  `parent.postMessage({ name: 'period', value: 2.01 }, '*')`: **Sim sends period** runs, and `Sim.period` is the latest
+  value (an error until it has sent one). **Send gravity = 1.6 to Sim** posts `{ name, value }` to the page (to a
+  website only at its own origin). Messages are data: only from that iframe's own window (`ui/stage.js`; a page's origin
+  is "null", so the window is the check), only a listed name, only one number, text (up to 1000 letters), true or false;
+  nothing in them is evaluated. Level 4.
+- **Copy a prompt for an AI chat** (Properties): asks for one self-contained HTML file that sends and listens by these
+  names (`embedPrompt`). No AI in App Builder.
+- **Sample: Pendulum lab (Embed)**: a ready-made pendulum page (sends period and length, listens for gravity), Earth,
+  Moon and Mars buttons, Record reading into a Readings table and a question. `PENDULUM_HTML` in `src/samples.js`.
+- Build note: `tools/build.mjs` writes any `<script` inside the bundle as `<\x73cript` (a sample's HTML would otherwise
+  stop the page's own script element from closing) and checks index.html has exactly one script element.
 
 ## Media store (ROADMAP §10, step 1, 26 Nov 2026)
 

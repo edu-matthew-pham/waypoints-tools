@@ -30,7 +30,7 @@ export const WAY_KINDS = {
 const KIND_OF_TRIGGER = {
   clicked: 'click', pressed: 'click', released: 'click', itemClicked: 'click',
   keyDown: 'key', keyUp: 'key', timer: 'timer', start: 'start',
-  changed: 'change', submitted: 'change', ended: 'media',
+  changed: 'change', submitted: 'change', ended: 'media', embedSent: 'change',
 };
 const wayKind = (conds) => {
   for (const c of conds) { const t = CONDITIONS[c.type]?.trigger; if (t) return KIND_OF_TRIGGER[t] || 'check'; }

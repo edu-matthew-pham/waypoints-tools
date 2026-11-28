@@ -277,6 +277,11 @@ export class EventSheet extends HTMLElement {
       case 'sound': return (sc.sounds || []).map((n) => [n, n]);
       case 'posSize': return [['w', 'width'], ['h', 'height'], ['x', 'x position'], ['y', 'y position']];
       case 'function': return (sc.functions || []).map((f) => [f.name, f.name]);
+      case 'message': { // the names the chosen Embed sends (or listens for), from its Properties
+        const t = entry.params.find((p) => p.type === 'object');
+        const o = sc.objects.find((x) => x.name === item[t?.name]);
+        return (o?.[prm.list] || []).map((n) => [n, n]);
+      }
     }
     return [];
   }
@@ -306,7 +311,7 @@ export class EventSheet extends HTMLElement {
       }
       if (prm.type === 'object' || prm.type === 'table') {
         // keep any variable or field picker of the same item pointing at something that exists
-        for (const other of entry.params.filter((p) => p.type === 'instVar' || p.type === 'field')) {
+        for (const other of entry.params.filter((p) => p.type === 'instVar' || p.type === 'field' || p.type === 'message')) {
           const opts = this._options(other, item, entry).map(([v]) => v);
           if (!opts.includes(item[other.name])) item[other.name] = opts[0] ?? '';
         }
@@ -386,6 +391,7 @@ export class EventSheet extends HTMLElement {
       if (prm.type === 'table' && !(sc.tables || []).length) return 'Add a table first (left side, under Tables)';
       if (prm.type === 'instVar' && !sc.objects.some((o) => o.vars.length)) return 'Needs an object with a variable of its own';
       if (prm.type === 'function' && !(sc.functions || []).length) return 'Make a function first (left side, under Functions)';
+      if (prm.type === 'message' && !sc.objects.some((o) => o[prm.list]?.length)) return prm.list === 'sends' ? 'List what an Embed sends first (its Properties)' : 'List what an Embed listens for first (its Properties)';
     }
     return '';
   }

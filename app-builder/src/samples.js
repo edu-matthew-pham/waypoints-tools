@@ -260,6 +260,93 @@ export function creatureStats() {
   };
 }
 
+// Pendulum lab (Level 4): an Embed with a ready-made simulation (one HTML file, as an AI chat might make it) and the
+// app built around it with events. The page sends period and length; the app sends gravity. The basis of an advanced
+// lesson (students build the app around a given sim and never write HTML) and of the teacher trial's templates.
+export const PENDULUM_HTML = `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Pendulum</title>
+<style>body{margin:0;font:14px system-ui,sans-serif;background:#f4f7ff;overflow:hidden}
+#c{display:block;width:100vw;height:calc(100vh - 44px)}
+.bar{height:44px;display:flex;gap:8px;align-items:center;padding:0 10px;background:#fff;border-top:1px solid #dde}
+input{flex:1}</style></head>
+<body><canvas id="c"></canvas>
+<div class="bar"><label for="len">Length</label><input id="len" type="range" min="0.2" max="2" step="0.1" value="1"><span id="lv">1.0 m</span> <span id="gv"></span></div>
+<script>
+// A pendulum. Tells the app its period and length; listens for gravity.
+let L = 1, g = 9.8, t = 0;
+const c = document.getElementById('c'), x = c.getContext('2d');
+const send = (name, value) => parent.postMessage({ name, value }, '*');
+const period = () => Math.round(2 * Math.PI * Math.sqrt(L / g) * 100) / 100;
+const tell = () => { send('length', L); send('period', period()); };
+const show = () => { document.getElementById('gv').textContent = 'g = ' + g + ' m/s²'; };
+document.getElementById('len').addEventListener('input', (e) => {
+  L = Number(e.target.value);
+  document.getElementById('lv').textContent = L.toFixed(1) + ' m';
+  tell();
+});
+addEventListener('message', (e) => {
+  const d = e.data || {};
+  if (d.name === 'gravity' && typeof d.value === 'number' && d.value > 0) { g = d.value; show(); tell(); }
+});
+function draw() {
+  const w = c.width = c.clientWidth, h = c.height = c.clientHeight;
+  t += 1 / 60;
+  const a = 0.5 * Math.cos(Math.sqrt(g / L) * t);
+  const len = L * (h - 30) / 2.1, ox = w / 2, oy = 10;
+  const bx = ox + len * Math.sin(a), by = oy + len * Math.cos(a);
+  x.clearRect(0, 0, w, h);
+  x.strokeStyle = '#445'; x.lineWidth = 2;
+  x.beginPath(); x.moveTo(ox - 40, oy); x.lineTo(ox + 40, oy); x.stroke();
+  x.beginPath(); x.moveTo(ox, oy); x.lineTo(bx, by); x.stroke();
+  x.fillStyle = '#3563e9'; x.beginPath(); x.arc(bx, by, 12, 0, 7); x.fill();
+  x.fillStyle = '#223'; x.fillText('Period: ' + period() + ' s', 10, h - 10);
+  requestAnimationFrame(draw);
+}
+show(); tell(); draw();
+<\/script></body></html>
+`;
+const utf8DataUrl = (text) => {
+  const bytes = new TextEncoder().encode(text);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return 'data:text/html;charset=utf-8;base64,' + btoa(bin);
+};
+export function pendulumLab() {
+  const planets = [['Earth', 9.8], ['Moon', 1.6], ['Mars', 3.7]];
+  return {
+    version: 1, name: 'Pendulum lab', device: 'web', features: { level: 4 },
+    pages: [{ name: 'pendulum', data: utf8DataUrl(PENDULUM_HTML) }],
+    variables: [
+      { name: 'Gravity', value: 9.8 },
+      { name: 'Readings', table: { fields: [{ name: 'length', type: 'number' }, { name: 'gravity', type: 'number' }, { name: 'period', type: 'number' }] }, value: [] },
+    ],
+    screens: [{
+      id: 'main', name: 'Lab',
+      objects: [
+        obj('Title', 'text', [inst('p0', 20, 12, 760, 32, 'Pendulum lab: what changes the period?')]),
+        obj('Sim', 'embed', [{ ...inst('p1', 20, 52, 460, 300, 'A pendulum: drag Length to change it'), page: 'pendulum', sends: 'period, length', listens: 'gravity' }]),
+        obj('Planet', 'button', planets.map(([n, g], i) => inst('p2' + i, 500, 52 + i * 48, 130, 40, n, { g })), [{ name: 'g', value: 0 }]),
+        obj('GravityText', 'text', [inst('p3', 500, 200, 280, 26, 'Gravity: 9.8 m/s²')]),
+        obj('PeriodText', 'text', [inst('p4', 500, 230, 280, 26, 'Period: ')]),
+        obj('Record', 'button', [inst('p5', 500, 270, 160, 44, 'Record reading')]),
+        obj('ReadingsView', 'table', [{ ...inst('p6', 20, 368, 460, 210, ''), source: 'Readings', columns: '' }]),
+        obj('Question', 'text', [inst('p7', 500, 368, 280, 140, 'Record two lengths on Earth, then the same lengths on the Moon. What makes the period longer? What doesn’t change it?')]),
+      ],
+      events: [
+        ev('p8', [{ type: 'onEmbedSends', target: 'Sim', message: 'period' }], [{ type: 'setText', target: 'PeriodText', value: '"Period: " & Sim.period & " s"' }]),
+        ev('p9', [{ type: 'onClicked', target: 'Planet' }], [
+          { type: 'setVar', var: 'Gravity', value: 'Planet.g' },
+          { type: 'sendToEmbed', target: 'Sim', message: 'gravity', value: 'Gravity' },
+          { type: 'setText', target: 'GravityText', value: '"Gravity: " & Gravity & " m/s²"' },
+        ]),
+        ev('p10', [{ type: 'onClicked', target: 'Record' }], [
+          { type: 'tableAdd', table: 'Readings', values: { length: 'Sim.length', gravity: 'Gravity', period: 'Sim.period' } },
+        ]),
+      ],
+    }],
+  };
+}
+
 // The samples were laid out as a phone-width column; on a web page that column is centred.
 const WEB_SHIFT = Math.round((800 - 390) / 2);
 function onWebPage(make) {
@@ -282,6 +369,7 @@ export const SAMPLES = {
   'Creature stats': onWebPage(creatureStats),
   'Minutes and goal (two screens)': onWebPage(musicTracker),
   'Daily chores (copies)': onWebPage(dailyChores),
+  'Pendulum lab (Embed)': pendulumLab,
 };
 
 // ---- lesson links: ?sample=<id> ----

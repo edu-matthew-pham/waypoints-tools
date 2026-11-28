@@ -13,6 +13,7 @@
 import { givesValue } from './functions.js';
 import { OBJECT_KINDS } from './catalog.js';
 import { imageNames, soundNames } from './assets.js';
+import { messageNames } from './embed-bridge.js';
 
 // Screen size of the app being built. Web page is the default; Phone is a per-project option.
 export const DEVICES = {
@@ -188,7 +189,8 @@ export function pasteRows(table, text, { row = 1, field } = {}) {
 
 export function scopeFor(project, screen) {
   return {
-    objects: (screen?.objects || []).map((o) => ({ name: o.name, kind: o.kind, vars: o.instanceVars.map((v) => v.name) })),
+    objects: (screen?.objects || []).map((o) => ({ name: o.name, kind: o.kind, vars: o.instanceVars.map((v) => v.name),
+      ...(o.kind === 'embed' ? { sends: messageNames(o.instances[0]?.sends), listens: messageNames(o.instances[0]?.listens) } : {}) })),
     variables: project.variables.filter((v) => !Array.isArray(v.value)).map((v) => v.name),
     lists: project.variables.filter(isList).map((v) => v.name),
     tables: project.variables.filter(isTable).map((v) => v.name),
@@ -222,7 +224,9 @@ export function exprScopeFor(project, screen, fn) {
     vars: new Set([...project.variables.map((v) => v.name), ...(fn?.params || [])]),
     params: new Set(fn?.params || []),
     functions: new Map((project.functions || []).map((f) => [f.name, f.params])),
-    objects: new Map((screen?.objects || []).map((o) => [o.name, new Set([...PROP_NAMES, ...(OBJECT_KINDS[o.kind]?.exposes || []), ...o.instanceVars.map((v) => v.name)])])),
+    // an Embed's values are the names it sends (Sim.period)
+    objects: new Map((screen?.objects || []).map((o) => [o.name, new Set([...PROP_NAMES, ...(OBJECT_KINDS[o.kind]?.exposes || []), ...o.instanceVars.map((v) => v.name),
+      ...(o.kind === 'embed' ? messageNames(o.instances[0]?.sends) : [])])])),
   };
 }
 

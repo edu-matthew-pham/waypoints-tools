@@ -75,3 +75,100 @@ test('share by link: not for apps with their own pages, or linking a site off th
   assert.ok(!canShareByLink(withEmbed('https://example.org/', { allowAnyEmbed: true })));
   assert.ok(canShareByLink(checkProject(newProject('x'))));
 });
+
+// ---------- the bridge (phase 2) ----------
+import { messageNames, badNames, readMessage, plainValue, embedPrompt } from '../src/core/embed-bridge.js';
+import { Runtime } from '../src/core/runtime.js';
+import { newEvent, scopeFor, exprScopeFor } from '../src/core/project.js';
+import { check } from '../src/core/expr.js';
+import { defaultParams } from '../src/core/catalog.js';
+
+test('message names: identifiers only, no repeats, none of the Embed\'s own property names', () => {
+  assert.deepEqual(messageNames('period, angle;  period\nlength'), ['period', 'angle', 'length']);
+  assert.deepEqual(messageNames('x, text, page, 2nd, a-b, ok_1'), ['ok_1']);
+  assert.deepEqual(badNames('x, 2nd, fine'), ['x', '2nd']);
+  assert.deepEqual(messageNames(undefined), []);
+});
+
+test('a message from a page is data: a listed name and one plain value, or nothing', () => {
+  assert.deepEqual(readMessage({ name: 'period', value: 1.42 }, 'period'), { name: 'period', value: 1.42 });
+  assert.deepEqual(readMessage({ name: 'done', value: true }, 'done'), { name: 'done', value: true });
+  assert.equal(readMessage({ name: 'angle', value: 1 }, 'period'), null, 'not a name the Embed lists');
+  assert.equal(readMessage({ name: 'period', value: { a: 1 } }, 'period'), null, 'not one plain value');
+  assert.equal(readMessage({ name: 'period', value: [1] }, 'period'), null);
+  assert.equal(readMessage({ name: 'period', value: NaN }, 'period'), null);
+  assert.equal(readMessage({ name: 'period', value: 'x'.repeat(1001) }, 'period'), null, 'text is capped');
+  assert.equal(readMessage({ name: 'period' }, 'period'), null);
+  assert.equal(readMessage('period', 'period'), null);
+  assert.equal(readMessage([{ name: 'period', value: 1 }], 'period'), null);
+  assert.equal(plainValue('ok'), 'ok');
+});
+
+function bridgeApp() {
+  const p = newProject('Bridge'), s = p.screens[0];
+  const sim = addObject(s, 'embed').obj; sim.name = 'Sim';
+  Object.assign(sim.instances[0], { page: 'pendulum', sends: 'period, swings', listens: 'gravity' });
+  addObject(s, 'text').obj.name = 'Out';
+  addObject(s, 'button').obj.name = 'Moon';
+  s.events.push(
+    newEvent({ conds: [{ type: 'onEmbedSends', target: 'Sim', message: 'period' }], actions: [{ type: 'setText', target: 'Out', value: '"Period: " & Sim.period' }] }),
+    newEvent({ conds: [{ type: 'onClicked', target: 'Moon' }], actions: [{ type: 'sendToEmbed', target: 'Sim', message: 'gravity', value: '1.6' }] }),
+  );
+  return p;
+}
+
+test('the page sends: "Sim sends period" runs, and Sim.period is its latest value', () => {
+  const rt = new Runtime(bridgeApp());
+  rt.start();
+  const sim = rt.instancesOf('Sim')[0], out = rt.instancesOf('Out')[0];
+  const before = out.props.text;
+  rt.embedMessage(sim.id, 'swings', 3);
+  assert.equal(out.props.text, before, 'another name doesn\'t run it');
+  rt.embedMessage(sim.id, 'period', 2.5);
+  assert.equal(out.props.text, 'Period: 2.5');
+  assert.equal(rt.evalExpr('Sim.swings', { picked: new Map(), loop: [] }), 3);
+  assert.throws(() => new Runtime(bridgeApp()).evalExpr('Sim.period', { picked: new Map(), loop: [] }), /no object|hasn't sent period yet/);
+  const rt2 = new Runtime(bridgeApp()); rt2.start();
+  assert.throws(() => rt2.evalExpr('Sim.period', { picked: new Map(), loop: [] }), /Sim hasn't sent period yet/);
+  assert.equal(rt.errors.length, 0);
+});
+
+test('the app sends: "Send gravity = 1.6 to Sim" hands one plain value to the renderer; a list is an error', () => {
+  const sent = [];
+  const p = bridgeApp();
+  p.screens[0].events.push(newEvent({ conds: [{ type: 'onStart' }], actions: [] }));
+  const rt = new Runtime(p, { hooks: { sendToEmbed: (...a) => sent.push(a) } });
+  rt.start();
+  rt.click(rt.instancesOf('Moon')[0].id);
+  assert.deepEqual(sent, [[rt.instancesOf('Sim')[0].id, 'gravity', 1.6]]);
+  p.variables.push({ name: 'L', value: [1, 2] });
+  p.screens[0].events[1].actions[0].value = 'L';
+  const rt3 = new Runtime(p, { hooks: { sendToEmbed: () => assert.fail('a list must not be sent') } });
+  rt3.start();
+  rt3.click(rt3.instancesOf('Moon')[0].id);
+  assert.match(rt3.errors[0].message, /Send one value/);
+});
+
+test('the event sheet offers the names the Embed lists; expressions know Sim.period', () => {
+  const p = bridgeApp(), s = p.screens[0];
+  const sc = scopeFor(p, s);
+  const sim = sc.objects.find((o) => o.name === 'Sim');
+  assert.deepEqual([sim.sends, sim.listens], [['period', 'swings'], ['gravity']]);
+  assert.equal(defaultParams(CONDITIONS_onEmbed(), sc).message, 'period');
+  const es = exprScopeFor(p, s);
+  assert.equal(check('Sim.period * 2', es), null);
+  assert.match(String(check('Sim.angle', es)), /no property "angle"/);
+  assert.match(sheetText(p), /object Sim \(embed\) text "" page "pendulum" sends period, swings listens gravity/);
+  assert.match(sheetText(p), /when Sim sends period/);
+  assert.match(sheetText(p), /Send gravity = 1.6 to Sim/);
+});
+import { CONDITIONS } from '../src/core/catalog.js';
+const CONDITIONS_onEmbed = () => CONDITIONS.onEmbedSends;
+
+test('the prompt asks for one file and names the messages both ways', () => {
+  const t = embedPrompt({ what: 'a pendulum', sends: 'period', listens: 'gravity' });
+  assert.match(t, /Make a pendulum as ONE self-contained HTML file/);
+  assert.match(t, /parent\.postMessage\(\{ name: 'period'/);
+  assert.match(t, /name 'gravity'/);
+  assert.ok(!/postMessage/.test(embedPrompt({})), 'no names: no messages');
+});

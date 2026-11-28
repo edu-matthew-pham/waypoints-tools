@@ -279,7 +279,7 @@ logger, a revision quiz, a budget, a timeline. No accounts, so school approval i
 5. **Teacher confidence:** a "for teachers" page (what it is, privacy, collecting work) and time being reliable in class.
 6. **iPad and phone,** at least for running apps.
 
-## 13. Embed object *(proposed and agreed 28 Nov 2026, Matthew; phase 1 built 28 Nov, 1.12: README › Embed)*
+## 13. Embed object *(proposed and agreed 28 Nov 2026, Matthew; phase 1 built and live 28 Nov, 1.12; the bridge, prompt and sample built 28 Nov, 1.13: README › Embed)*
 
 **Why.** A trial with teachers making their own apps. Teachers already use an AI chat to make single-file simulations
 (as Matthew did for science). Embed lets them bring one in and build the app around it with event sheets: questions, a
@@ -305,12 +305,14 @@ Google Sites embeds can't do is the two-way bridge (phase 2) between the embedde
   are limited to PhET, Desmos, GeoGebra and Wikimedia Commons unless the app's Allow any website is ticked (like
   Allow YouTube links). The learning risk is skipping the event sheets: lessons can require the bridge events.
 
-**Phase 2, the bridge:**
+**Phase 2, the bridge** *(built, 1.13)*:
 - Event "When the embed sends `<name>`", with the value available in the event. Action "Send to embed `<name>` `<value>`".
 - `postMessage` `{ name, value }`: plain text or numbers only, a size cap, accepted only from that iframe's own window.
   Messages are data, never evaluated, and join the event queue like a click. Interpreter tests fake messages without an iframe.
+- As built: the Embed lists the names in Properties (Sends, Listens for), so the sheet offers them, expressions check
+  `Sim.period`, and only listed names get through; true and false are plain values too; text up to 1000 letters.
 
-**Then:**
+**Then** *(built, 1.13)*:
 - Prompt helper: a copyable prompt asking an AI chat for one self-contained HTML file that sends named values by this
   protocol (e.g. "send `period` whenever it changes").
 - A sample: a ready-made pendulum that sends `period`, with an app around it (a readings table, questions, checks). The
