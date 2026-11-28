@@ -285,6 +285,23 @@ Sound takes no space while the app runs and still plays from events (Play, Stop)
 shows faded, labelled "no player: plays from events", so it can still be found and selected. Its credit (the open
 licences ask for one) then shows in a line under the running app. The sheet text adds "(no player)".
 
+## Slips in names and values (1.14, 28 Nov 2026)
+
+- **Did you mean …?** (`src/core/names.js`): an unknown object, variable, property, field, table or function name, in the
+  editor's check of a value box and in errors while the app runs, ends with the closest existing name when one is close
+  enough to be a slip (other capitals, one or two letters added, missing, changed or swapped; nothing when two are as
+  close): *There's no object called "MinutesInputs" on this screen. Did you mean MinutesInput?* An object's name used as
+  a value says *TotalText is an object, not a variable: use one of its properties, like TotalText.text*. A value box with
+  an unknown name can't be added, so in practice students see this in the dialog.
+- **Guided tutorials check what was typed** (`src/ui/tutorial-panel.js`): moving on from a value box in a dialog that
+  doesn't say what the lesson's clip typed (spaces ignored; the last thing typed into each box) brings the ring back to
+  it: *Not quite: check yours matches, letter for letter … Type: …*. A value already added that isn't what the clip
+  typed (a slip that is still a valid value, such as `" minute"` for `" minutes"`) shows on the card as *Check what you
+  typed. The lesson's video types: …*, and the ring points there first. Only boxes the student has passed count, so
+  steps that hand over to the checklist are unchanged. A misnamed object was already handled (the ring leads through
+  renaming it). Test: tests/browser/tutorial.test.mjs › a typo in a value box; `npm run audit:lessons` unchanged
+  (18 built, 17 checklist, the same 2 stuck steps as before).
+
 ## Embed (ROADMAP §13, 28 Nov 2026; 1.12, the bridge 1.13; Level 4)
 
 **Embed object** (Media, Level 4): a simulation or tool made as one self-contained HTML file (often by an AI chat, with

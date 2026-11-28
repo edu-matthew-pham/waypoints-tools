@@ -13,6 +13,9 @@ import { COMPONENTS } from '../core/components.js';
 
 const OBJECTISH = /add-object|kind:|object-menu|menu:rename/; // clip moves that add or rename objects (a rename box only after menu:rename: functions are renamed in it too)
 const VARISH = /new-variable-/; // clip moves that make a variable
+// What the lesson typed into a box in a dialog (a value or a condition), compared without spaces, as the checks do
+const flat = (x) => String(x ?? '').replace(/\s+/g, '');
+const TYPED_IN_DIALOG = (t) => t.action === 'type' && /dialog/.test(t.selector) && String(t.text ?? '').trim() !== '';
 const APP = (sel) => `.view-events .preview-col ${sel}, .view-run ${sel}`; // the running app: preview or Run tab
 
 export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getProject, onPlay, store }) {
@@ -66,6 +69,9 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       check.push(h('p', { class: 'tut-check' + (built(at) ? ' ok' : ''), role: 'status' }, built(at) ? '✓ Done: ' : 'This ticks by itself when it’s done: ', s.check.text));
       const items = built(at) ? [] : [...todo(s.check.rules, getSheet()), ...missingUsed(tutorial, s, getSheet(), projectNames())];
       if (items.length) check.push(h('ul', { class: 'tut-todo', 'data-ab': 'tutorial-todo' }, items.map((i) => h('li', { class: i.ok ? 'ok' : '' }, (i.ok ? '✓ ' : '○ ') + i.label))));
+      const typed = built(at) ? [] : typedMissing(s);
+      if (typed.length && !document.querySelector('dialog[open]')) check.push(h('div', { class: 'tut-typed', 'data-ab': 'tutorial-typed' },
+        h('p', {}, 'Check what you typed. The lesson\u2019s video types:'), h('ul', {}, typed.map((x) => h('li', {}, h('code', {}, x))))));
     }
     s.tries.forEach((t, n) => { const y = tried.has(`${at}:${n}`); check.push(h('p', { class: 'tut-check' + (y ? ' ok' : ''), role: 'status' }, (y ? '✓ ' : '') + tryText(t))); });
     if (!check.length) check.push(h('p', { class: 'tut-check none' }, 'When you’ve done this, choose Next.'));
@@ -118,6 +124,18 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
       while (ptr < t.length && t[ptr].action === 'type') { const el = find(t[ptr].selector); if (!el || el.value === undefined || String(el.value).trim() !== String(t[ptr].text ?? '').trim()) break; ptr++; }
       let renaming = false; // done another way: skip that part (and the name typed after an object's Rename)
       while (ptr < t.length && ((!obj && (OBJECTISH.test(t[ptr].selector) || (renaming && /input\.rename/.test(t[ptr].selector)))) || (!v && VARISH.test(t[ptr].selector)))) { renaming = /menu:rename/.test(t[ptr].selector); ptr++; }
+      // a box the student has typed into, still open, that doesn't say what the lesson typed: back to it before moving on
+      const seen = new Set(); // the same box typed twice: only what was typed last counts
+      for (let k = Math.min(ptr, t.length) - 1; k >= 0 && t[k].action === 'type'; k--) {
+        if (seen.has(t[k].selector)) continue;
+        seen.add(t[k].selector);
+        if (!TYPED_IN_DIALOG(t[k])) continue;
+        const box = find(t[k].selector);
+        if (box && box.value !== undefined && String(box.value).trim() !== '' && flat(box.value) !== flat(t[k].text)) return { el: box, caption: `Not quite: check yours matches, letter for letter (spaces don\u2019t matter). Type: ${t[k].text}` };
+      }
+      // a value already added that isn't what the lesson typed: fix that before going on
+      const typedBox = !document.querySelector('dialog[open]') && card.querySelector('.tut-typed');
+      if (typedBox && open && !small) return { el: typedBox, caption: 'Find this in your events and check it matches, letter for letter.' };
       if (ptr < t.length) {
         const el = find(t[ptr].selector);
         if (el) return { el, caption: captionFor(t[ptr], el) };
@@ -151,6 +169,9 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     if (watch.length && !find(APP('.stage'))) { const te = find("[data-ab='tab:events']"); if (te) return { el: te, caption: `Open Events to run the app and watch ${watch[0]} change.` }; }
     return null;
   }
+  // what this step's clip typed into dialogs, in boxes the student has already passed, that isn't anywhere in their app:
+  // most likely a typo (boxes still ahead aren't listed: those are just not done yet)
+  const typedMissing = (s) => { const app = flat(getSheet()); return [...new Set(s.targets.slice(0, ptr).filter(TYPED_IN_DIALOG).map((t) => String(t.text).trim()))].filter((x) => !app.includes(flat(x))); };
   const projectNames = () => new Set((getProject().screens || []).flatMap((sc) => (sc.objects || []).map((o) => o.name)));
   // Pointing at what a missing object needs: the picker tile, renaming one the student added with its default name
   // (Button1 -> SaveButton), or Add object.

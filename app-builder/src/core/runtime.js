@@ -21,7 +21,8 @@ import { isRef, isDataUrl, withRange } from './media.js';
 import { evaluate, parse, ExprError, fieldOf, isRecord, fmt } from './expr.js';
 import { CONDITIONS, ACTIONS, OBJECT_KINDS, normaliseKey } from './catalog.js';
 import { sharedEventsFor, objectNames, itemObjects } from './shared.js';
-import { findFunction } from './functions.js';
+import { findFunction, functionsOf } from './functions.js';
+import { meant } from './names.js';
 
 const MAX_DEPTH = 50; // calls inside calls
 
@@ -221,12 +222,14 @@ export class Runtime {
   get allInstances() { return [...this.objects.values()].flatMap((o) => o.instances); }
   instancesOf(name) { return this.objects.get(name)?.instances ?? []; }
 
+  // "There's no variable called "Minuts". Did you mean Minutes?"
+  #noVar(name) { return new ExprError(`There's no variable called "${name}".${meant(name, this.globals.keys())}`); }
   getVar(name) {
-    if (!this.globals.has(name)) throw new ExprError(`There's no variable called "${name}"`);
+    if (!this.globals.has(name)) throw this.#noVar(name);
     return this.globals.get(name);
   }
   setVar(name, value) {
-    if (!this.globals.has(name)) throw new ExprError(`There's no variable called "${name}"`);
+    if (!this.globals.has(name)) throw this.#noVar(name);
     if (this.tables.has(name)) throw new ExprError(`${name} is a table: use the table actions (Add a row, Set a field ...)`);
     if (Array.isArray(this.globals.get(name))) throw new ExprError(`${name} is a list: use the list actions (Add to list, Clear list ...)`);
     if (Array.isArray(value)) throw new ExprError(`A variable can't hold a whole list or table. Use one item, like item(${name}, 1)`);
@@ -235,7 +238,7 @@ export class Runtime {
   // a list or a table (both are lists of items; a table's items are rows)
   listOf(name) {
     const l = this.globals.get(name);
-    if (!Array.isArray(l)) throw new ExprError(`There's no list or table called "${name}"`);
+    if (!Array.isArray(l)) throw new ExprError(`There's no list or table called "${name}".${meant(name, [...this.globals].filter(([, v]) => Array.isArray(v)).map(([k]) => k))}`);
     return l;
   }
   listChange(name, fn) {
@@ -244,7 +247,7 @@ export class Runtime {
   }
   // ---------- tables ----------
   tableOf(name) {
-    if (!this.tables.has(name)) throw new ExprError(`There's no table called "${name}"`);
+    if (!this.tables.has(name)) throw new ExprError(`There's no table called "${name}".${meant(name, this.tables.keys())}`);
     return this.globals.get(name);
   }
   fieldsOf(name) { this.tableOf(name); return this.tables.get(name); }
@@ -343,7 +346,7 @@ export class Runtime {
   // picking: the copies an event is currently working on
   pickList(ctx, objName) {
     if (!this.objects.has(objName) && ctx.fn) return []; // in a function: an object this screen doesn't have has no copies
-    if (!this.objects.has(objName)) throw new ExprError(`There's no object called "${objName}" on this screen`);
+    if (!this.objects.has(objName)) throw new ExprError(`There's no object called "${objName}" on this screen.${meant(objName, this.objects.keys())}`);
     return ctx.picked.get(objName) ?? this.instancesOf(objName);
   }
   ctxWith(ctx, objName, inst) {
@@ -386,7 +389,7 @@ export class Runtime {
           if (inst.received && p in inst.received) return inst.received[p];
           throw new ExprError(`${o} hasn't sent ${p} yet`);
         }
-        throw new ExprError(`${o} has no property "${p}"`);
+        throw new ExprError(`${o} has no property "${p}".${meant(p, [...Object.keys(inst.props), ...Object.keys(inst.vars)])}`);
       },
       call: (name, values) => this.callFunction(name, values, ctx, true), // Total(price, qty)
     };
@@ -397,7 +400,7 @@ export class Runtime {
   // the values a call gives, in the order of the function's parameters (args = { param: expression })
   argValues(name, args, ctx) {
     const f = findFunction(this.project, name);
-    if (!f) throw new ExprError(name ? `There's no function called "${name}"` : 'Choose a function to call');
+    if (!f) throw new ExprError(name ? `There's no function called "${name}".${meant(name, functionsOf(this.project).map((x) => x.name))}` : 'Choose a function to call');
     return f.params.map((p) => {
       const src = args?.[p];
       if (src == null || String(src).trim() === '') throw new ExprError(`${name} needs a value for ${p}`);
@@ -407,7 +410,7 @@ export class Runtime {
   // Run a function now. asValue: it was used in a value box, so it must set a return value.
   callFunction(name, values, ctx, asValue = false) {
     const f = findFunction(this.project, name);
-    if (!f) throw new ExprError(`There's no function called "${name}"`);
+    if (!f) throw new ExprError(`There's no function called "${name}".${meant(name, functionsOf(this.project).map((x) => x.name))}`);
     if (values.length !== f.params.length) throw new ExprError(`${name}() needs ${f.params.length} value${f.params.length === 1 ? '' : 's'}`);
     if (this.depth >= MAX_DEPTH) throw new ExprError(`${name} was called inside itself more than ${MAX_DEPTH} times, so it was stopped. Does it call itself without a way to stop?`);
     const frame = { fn: f, args: new Map(f.params.map((p, i) => [p, values[i]])), ret: undefined, returned: false };

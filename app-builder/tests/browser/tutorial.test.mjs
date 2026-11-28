@@ -4,7 +4,7 @@
 import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { page, openApp, close, lessonFiles, region, loadProject, watchFlips, followRing, stepBuilt, ROOT } from './helpers.mjs';
+import { page, openApp, close, lessonFiles, region, loadProject, watchFlips, followRing, stepBuilt, ring, ROOT } from './helpers.mjs';
 import { parseLesson } from '../../src/edu/tutorial.js';
 
 after(close);
@@ -129,5 +129,48 @@ test('a check that asks for an object’s text: the ring selects it and says wha
   const texts = await p.evaluate(() => Object.fromEntries(window.__app.S.project.screens[0].objects.map((o) => [o.name, o.instances[0].text])));
   assert.equal(texts.SaveButton, 'Save');
   assert.ok(Object.values(texts).includes('Practice tracker'));
+  assert.deepEqual(p.errors, []);
+});
+
+// A slip in a typed value (28 Nov 2026): the ring goes back to the box while it's open; once it's closed, the card
+// shows what the lesson typed. A student following only the ring until the value box, then typing Minuts for Minutes.
+test('a typo in a value box: the ring goes back to it, then the card says what the lesson typed', async () => {
+  const p = await atStep('practice-tracker', /^Build 3/);
+  const want = '"You\'ve practised " & Minutes & " minutes"';
+  let r;
+  for (let n = 0; n < 30; n++) { // follow the ring until it points at the dialog's value box
+    await p.waitForTimeout(350);
+    r = await ring(p);
+    assert.ok(r, 'the ring is there');
+    if (r.inDialog && r.ab === 'param:value') break;
+    if (r.tag === 'SELECT') await p.selectOption('[data-ringed]', { label: r.caption.match(/Choose: (.*)$/)[1] });
+    else await p.click('[data-ringed]');
+  }
+  assert.equal(r.ab, 'param:value');
+  await p.fill('[data-ringed]', want.replace('Minutes', 'Minuts'));
+  await p.press('[data-ringed]', 'Tab');
+  await p.waitForTimeout(400);
+  r = await ring(p);
+  assert.equal(r.ab, 'param:value', 'the ring stays on the box with the slip');
+  assert.match(r.caption, /^Not quite: check yours matches, letter for letter .* Type: "You've practised " & Minutes & " minutes"$/);
+  // fixed: the ring moves on (to Done)
+  await p.fill('[data-ringed]', want);
+  await p.press('[data-ringed]', 'Tab');
+  await p.waitForTimeout(400);
+  r = await ring(p);
+  assert.notEqual(r.ab, 'param:value', 'fixed: the ring moves on');
+  // an unknown name can't be added at all: the dialog says so, with the closest name
+  await p.fill("dialog[open] [data-ab='param:value']", want.replace('Minutes', 'Minuts'));
+  await p.waitForTimeout(300);
+  assert.ok(await p.locator("dialog[open] [data-ab='done']").isDisabled(), 'Add is off while the value has an unknown name');
+  assert.match(await p.locator('dialog[open]').innerText(), /There's no variable called "Minuts"\. Did you mean Minutes\?/);
+  // a slip that is still a valid value (" minute" for " minutes"), and Add anyway: the card shows what the lesson
+  // typed, and the ring points at it
+  await p.fill("dialog[open] [data-ab='param:value']", want.replace('" minutes"', '" minute"'));
+  await p.click("dialog[open] [data-ab='done']");
+  await p.waitForTimeout(500);
+  assert.match(await p.locator("[data-ab='tutorial-typed']").innerText(), /The lesson’s video types:[\s\S]*"You've practised " & Minutes & " minutes"/);
+  r = await ring(p);
+  assert.match(r.caption, /^Find this in your events and check it matches/);
   assert.deepEqual(p.errors, []);
 });

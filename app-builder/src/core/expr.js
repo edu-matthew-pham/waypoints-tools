@@ -4,6 +4,8 @@
 //   if(test, value if true, value if false)   test = two values and  = ≠ < ≤ > ≥  (also != <= >= ==)
 // No eval, no JS: the parser builds a small tree and we walk it.
 
+import { meant } from './names.js';
+
 export class ExprError extends Error {
   constructor(message) { super(message); this.name = 'ExprError'; }
 }
@@ -251,22 +253,25 @@ export function check(src, scope) {
   const checkField = (name) => {
     if (!scope.fields || scope.fields.has(name)) return;
     const lower = [...scope.fields].find((f) => f.toLowerCase() === name.toLowerCase());
-    throw new ExprError(lower ? `Use .${lower} (small letters), not .${name}` : scope.fields.size ? `No table has a field called "${name}"` : `"${name}" would be a field of a table, but there are no tables yet`);
+    throw new ExprError(lower ? `Use .${lower} (small letters), not .${name}` : scope.fields.size ? `No table has a field called "${name}".${meant(name, scope.fields)}` : `"${name}" would be a field of a table, but there are no tables yet`);
   };
   try {
     const ast = parse(String(src ?? ''));
     (function walk(n) {
       switch (n.k) {
         case 'var':
-          if (!scope.vars.has(n.name) && !LOOP_NAMES.includes(n.name)) throw new ExprError(`There's no variable called "${n.name}"`);
+          if (!scope.vars.has(n.name) && !LOOP_NAMES.includes(n.name)) {
+            if (scope.objects.has(n.name)) throw new ExprError(`${n.name} is an object, not a variable: use one of its properties, like ${n.name}.text`);
+            throw new ExprError(`There's no variable called "${n.name}".${meant(n.name, [...scope.vars, ...LOOP_NAMES])}`);
+          }
           break;
         case 'prop': {
           const props = scope.objects.get(n.obj);
           if (!props && (scope.vars.has(n.obj) || LOOP_NAMES.includes(n.obj))) { checkField(n.prop); break; } // a row of a table: LoopItem.artist
-          if (!props) throw new ExprError(`There's no object called "${n.obj}" on this screen`);
+          if (!props) throw new ExprError(`There's no object called "${n.obj}" on this screen.${meant(n.obj, [...scope.objects.keys(), ...scope.vars])}`);
           if (!props.has(n.prop)) {
             const lower = [...props].find((p) => p.toLowerCase() === n.prop.toLowerCase());
-            throw new ExprError(lower ? `Use ${n.obj}.${lower} (small letters), not ${n.obj}.${n.prop}` : `${n.obj} has no property "${n.prop}"`);
+            throw new ExprError(lower ? `Use ${n.obj}.${lower} (small letters), not ${n.obj}.${n.prop}` : `${n.obj} has no property "${n.prop}".${meant(n.prop, props)}`);
           }
           break;
         }
@@ -283,7 +288,7 @@ export function check(src, scope) {
         case 'call': {
           const own = scope.functions?.get(n.name);
           if (own && n.args.length !== own.length) throw new ExprError(`${n.name}() needs ${own.length} value${own.length === 1 ? '' : 's'}${own.length ? ` (${own.join(', ')})` : ''}`);
-          if (!own && !FUNCTION_NAMES().includes(n.name)) throw new ExprError(`There's no function called "${n.name}"`);
+          if (!own && !FUNCTION_NAMES().includes(n.name)) throw new ExprError(`There's no function called "${n.name}".${meant(n.name, [...(scope.functions?.keys() || []), ...FUNCTION_NAMES()])}`);
           n.args.forEach(walk);
           break;
         }
