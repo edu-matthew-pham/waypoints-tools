@@ -302,6 +302,17 @@ licences ask for one) then shows in a line under the running app. The sheet text
   renaming it). Test: tests/browser/tutorial.test.mjs › a typo in a value box; `npm run audit:lessons` unchanged
   (18 built, 17 checklist, the same 2 stuck steps as before).
 
+## Two guided-tutorial fixes (1.14.1, 28 Nov 2026)
+
+- Clip selectors written with Playwright's `:has-text('words')` (such as `label:has-text('Visible at start') input`)
+  are found by guided mode too (`pick`, `named` in `src/ui/tutorial-panel.js`); before, the ring couldn't find them
+  and fell back to the previous box with no instruction (App Builder apps › practice-record Build 2).
+- Pressing Enter in a box and the browser's change event as it loses focus count as one move; before, the second one
+  could skip the next box with the same selector, such as a new field's name (Data apps › one-table Build 1 skipped
+  "artist").
+- `npm run audit:lessons`: 37 guided build steps, 21 built by the ring (was 18), 16 handed to the checklist, 0 with
+  problems (was 2). Both lessons are fixtures in `tests/browser/tutorial.test.mjs` (they fail without the fixes).
+
 ## Embed (ROADMAP §13, 28 Nov 2026; 1.12, the bridge 1.13; Level 4)
 
 **Embed object** (Media, Level 4): a simulation or tool made as one self-contained HTML file (often by an AI chat, with

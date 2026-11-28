@@ -9,7 +9,7 @@ import { parseLesson } from '../../src/edu/tutorial.js';
 
 after(close);
 
-const LESSONS = { 'code/apps/practice-tracker': 'practice-tracker', 'code/apps/water-sound': 'water-sound', 'code/apps/creature-scores': 'creature-scores', 'code/data-apps/journal-drawings': 'journal-drawings' };
+const LESSONS = { 'code/apps/practice-tracker': 'practice-tracker', 'code/apps/water-sound': 'water-sound', 'code/apps/creature-scores': 'creature-scores', 'code/data-apps/journal-drawings': 'journal-drawings', 'code/apps/practice-record': 'practice-record', 'code/data-apps/one-table': 'one-table' };
 const slugOf = (fixture) => Object.keys(LESSONS).find((k) => LESSONS[k] === fixture);
 
 // Open a fixture lesson guided, go to the step whose title matches, starting from that step's own starter.
@@ -35,6 +35,8 @@ const EXPECT = [
   ['water-sound', /^Build 1/, 'built'],        // a box already holding the clip's text; a dropdown set with arrow keys
   ['creature-scores', /^Build 1/, 'checklist'], // renaming a function, not an object
   ['journal-drawings', /^Build 3/, 'checklist'], // a table rule with settings: no endless add-and-rename
+  ['practice-record', /^Build 2/, 'built'],     // a tick box named with Playwright's :has-text() (was stuck, 28 Nov 2026)
+  ['one-table', /^Build 1/, 'built'],           // Enter then change in a field-name box is one move (was stuck: skipped "artist")
 ];
 for (const [fixture, title, want] of EXPECT) {
   test(`${fixture} ${title.source.slice(1)}: following the ring → ${want}, the card steady`, async () => {

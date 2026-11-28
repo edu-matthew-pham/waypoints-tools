@@ -101,7 +101,7 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
     const modal = document.querySelector('dialog[open]');
     return !modal || modal.contains(el); // behind an open dialog it can't be reached
   };
-  const find = (sel) => { try { const { css, nth } = parseSel(sel); const all = [...document.querySelectorAll(css)].filter(visible); return (nth == null ? all[0] : all[nth]) || null; } catch { return null; } };
+  const find = (sel) => { try { const { css, nth } = parseSel(sel); const all = pick(css).filter(visible); return (nth == null ? all[0] : all[nth]) || null; } catch { return null; } };
   function target() {
     if (!open || finished) return null;
     const s = tutorial.steps[at], t = s.targets;
@@ -272,14 +272,21 @@ export function startTutorial({ tutorial, id, lessonUrl, getSheet, getTab, getPr
   // clicking or typing into what the ring points at moves it on (capture: before the editor redraws)
   // pointerdown as well as click: the app's own objects on the stage take the press (to select or drag them), so
   // their click may never come; a dropdown moves on when it changes, since opening it is only half the move
+  // Enter in a box, then the browser's change event as it loses focus, are one move: without this the second one
+  // could skip the next box that has the same selector (a new field's name, typed in a box just like this one)
+  let typedAt = null;
   const advance = (e, action) => {
     const t = tutorial.steps[at].targets;
     if (!(e.target instanceof Element)) return;
+    if (action === 'change' && typedAt && typedAt.el === e.target && Date.now() - typedAt.at < 1500) return;
     for (let k = ptr; k < t.length; k++) {
       if (t[k].action !== action && !(action === 'change' && (t[k].action === 'type' || t[k].key || t[k].arrows))) continue;
       if (action === 'click' && (t[k].key || t[k].arrows)) continue; // a dropdown: wait for the choice
-      let hit = false; try { hit = !!e.target.closest(parseSel(t[k].selector).css); } catch { /* not a selector */ }
-      if (hit) { ptr = k + 1; card.dataset.next = t[ptr]?.selector || ''; setTimeout(place, 0); return; }
+      let hit = false; try { hit = named(e.target, parseSel(t[k].selector).css); } catch { /* not a selector */ }
+      if (hit) {
+        if (action === 'change') typedAt = { el: e.target, at: Date.now() };
+        ptr = k + 1; card.dataset.next = t[ptr]?.selector || ''; setTimeout(place, 0); return;
+      }
     }
   };
   let down = null; // one press and its click are one move
@@ -334,6 +341,25 @@ function stuckSection(s, lessonUrl) {
 function parseSel(sel) {
   const m = String(sel).match(/^(.*?)\s*>>\s*nth=(\d+)\s*$/);
   return m ? { css: m[1], nth: Number(m[2]) } : { css: String(sel), nth: null };
+}
+
+// Elements a clip's selector names. Lesson clips are Playwright selectors, so besides plain CSS this understands
+// Playwright's `A:has-text('words') B` (an A whose text contains the words, then B inside it, or A itself).
+function pick(css) {
+  const m = String(css).match(/^(.*?):has-text\((['"])(.*?)\2\)\s*(.*)$/);
+  if (!m) return [...document.querySelectorAll(css)];
+  const [, outer, , words, inner] = m;
+  const out = [];
+  for (const el of document.querySelectorAll(outer || '*')) {
+    if (!el.textContent.includes(words)) continue;
+    if (!inner) out.push(el); else out.push(...el.querySelectorAll(inner));
+  }
+  return [...new Set(out)];
+}
+// Is el (or something it sits inside) named by a clip's selector?
+function named(el, css) {
+  if (!/:has-text\(/.test(css)) return !!el.closest(css);
+  return pick(css).some((x) => x === el || x.contains(el));
 }
 
 // What the ring's bubble says for a clip move: its caption, plus what to type or which option to choose.
