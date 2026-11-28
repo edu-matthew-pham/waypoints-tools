@@ -1,0 +1,46 @@
+# Publishes the site (tools.learningwaypoints.com) from main, plus the newest lesson audit page at /app-builder/audit/
+# (made by the weekly "App Builder: tests" run; unlisted, noindex). Needs Settings › Pages › Source: GitHub Actions.
+# Runs on every push to main, after each tests run on main, and by hand.
+name: Publish site
+on:
+  push:
+    branches: [main]
+  workflow_run:
+    workflows: ["App Builder: tests"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: read
+concurrency: { group: pages, cancel-in-progress: false }
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - name: Site files (everything but .git and .github)
+        run: rsync -a --exclude .git --exclude .github ./ _site/
+      - name: Newest audit page
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          run=$(gh api "repos/${{ github.repository }}/actions/artifacts?name=guided-tutorial-page&per_page=20" \
+            --jq '[.artifacts[] | select(.expired | not)] | sort_by(.created_at) | last | .workflow_run.id // empty')
+          if [ -n "$run" ]; then
+            gh run download "$run" -R "${{ github.repository }}" -n guided-tutorial-page -D _site/app-builder/audit
+            echo "Audit page from run $run" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No audit page yet (the weekly lesson audit makes one)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: _site }
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: "${{ steps.deploy.outputs.page_url }}" }
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

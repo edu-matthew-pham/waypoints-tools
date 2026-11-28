@@ -6,7 +6,7 @@
 #      ring through real lessons in tests/fixtures, the card staying put, Choose a photo/sound, the Tutorials list)
 # And, weekly and on demand, the lesson audit: the follow-the-ring student through every published lesson on the
 # tutorials site, reporting steps that get stuck, flip or error (a lesson change can need an App Builder change, or
-# the other way round).
+# the other way round). It also makes the audit page (every guided step's video), which pages.yml publishes.
 name: "App Builder: tests"
 on:
   push:
@@ -51,10 +51,12 @@ jobs:
         with: { node-version: 22, cache: npm, cache-dependency-path: app-builder/package-lock.json }
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: ffmpeg (videos to .mp4 for the audit page)
+        run: sudo apt-get install -y ffmpeg
       - name: Lesson audit (every published App Builder lesson)
         run: |
           set -o pipefail
-          npm run audit:lessons -- --video videos | tee audit.txt
+          npm run audit:lessons -- --video videos --report report.json | tee audit.txt
       - name: Summary
         if: always()
         run: |
@@ -66,3 +68,11 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with: { name: guided-tutorial-videos, path: app-builder/videos/*.webm, retention-days: 30, if-no-files-found: ignore }
+      # the same as a page: pages.yml picks up the newest one and publishes it at tools.learningwaypoints.com/app-builder/audit/
+      - name: Audit page
+        if: always() && hashFiles('app-builder/report.json') != ''
+        run: node tools/audit-page.mjs videos report.json audit-page
+      - name: Upload audit page
+        if: always() && hashFiles('app-builder/audit-page/index.html') != ''
+        uses: actions/upload-artifact@v4
+        with: { name: guided-tutorial-page, path: app-builder/audit-page, retention-days: 90 }
