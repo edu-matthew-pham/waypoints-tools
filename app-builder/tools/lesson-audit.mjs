@@ -12,7 +12,8 @@
 //   --video <folder>                                   also record each guided step as a video (one .webm per step,
 //                                                      named <course>--<lesson>--<step>.webm), to watch what a student
 //                                                      following the ring sees
-import { readFileSync, readdirSync, statSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+//   --report <file.json>                               also write the results as JSON (tools/audit-page.mjs reads it)
+import { readFileSync, readdirSync, statSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { page, openApp, close, region, loadProject, watchFlips, followRing } from '../tests/browser/helpers.mjs';
 import { parseLesson, tutorialSections, TUTORIAL_LIST, LESSON_BASE } from '../src/edu/tutorial.js';
@@ -20,7 +21,8 @@ import { parseLesson, tutorialSections, TUTORIAL_LIST, LESSON_BASE } from '../sr
 const args = process.argv.slice(2);
 const content = args.includes('--content') ? args[args.indexOf('--content') + 1] : null;
 const videos = args.includes('--video') ? args[args.indexOf('--video') + 1] : null;
-const filter = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--content' && args[i - 1] !== '--video')[0] || '';
+const reportFile = args.includes('--report') ? args[args.indexOf('--report') + 1] : null;
+const filter = args.filter((a, i) => !a.startsWith('--') && !['--content', '--video', '--report'].includes(args[i - 1]))[0] || '';
 if (videos) mkdirSync(videos, { recursive: true });
 const tidy = (x) => String(x).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 
@@ -30,7 +32,9 @@ async function lessons() {
     for (const course of ['code/apps', 'code/data-apps']) {
       const dir = join(content, course);
       if (!existsSync(dir)) continue;
-      for (const l of readdirSync(dir)) {
+      // in course order (each lesson's order: line), as the published Tutorials list has them
+      const orderOf = (l) => Number(readFileSync(join(dir, l, 'lesson.md'), 'utf8').match(/^order:\s*([\d.]+)/m)?.[1] ?? 999);
+      for (const l of readdirSync(dir).filter((l) => existsSync(join(dir, l, 'lesson.md'))).sort((a, b) => orderOf(a) - orderOf(b))) {
         const d = join(dir, l);
         if (!existsSync(join(d, 'lesson.md'))) continue;
         const files = {};
@@ -51,11 +55,12 @@ async function lessons() {
 
 const all = await lessons();
 let bad = 0, total = 0, built = 0, handed = 0;
+const report = []; // { slug, title, steps: [{ title, outcome, moves, problem, video }] }
 for (const [slug, files] of Object.entries(all)) {
   if (filter && !slug.includes(filter)) continue;
   let steps;
   try { steps = parseLesson(files['lesson.md']).steps; } catch { continue; } // no guided steps (e.g. Your own app)
-  const lines = [];
+  const lines = [], rsteps = [];
   for (let i = 0; i < steps.length; i++) {
     const s = steps[i];
     if (!s.check || !s.targets.length) continue; // build steps with a clip and a code check
@@ -76,8 +81,10 @@ for (const [slug, files] of Object.entries(all)) {
       const problem = outcome.startsWith('STUCK') || idle > 0 || p.errors.length;
       if (outcome === 'built') built++; else if (outcome === 'checklist') handed++;
       if (problem) bad++;
+      rsteps.push({ title: s.title, outcome, moves: r.moves, problem: !!problem, video: videos ? `${tidy(slug.replace(/^code\//, ''))}--${tidy(s.title)}.webm` : null });
       lines.push(`  ${problem ? '✗' : '✓'} ${s.title}: ${outcome} (${r.moves} moves${during ? `, card moved ${during}×` : ''}${idle ? `, FLIPS WHILE IDLE ${idle}×` : ''})${p.errors.length ? ' errors: ' + p.errors.join(' / ') : ''}`);
     } catch (e) {
+      rsteps.push({ title: s.title, outcome: 'error: ' + String(e.message).split('\n')[0], moves: 0, problem: true, video: null });
       bad++; lines.push(`  ✗ ${s.title}: the audit couldn't run it (${String(e.message).split('\n')[0]})`);
     } finally {
       await p.context().close();
@@ -85,8 +92,10 @@ for (const [slug, files] of Object.entries(all)) {
     }
   }
   if (lines.length) console.log(slug + '\n' + lines.join('\n'));
+  if (rsteps.length) report.push({ slug, title: files['lesson.md'].match(/^title:\s*(.+)$/m)?.[1]?.replace(/^["']|["']$/g, '') || slug, steps: rsteps });
 }
 await close();
 if (videos) { rmSync(join(videos, '.raw'), { recursive: true, force: true }); console.log(`\nVideos: ${videos}/ (one per guided build step)`); }
+if (reportFile) writeFileSync(reportFile, JSON.stringify({ when: new Date().toISOString(), version: readFileSync(new URL('../src/version.js', import.meta.url), 'utf8').match(/'([\d.]+)'/)?.[1] || '', total, built, handed, problems: bad, lessons: report }, null, 1));
 console.log(`\n${total} guided build steps: ${built} built by the ring, ${handed} handed to the checklist, ${bad} with problems.`);
 process.exit(bad ? 1 : 0);
